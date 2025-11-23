@@ -1,0 +1,14 @@
+# Ignore all by default
+*
+
+# Allow essential files
+!scrape_encar_partitioned.py
+!preprocess_encar.py
+!train_model_advanced.py
+!predict_car_price.py
+!best_car_price_model.pkl
+!processed_encar_data.csv
+!requirements.txt
+!README.md
+!prediction_plot.png
+!.gitignore
