@@ -20,10 +20,15 @@ class IntegratedCarAdvisor:
     
     def __init__(self):
         # 가격 예측 모델 로드
+        import os
+        # 상위 폴더의 models 디렉토리
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
         model_files = [
-            'improved_car_price_model.pkl',
-            'best_car_price_model_improved.pkl',
-            'best_car_price_model.pkl'
+            os.path.join(base_dir, 'models', 'improved_car_price_model.pkl'),
+            os.path.join(base_dir, 'models', 'best_car_price_model_improved.pkl'),
+            os.path.join(base_dir, 'models', 'best_car_price_model.pkl'),
+            'improved_car_price_model.pkl'  # fallback to current dir
         ]
         
         self.model = None
