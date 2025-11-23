@@ -7,3 +7,9 @@ requests
 matplotlib
 seaborn
 scipy
+yfinance
+beautifulsoup4
+lxml
+python-dotenv
+selenium
+webdriver-manager

@@ -1,14 +1,55 @@
-# Ignore all by default
-*
+# API Keys and Secrets
+.env
+*.env
+*_api_key.txt
 
-# Allow essential files
-!scrape_encar_partitioned.py
-!preprocess_encar.py
-!train_model_advanced.py
-!predict_car_price.py
-!best_car_price_model.pkl
-!processed_encar_data.csv
-!requirements.txt
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+
+# Data files (large)
+data/*.csv
+!data/new_car_schedule.csv
+
+# Model files
+models/*.pkl
+models/*.h5
+models/*.pt
+
+# Output files
+*.png
+!docs/images/*.png
+*.jpg
+*.jpeg
+*.log
+results/*.json
+complete_timing_data_*.json
+timing_data_*.json
+real_timing_data_*.json
+collected_data_*.json
+timing_score_*.json
+comparison_*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints
+
+# Documentation
 !README.md
-!prediction_plot.png
-!.gitignore
+!docs/*.md

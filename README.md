@@ -1,54 +1,223 @@
-# Used Car Price Predictor (Encar) 🚗💰
+# 🚗 Car-Sentix: 중고차 구매 의사결정 지원 시스템
 
-This project collects used car data from **Encar**, trains an **XGBoost** machine learning model, and predicts the market price of domestic cars in Korea.
+**Track 1**: 가격 예측 (XGBoost)  
+**Track 2**: 타이밍 분석 (실시간 데이터 기반)
 
-## 📂 Project Structure
+> 단순한 가격 예측을 넘어, **언제 사야 할지**까지 알려주는 통합 어드바이저
 
-- **`scrape_encar_partitioned.py`**: The robust scraper that collects ~120,000 car records from Encar API using price partitioning to bypass limits.
-- **`preprocess_encar.py`**: Cleans the raw data, handles feature engineering (Car Age, Log Price), and prepares it for training.
-- **`train_model_advanced.py`**: Trains an XGBoost model with **RandomizedSearchCV** for hyperparameter tuning and **Log-transformation** for better accuracy.
-- **`predict_car_price.py`**: Inference script to predict the price of a specific car.
-- **`best_car_price_model.pkl`**: The trained and optimized model file.
-- **`processed_encar_data.csv`**: The cleaned dataset used for training (119,368 records).
+## 🎯 시스템 개요
 
-## 🚀 How to Use
+### Track 1: 가격 예측 (XGBoost)
 
-### 1. Install Dependencies
+| 지표 | 값 |
+|------|-----|
+| **R² Score** | **0.87** |
+| **MAE** | 231만원 |
+| **데이터** | 119,343대 |
+| **모델 수** | 253개 (고신뢰도) |
+
+### Track 2: 타이밍 분석 (Car-Sentix)
+
+| 지표 | 데이터 소스 |
+|------|-------------|
+| **거시경제** | 한국은행 API, Yahoo Finance |
+| **검색 트렌드** | 네이버 데이터랩 API |
+| **신차 일정** | 신차 출시 DB |
+| **커뮤니티** | 보배드림 (Selenium) |
+
+## 🎯 주요 특징
+
+✅ **통합 모델**: 하나의 모델이 모든 브랜드/모델 동시 학습  
+✅ **고성능**: R² 0.87 (Kaggle 우승 수준)  
+✅ **빠른 학습**: 11만 데이터 20분  
+✅ **해석 가능**: Feature Importance 확인 가능  
+✅ **실용적**: 실시간 예측 가능
+
+## 📂 프로젝트 구조
+
+```
+used-car-price-predictor/
+├── src/                          # 소스 코드
+│   ├── predict_car_price.py      # Track 1: 가격 예측
+│   ├── car_sentix.py             # Track 2: 타이밍 분석
+│   ├── integrated_advisor.py     # 통합 어드바이저
+│   ├── timing_engine.py          # 타이밍 점수 계산
+│   ├── data_collectors_complete.py  # 실시간 데이터 수집
+│   ├── bobaedream_scraper.py     # 보배드림 크롤러
+│   └── train_model_improved.py   # 모델 학습
+│
+├── models/                       # 학습된 모델
+│   └── improved_car_price_model.pkl
+│
+├── data/                         # 데이터
+│   ├── processed_encar_data.csv  # 중고차 데이터 (119,343대)
+│   └── new_car_schedule.csv      # 신차 출시 일정
+│
+├── docs/                         # 문서
+│   ├── TIMING_ADVISOR_PLAN.md    # 타이밍 시스템 설계
+│   ├── API_SETUP_GUIDE.md        # API 설정 가이드
+│   └── IMPLEMENTATION_STATUS.md  # 구현 현황
+│
+├── .env                          # API 키 (gitignore)
+├── requirements.txt              # 의존성
+└── README.md                     # 이 문서
+```
+
+## 🚀 사용 방법
+
+### 1. 설치
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Collect Data (Optional)
-If you want to collect fresh data:
+### 2. API 키 설정 (.env 파일)
+```bash
+# .env 파일 생성
+BOK_API_KEY=your_bok_api_key              # 한국은행 API
+NAVER_CLIENT_ID=your_naver_client_id      # 네이버 데이터랩
+NAVER_CLIENT_SECRET=your_naver_secret     # 네이버 시크릿
+```
+
+**API 발급 방법:** `docs/API_SETUP_GUIDE.md` 참조
+
+### 3. Track 1: 가격 예측만
+```bash
+cd src
+python predict_car_price.py "현대" "그랜저" 2022 50000 "가솔린"
+```
+
+**출력:**
+```
+💰 예상 가격: 3,200만원
+```
+
+### 4. Track 2: 타이밍 분석만
+```bash
+cd src
+python car_sentix.py 그랜저
+```
+
+**출력:**
+```
+📊 타이밍 점수: 54.8점 / 100점
+판단: 🔴 대기
+이유:
+  ✅ 저금리 2.5%
+  ✅ 저유가 $58
+  ❌ 신차 3.2개월 후 출시
+```
+
+### 5. 통합 분석 (가격 + 타이밍)
+```bash
+cd src
+python integrated_advisor.py 현대 그랜저 2022 50000 가솔린
+```
+
+**출력:**
+```
+💰 예상 가격: 3,200만원
+📊 타이밍 점수: 54.8점 (대기)
+
+✨ 최종 조언:
+🔴 구매를 미루시는 것을 권장합니다
+   - 만약 구매 시: 2,720만원 이하
+   - 추천: 1-2개월 후 재검토
+```
+
+### 6. 여러 차량 비교
+```bash
+cd src
+python car_sentix.py 그랜저 아반떼 K5
+```
+
+**출력:**
+```
+📊 비교 요약
+순위   차량    점수       판단
+1    K5      56.8점  🟡 관망
+2    아반떼   55.8점  🟡 관망
+3    그랜저   54.8점  🔴 대기
+```
+
+## 🔄 데이터 수집 (선택사항)
+
+새로운 데이터로 재학습하려면:
+
+### 1. 데이터 수집
 ```bash
 python scrape_encar_partitioned.py
 ```
-*Note: This takes about 10-15 minutes.*
+*약 10-15분 소요*
 
-### 3. Preprocess Data
+### 2. 전처리
 ```bash
 python preprocess_encar.py
 ```
 
-### 4. Train Model
+### 3. 모델 재학습
 ```bash
-python train_model_advanced.py
+python train_model_improved.py
 ```
-*Output: `best_car_price_model.pkl` and performance metrics.*
+*약 20-30분 소요*
 
-### 5. Predict Price
-Run the prediction script with car details:
-```bash
-# Usage: python predict_car_price.py [Brand] [Model] [Year] [Mileage] [Fuel]
-python predict_car_price.py "현대" "그랜저 IG" 2020 40000 "가솔린"
+## 📖 상세 문서
+
+### 모델 설명
+**MODEL_EXPLANATION.md** 파일에서 다음 내용을 확인하세요:
+- 예측 방식 (Step-by-Step)
+- 브랜드/모델별 처리 방법
+- 왜 XGBoost를 선택했는가
+- RNN/딥러닝을 사용하지 않는 이유
+- 피처 설명 및 복잡도 검토
+- 향후 개선 방향
+
+### 개선 이력
+**IMPROVEMENTS.md**에서 성능 개선 과정을 확인하세요:
+- Phase 1~5 개선 로드맵
+- 이전 모델 대비 개선 사항
+- 우선순위별 작업 항목
+
+## 🧪 모델 비교
+
+| 버전 | R² | RMSE | MAE | MAPE |
+|------|-----|------|-----|------|
+| **Improved** | **0.87** | **516만원** | **231만원** | **12.6%** |
+| Advanced | 0.60 | 1,127만원 | 372만원 | 15.0% |
+
+개선율: **R² +45%, MAE -38%**
+
+## 🎓 기술 스택
+
+- **Python** 3.8+
+- **XGBoost** - Gradient Boosting
+- **scikit-learn** - 전처리, 평가
+- **pandas** - 데이터 처리
+- **matplotlib/seaborn** - 시각화
+
+## 📈 성능 세부 사항
+
+### 가격대별 성능
+```
+저가 (<1000만):  MAE  94만원, MAPE 15.6%
+중저가 (1000-2000): MAE 170만원, MAPE 11.5%
+중가 (2000-4000): MAE 294만원, MAPE 10.5%
+고가 (4000+):    MAE 734만원, MAPE 12.5%
 ```
 
-## 📊 Model Performance
+### 브랜드별 평균 가격
+```
+제네시스: 3,911만원
+기아:     1,940만원
+현대:     1,855만원
+```
 
-- **MAE (Mean Absolute Error)**: ~384 Man-won (approx. 3.84 million KRW)
-- **R2 Score**: 0.53
-- **Data Coverage**: 119,368 unique domestic cars (Full Market Coverage)
+## 💡 참고
 
-## 📝 Notes
-- The model uses `log1p` transformation for the target variable to handle the wide range of car prices effectively.
-- Feature `age` is calculated as `2025 - year`.
+- 로그 변환(`log1p`) 사용으로 가격 범위 효과적 처리
+- OneHotEncoder로 421개 모델을 492개 피처로 확장
+- 샘플 가중치 적용 (고가 차량 2배, 저가 1.2배)
+- 층화 샘플링으로 가격대별 균형 유지
+
+## 📞 문의
+
+문제나 개선 제안이 있으면 이슈를 등록해주세요.
