@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class CarUserManagementApplication {
     
     public static void main(String[] args) {
-        SpringApplication.run(CarUserManagementApplication.java, args);
+        SpringApplication.run(CarUserManagementApplication.class, args);
     }
 }
 

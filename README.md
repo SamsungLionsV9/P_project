@@ -71,9 +71,14 @@ python src/integrated_advisor_real.py 현대 그랜저 2022 50000 가솔린
 
 ## 📂 프로젝트 구조 (마이크로서비스 아키텍처)
 
+> **중요**: 이 프로젝트는 2개의 독립적인 마이크로서비스로 구성됩니다!
+> 자세한 내용은 **[MICROSERVICES_GUIDE.md](MICROSERVICES_GUIDE.md)** 참조
+
 ```
 used-car-price-predictor/
-├── ml-service/                          # 🆕 ML & 자동차 분석 서비스 (FastAPI)
+├── MICROSERVICES_GUIDE.md               # 🔥 마이크로서비스 아키텍처 가이드
+│
+├── ml-service/                          # 🟢 ML & 차량 분석 서비스 (FastAPI, 포트 8000)
 │   ├── main.py                          # FastAPI 메인 애플리케이션
 │   ├── run.sh                           # 서버 실행 스크립트
 │   ├── models/                          # Pydantic 스키마
@@ -85,7 +90,7 @@ used-car-price-predictor/
 │       ├── model_loader.py              # ML 모델 로더
 │       └── validators.py                # 입력 검증
 │
-├── user-service/                        # 🆕 사용자 관리 서비스 (Spring Boot)
+├── user-service/                        # 🔵 사용자 관리 서비스 (Spring Boot, 포트 8080)
 │   ├── src/                             # Spring Boot 소스
 │   │   └── main/java/com/example/carproject/
 │   │       ├── controller/              # REST API 컨트롤러
@@ -138,38 +143,132 @@ used-car-price-predictor/
 
 ### 🌐 마이크로서비스 API 실행 (추천!)
 
-#### 1. ML 서비스 실행 (포트 8000)
+> **📘 먼저 읽어보세요**: [MICROSERVICES_GUIDE.md](MICROSERVICES_GUIDE.md)
+
+이 프로젝트는 **2개의 독립적인 서비스**로 구성됩니다:
+
+#### 🟢 ML Service (포트 8000) - 차량 관련 모든 API
 ```bash
 cd ml-service
 pip install -r requirements.txt
-./run.sh
-
-# 또는
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+**API 엔드포인트**:
+- `POST /api/predict` - 가격 예측
+- `POST /api/timing` - 타이밍 분석
+- `POST /api/smart-analysis` - 통합 분석
+- `GET /api/brands` - 브랜드 목록
+- `GET /api/models/{brand}` - 모델 목록
+- `GET /api/fuel-types` - 연료 타입 목록
+
 **API 문서**: http://localhost:8000/docs
 
-#### 2. 사용자 서비스 실행 (포트 8080)
+#### 🔵 User Service (포트 8080) - 회원 관리 전용
 ```bash
 cd user-service
 
-# MySQL 설정
-mysql.server start
+# 1. MySQL 설정
 mysql -u root -p < setup_mysql.sql
 
-# 애플리케이션 실행
+# 2. 설정 파일 생성
+cd src/main/resources
+cp application.yml.example application.yml
+# application.yml에 MySQL 비밀번호 입력
+
+# 3. 실행
+cd ../../..
 ./gradlew bootRun
 ```
 
-**주요 기능**:
-- 회원가입/로그인/로그아웃
-- JWT 인증
-- MySQL 연동
+**API 엔드포인트**:
+- `POST /api/auth/signup` - 회원가입
+- `POST /api/auth/login` - 로그인
+- `GET /api/auth/me` - 내 정보 (JWT 필요)
 
 📖 **상세 가이드**:
+- **🔥 마이크로서비스 구조**: [MICROSERVICES_GUIDE.md](MICROSERVICES_GUIDE.md)
 - ML Service: [ml-service/README.md](ml-service/README.md)
-- User Service: [SPRING_BOOT_COMPLETE.md](SPRING_BOOT_COMPLETE.md)
+- User Service: [user-service/SETUP_GUIDE.md](user-service/SETUP_GUIDE.md)
+- API 테스트: [API_TEST_RESULTS.md](API_TEST_RESULTS.md)
+
+---
+
+## 🤝 협업 가이드 (GitHub)
+
+### ⚙️ 초기 설정
+
+#### 1. 저장소 클론
+```bash
+git clone https://github.com/your-username/used-car-price-predictor.git
+cd used-car-price-predictor
+```
+
+#### 2. 설정 파일 생성
+```bash
+# Spring Boot 설정
+cd user-service/src/main/resources
+cp application.yml.example application.yml
+# application.yml 파일을 열어 MySQL 비밀번호와 JWT Secret 입력
+
+# ML Service 설정 (선택사항)
+cd ../../../ml-service
+cp .env.example .env  # (만약 .env.example이 있다면)
+```
+
+#### 3. 의존성 설치 및 실행
+자세한 내용은 [user-service/SETUP_GUIDE.md](user-service/SETUP_GUIDE.md)를 참조하세요.
+
+### 🔒 보안 주의사항
+
+#### ⚠️ 절대 커밋하지 말 것:
+- `application.yml` (실제 비밀번호 포함)
+- `.env` 파일 (API 키 포함)
+- `build/`, `target/` (빌드 결과물)
+- `*.pkl` (대용량 모델 파일, Git LFS 사용 고려)
+- `data/*.csv` (대용량 데이터 파일)
+
+#### ✅ 커밋해야 할 것:
+- `application.yml.example` (템플릿)
+- `setup_mysql.sql` (DB 스키마)
+- 모든 소스 코드
+- README 및 문서
+
+### 🌿 브랜치 전략
+
+```bash
+# 새 기능 개발
+git checkout -b feature/기능명
+# 예: git checkout -b feature/user-profile
+
+# 버그 수정
+git checkout -b fix/버그명
+# 예: git checkout -b fix/login-error
+
+# 작업 완료 후 커밋
+git add .
+git commit -m "feat: 사용자 프로필 기능 추가"
+git push origin feature/기능명
+```
+
+### 📝 커밋 메시지 규칙
+
+```
+feat: 새로운 기능 추가
+fix: 버그 수정
+docs: 문서 수정
+refactor: 코드 리팩토링
+test: 테스트 추가/수정
+style: 코드 포맷팅 (기능 변경 없음)
+chore: 빌드 설정 등 기타 변경
+```
+
+**예시:**
+```bash
+git commit -m "feat: JWT 토큰 갱신 기능 추가"
+git commit -m "fix: 로그인 시 비밀번호 검증 오류 수정"
+git commit -m "docs: SETUP_GUIDE.md 업데이트"
+```
 
 ---
 

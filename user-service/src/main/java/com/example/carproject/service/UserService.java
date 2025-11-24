@@ -5,7 +5,7 @@ import com.example.carproject.dto.UserResponseDto;
 import com.example.carproject.dto.UserSignupDto;
 import com.example.carproject.entity.User;
 import com.example.carproject.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -17,13 +17,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class UserService implements UserDetailsService {
     
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    
+    public UserService(UserRepository userRepository,
+                      PasswordEncoder passwordEncoder,
+                      @Lazy AuthenticationManager authenticationManager,
+                      JwtService jwtService) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
+    }
     
     /**
      * 회원가입

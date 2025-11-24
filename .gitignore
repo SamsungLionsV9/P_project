@@ -2,6 +2,8 @@
 .env
 *.env
 *_api_key.txt
+application.yml
+application.properties
 
 # Python
 __pycache__/
@@ -21,6 +23,8 @@ data/*.csv
 models/*.pkl
 models/*.h5
 models/*.pt
+*.pkl
+!improved_car_price_model.pkl
 
 # Output files
 *.png
@@ -57,3 +61,35 @@ Thumbs.db
 # Documentation
 !README.md
 !docs/*.md
+
+# === Spring Boot / Gradle ===
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+gradle-app.setting
+.gradletasknamecache
+
+# Compiled class files
+*.class
+*.jar
+*.war
+*.ear
+!gradle-wrapper.jar
+
+# Spring Boot
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Test results
+*.log
+*.tmp
+
+# Database files (never commit actual DB files)
+*.db
+*.sqlite
+*.sqlite3

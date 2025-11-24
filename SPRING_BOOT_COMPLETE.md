@@ -88,7 +88,8 @@ mysql -u root -p < setup_mysql.sql
 ```yaml
 spring:
   datasource:
-    password: your_actual_password  # 실제 MySQL 비밀번호로 변경!
+    username: root
+    password: Project1!
 ```
 
 ### 3️⃣ 애플리케이션 실행
