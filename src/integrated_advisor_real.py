@@ -20,8 +20,10 @@ def load_price_model():
     """가격 예측 모델 로드"""
     # 모델 경로 찾기
     possible_paths = [
+        '../models/improved_car_price_model.pkl',
         '../models/car_price_model.pkl',
         '../models/xgboost_model.pkl',
+        'models/improved_car_price_model.pkl',
         'models/car_price_model.pkl',
         'car_price_model.pkl'
     ]

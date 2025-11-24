@@ -35,6 +35,10 @@ real_timing_data_*.json
 collected_data_*.json
 timing_score_*.json
 comparison_*.json
+smart_analysis_*.json
+
+# Test files
+test_*.py
 
 # IDE
 .vscode/

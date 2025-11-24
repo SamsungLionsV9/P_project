@@ -26,7 +26,7 @@ class GroqCarAdvisor:
             raise ValueError("GROQ_API_KEY가 설정되지 않았습니다")
         
         self.client = Groq(api_key=self.api_key)
-        self.model = "llama-3.1-70b-versatile"  # 가장 똑똑한 모델
+        self.model = "llama-3.3-70b-versatile"  # 최신 모델 (2024-11)
     
     def generate_signal_report(self, vehicle_data, prediction_data, timing_data):
         """
