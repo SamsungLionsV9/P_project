@@ -236,7 +236,10 @@ def collect_complete_data(car_model):
     # 3. 커뮤니티 데이터
     print("💬 커뮤니티 데이터 수집 중...")
     
-    # 보배드림 Selenium 크롤러 사용
+    sentiment_data = None
+    posts = []
+    
+    # 방법 1: 보배드림 Selenium 크롤러 (실시간)
     try:
         from bobaedream_scraper import BobaedreamScraper
         
@@ -245,21 +248,80 @@ def collect_complete_data(car_model):
             result = scraper.collect_all(car_model, limit=50)
             posts = result['posts']
             sentiment_data = result['sentiment']
+            
+            # 데이터가 너무 적으면 실패로 간주
+            if sentiment_data['total_posts'] < 5:
+                print(f"  ⚠️ 수집된 게시글이 너무 적음 ({sentiment_data['total_posts']}개)")
+                sentiment_data = None
         finally:
             scraper.close()
             
     except Exception as e:
         print(f"  ⚠️ 보배드림 Selenium 실패: {e}")
-        print(f"  → 기본 크롤러로 대체")
-        
-        community = RealCommunityCollector()
-        posts = community.scrape_bobaedream(car_model, limit=50)
-        
-        if not posts:
-            print(f"  → 네이버 블로그로 대체")
-            posts = community.search_naver_blog(f"{car_model} 중고차", limit=50)
-        
-        sentiment_data = community.analyze_sentiment_enhanced(posts)
+    
+    # 방법 2: 기본 크롤러 (실시간)
+    if sentiment_data is None:
+        print(f"  → 기본 크롤러 시도")
+        try:
+            community = RealCommunityCollector()
+            posts = community.scrape_bobaedream(car_model, limit=50)
+            
+            if not posts:
+                print(f"  → 네이버 블로그 시도")
+                posts = community.search_naver_blog(f"{car_model} 중고차", limit=50)
+            
+            if posts and len(posts) >= 5:
+                sentiment_data = community.analyze_sentiment_enhanced(posts)
+        except Exception as e:
+            print(f"  ⚠️ 기본 크롤러 실패: {e}")
+    
+    # 방법 3: 네이버 블로그 검색 API (실제 데이터) ⭐
+    if sentiment_data is None or sentiment_data.get('total_posts', 0) < 5:
+        print(f"  → 네이버 블로그 API 사용 (실제 데이터)")
+        try:
+            from naver_blog_api import NaverBlogSentimentAnalyzer
+            
+            analyzer = NaverBlogSentimentAnalyzer()
+            sentiment_data = analyzer.collect_and_analyze(car_model)
+            
+            if sentiment_data['total_posts'] >= 10:
+                print(f"  ✅ 네이버 블로그 {sentiment_data['total_posts']}개 분석 완료")
+                print(f"    점수: {sentiment_data['score']:.1f}/10 ({sentiment_data['trend']})")
+            else:
+                print(f"  ⚠️ 데이터 부족 ({sentiment_data['total_posts']}개)")
+                sentiment_data = None
+                
+        except Exception as e:
+            print(f"  ⚠️ 네이버 블로그 API 실패: {e}")
+            sentiment_data = None
+    
+    # 방법 4: 정적 데이터베이스 (최후의 대안)
+    if sentiment_data is None or sentiment_data.get('total_posts', 0) < 5:
+        print(f"  → 모든 실시간 수집 실패, 정적 DB 사용 (참고용)")
+        try:
+            from sentiment_database import VehicleSentimentDB
+            
+            db = VehicleSentimentDB()
+            sentiment_data = db.get_sentiment(car_model)
+            
+            if sentiment_data['source'] == 'static_db':
+                print(f"  ⚠️ '{sentiment_data['model_name']}' 정적 데이터 (참고용)")
+                print(f"    점수: {sentiment_data['score']:.1f}/10 ({sentiment_data['trend']})")
+            else:
+                print(f"  ⚠️ DB에 없음, 중립값 사용")
+                
+        except Exception as e:
+            print(f"  ⚠️ 정적 DB 로드 실패: {e}")
+            # 최후의 대안: 중립값
+            sentiment_data = {
+                'score': 0,
+                'positive_ratio': 0.5,
+                'negative_ratio': 0.5,
+                'neutral_ratio': 0.0,
+                'trend': 'neutral',
+                'total_posts': 0,
+                'source': 'default'
+            }
     
     print()
     

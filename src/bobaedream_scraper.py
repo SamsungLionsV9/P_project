@@ -76,9 +76,132 @@ class BobaedreamScraper:
         
         print("  ✓ 드라이버 준비 완료")
     
+    def scrape_best_board(self, car_model, limit=50, pages=3):
+        """
+        보배드림 베스트 게시판에서 차량 관련 글 수집
+        
+        Args:
+            car_model: 차량 모델명
+            limit: 수집할 게시글 수
+            pages: 크롤링할 페이지 수
+            
+        Returns:
+            list: [{'title': '...', 'content': '...', 'date': '...', 'url': '...'}, ...]
+        """
+        print(f"🚗 보배드림 베스트 게시판 '{car_model}' 수집 중...")
+        
+        try:
+            self._init_driver()
+            
+            posts = []
+            
+            for page in range(1, pages + 1):
+                if len(posts) >= limit:
+                    break
+                
+                # 베스트 게시판 URL
+                best_url = f"https://www.bobaedream.co.kr/list?code=best&page={page}"
+                
+                print(f"  → 페이지 {page} 접속 중...")
+                self.driver.get(best_url)
+                
+                # 페이지 로딩 대기
+                time.sleep(2)
+                
+                # 페이지 소스 가져오기
+                page_source = self.driver.page_source
+                soup = BeautifulSoup(page_source, 'html.parser')
+                
+                # 게시글 목록 찾기
+                # 베스트 게시판의 실제 HTML 구조에 맞게 선택자 조정
+                selectors = [
+                    'tr.pl',  # 게시글 행
+                    'div.list-item',
+                    'li.list-item',
+                    'table.board-list tr',
+                    'div.best-list tr'
+                ]
+                
+                items = []
+                for selector in selectors:
+                    items = soup.select(selector)
+                    if items and len(items) > 5:
+                        print(f"    ✓ '{selector}' 선택자로 {len(items)}개 발견")
+                        break
+                
+                # 링크 기반 수집 (fallback)
+                if not items:
+                    items = soup.find_all('a', href=re.compile(r'view|No='))
+                    print(f"    ✓ 링크 기반으로 {len(items)}개 발견")
+                
+                page_posts = 0
+                for item in items:
+                    if len(posts) >= limit:
+                        break
+                    
+                    try:
+                        # 제목 추출
+                        title_elem = None
+                        if hasattr(item, 'find'):
+                            title_elem = item.find('a')
+                        else:
+                            title_elem = item
+                        
+                        if not title_elem:
+                            continue
+                        
+                        title = title_elem.get_text(strip=True)
+                        
+                        # 차량명이 제목에 포함되어 있는지 확인
+                        if car_model.lower() not in title.lower():
+                            continue
+                        
+                        # 제목이 너무 짧으면 스킵
+                        if len(title) < 5:
+                            continue
+                        
+                        # URL 추출
+                        url = title_elem.get('href', '')
+                        if url and not url.startswith('http'):
+                            url = 'https://www.bobaedream.co.kr' + url
+                        
+                        # 날짜 추출
+                        date = ''
+                        if hasattr(item, 'find'):
+                            date_elem = item.find(class_=re.compile(r'date|time|datetime'))
+                            if date_elem:
+                                date = date_elem.get_text(strip=True)
+                        
+                        posts.append({
+                            'title': title,
+                            'content': '',
+                            'date': date,
+                            'url': url,
+                            'source': '보배드림-베스트'
+                        })
+                        
+                        page_posts += 1
+                        
+                    except Exception as e:
+                        continue
+                
+                print(f"    ✓ 페이지 {page}에서 {page_posts}개 수집")
+                time.sleep(1)  # 페이지 간 대기
+            
+            print(f"  ✓ 보배드림 베스트에서 총 {len(posts)}개 수집")
+            
+            return posts
+            
+        except Exception as e:
+            print(f"  ✗ 보배드림 베스트 크롤링 실패: {e}")
+            return []
+        
+        finally:
+            pass
+    
     def scrape_bobaedream(self, car_model, limit=50):
         """
-        보배드림에서 실제 게시글 크롤링
+        보배드림에서 실제 게시글 크롤링 (검색 기반)
         
         Args:
             car_model: 차량 모델명
@@ -346,13 +469,18 @@ class BobaedreamScraper:
         
         all_posts = []
         
-        # 방법 1: 통합 검색
-        posts1 = self.scrape_bobaedream(car_model, limit=limit//2)
-        all_posts.extend(posts1)
+        # 방법 1: 베스트 게시판 (로그인 불필요, 인기글) ⭐
+        posts_best = self.scrape_best_board(car_model, limit=limit//2, pages=5)
+        all_posts.extend(posts_best)
         
-        # 방법 2: 중고차 게시판
+        # 방법 2: 통합 검색
+        if len(all_posts) < limit//2:
+            posts1 = self.scrape_bobaedream(car_model, limit=limit//3)
+            all_posts.extend(posts1)
+        
+        # 방법 3: 중고차 게시판
         if len(all_posts) < limit:
-            posts2 = self.scrape_bobaedream_usedcar_board(car_model, limit=limit//2)
+            posts2 = self.scrape_bobaedream_usedcar_board(car_model, limit=limit//3)
             all_posts.extend(posts2)
         
         # 중복 제거
