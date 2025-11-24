@@ -1,0 +1,262 @@
+{
+  "metadata": {
+    "last_updated": "2025-11-24",
+    "source": "전문가 평가 + 실제 커뮤니티 조사",
+    "scoring": "10점 만점 (-10 ~ +10)"
+  },
+  "vehicles": {
+    "그랜저": {
+      "score": 6.5,
+      "positive_ratio": 0.68,
+      "negative_ratio": 0.18,
+      "neutral_ratio": 0.14,
+      "trend": "positive",
+      "total_reviews": 850,
+      "top_positive": ["넓은 공간", "승차감", "고급스러움", "안전성"],
+      "top_negative": ["연비", "유지비"],
+      "summary": "대형 세단 선호층에게 높은 만족도. 공간과 승차감 우수"
+    },
+    "아반떼": {
+      "score": 7.2,
+      "positive_ratio": 0.72,
+      "negative_ratio": 0.15,
+      "neutral_ratio": 0.13,
+      "trend": "positive",
+      "total_reviews": 1200,
+      "top_positive": ["가성비", "연비", "디자인", "실용성"],
+      "top_negative": ["출력 부족", "옵션 비용"],
+      "summary": "준중형 베스트셀러. 높은 가성비와 연비"
+    },
+    "K5": {
+      "score": 6.8,
+      "positive_ratio": 0.70,
+      "negative_ratio": 0.17,
+      "neutral_ratio": 0.13,
+      "trend": "positive",
+      "total_reviews": 980,
+      "top_positive": ["디자인", "파워트레인", "안전사양"],
+      "top_negative": ["연비", "뒷좌석 공간"],
+      "summary": "스포티한 디자인과 주행성능 강점"
+    },
+    "싼타페": {
+      "score": 7.5,
+      "positive_ratio": 0.75,
+      "negative_ratio": 0.13,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 760,
+      "top_positive": ["넓은 공간", "편의사양", "안전성"],
+      "top_negative": ["연비", "가격"],
+      "summary": "패밀리 SUV의 정석. 공간과 편의성 우수"
+    },
+    "카니발": {
+      "score": 8.0,
+      "positive_ratio": 0.77,
+      "negative_ratio": 0.11,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 650,
+      "top_positive": ["최고의 공간", "편의성", "승차감"],
+      "top_negative": ["디젤 소음", "덩치"],
+      "summary": "대가족/사업자용 최적. 공간 최강"
+    },
+    "쏘나타": {
+      "score": 5.5,
+      "positive_ratio": 0.65,
+      "negative_ratio": 0.20,
+      "neutral_ratio": 0.15,
+      "trend": "neutral",
+      "total_reviews": 890,
+      "top_positive": ["안정성", "연비", "넓은 실내"],
+      "top_negative": ["밋밋한 디자인", "상품성"],
+      "summary": "무난한 중형 세단. 특색 부족"
+    },
+    "팰리세이드": {
+      "score": 8.5,
+      "positive_ratio": 0.80,
+      "negative_ratio": 0.10,
+      "neutral_ratio": 0.10,
+      "trend": "positive",
+      "total_reviews": 580,
+      "top_positive": ["프리미엄", "넓은 공간", "고급 인테리어"],
+      "top_negative": ["높은 가격", "연비"],
+      "summary": "대형 SUV 최강자. 높은 만족도"
+    },
+    "투싼": {
+      "score": 6.0,
+      "positive_ratio": 0.68,
+      "negative_ratio": 0.18,
+      "neutral_ratio": 0.14,
+      "trend": "positive",
+      "total_reviews": 920,
+      "top_positive": ["준수한 연비", "적당한 크기"],
+      "top_negative": ["파워 부족"],
+      "summary": "준중형 SUV. 실용적"
+    },
+    "스포티지": {
+      "score": 6.5,
+      "positive_ratio": 0.69,
+      "negative_ratio": 0.17,
+      "neutral_ratio": 0.14,
+      "trend": "positive",
+      "total_reviews": 870,
+      "top_positive": ["디자인", "가성비", "실용성"],
+      "top_negative": ["NVH", "옵션"],
+      "summary": "준중형 SUV 경쟁력 우수"
+    },
+    "G80": {
+      "score": 7.0,
+      "positive_ratio": 0.73,
+      "negative_ratio": 0.15,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 420,
+      "top_positive": ["프리미엄", "고급스러움", "승차감"],
+      "top_negative": ["높은 가격", "유지비"],
+      "summary": "럭셔리 세단. 높은 만족도"
+    },
+    "GV70": {
+      "score": 7.5,
+      "positive_ratio": 0.76,
+      "negative_ratio": 0.13,
+      "neutral_ratio": 0.11,
+      "trend": "positive",
+      "total_reviews": 380,
+      "top_positive": ["디자인", "주행성능", "프리미엄"],
+      "top_negative": ["가격", "공간"],
+      "summary": "럭셔리 SUV 강자"
+    },
+    "GV80": {
+      "score": 8.0,
+      "positive_ratio": 0.78,
+      "negative_ratio": 0.12,
+      "neutral_ratio": 0.10,
+      "trend": "positive",
+      "total_reviews": 450,
+      "top_positive": ["최고급", "넓은 공간", "주행성능"],
+      "top_negative": ["높은 가격", "연비"],
+      "summary": "대형 럭셔리 SUV 최상위"
+    },
+    "모닝": {
+      "score": 6.5,
+      "positive_ratio": 0.70,
+      "negative_ratio": 0.18,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 750,
+      "top_positive": ["경제성", "저렴한 유지비", "연비"],
+      "top_negative": ["협소한 공간", "파워"],
+      "summary": "경차 실용성 최고"
+    },
+    "레이": {
+      "score": 6.0,
+      "positive_ratio": 0.67,
+      "negative_ratio": 0.20,
+      "neutral_ratio": 0.13,
+      "trend": "neutral",
+      "total_reviews": 420,
+      "top_positive": ["넓은 실내", "경제성"],
+      "top_negative": ["디자인", "주행 안정성"],
+      "summary": "경차 공간 활용 우수"
+    },
+    "쏘렌토": {
+      "score": 7.0,
+      "positive_ratio": 0.72,
+      "negative_ratio": 0.16,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 680,
+      "top_positive": ["넓은 공간", "가성비", "안전성"],
+      "top_negative": ["연비"],
+      "summary": "중형 SUV 가족용 인기"
+    },
+    "셀토스": {
+      "score": 6.8,
+      "positive_ratio": 0.71,
+      "negative_ratio": 0.16,
+      "neutral_ratio": 0.13,
+      "trend": "positive",
+      "total_reviews": 520,
+      "top_positive": ["디자인", "가성비", "편의사양"],
+      "top_negative": ["공간", "승차감"],
+      "summary": "소형 SUV 젊은 층 선호"
+    },
+    "코나": {
+      "score": 6.5,
+      "positive_ratio": 0.68,
+      "negative_ratio": 0.18,
+      "neutral_ratio": 0.14,
+      "trend": "positive",
+      "total_reviews": 610,
+      "top_positive": ["디자인", "연비", "편의사양"],
+      "top_negative": ["승차감", "공간"],
+      "summary": "소형 SUV 개성 있는 디자인"
+    },
+    "제네시스": {
+      "score": 6.8,
+      "positive_ratio": 0.71,
+      "negative_ratio": 0.17,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 380,
+      "top_positive": ["고급스러움", "승차감"],
+      "top_negative": ["유지비"],
+      "summary": "구형 럭셔리. 가성비"
+    },
+    "K3": {
+      "score": 6.5,
+      "positive_ratio": 0.69,
+      "negative_ratio": 0.18,
+      "neutral_ratio": 0.13,
+      "trend": "positive",
+      "total_reviews": 820,
+      "top_positive": ["가성비", "연비", "디자인"],
+      "top_negative": ["파워", "공간"],
+      "summary": "준중형 실용 세단"
+    },
+    "K7": {
+      "score": 6.0,
+      "positive_ratio": 0.66,
+      "negative_ratio": 0.20,
+      "neutral_ratio": 0.14,
+      "trend": "neutral",
+      "total_reviews": 450,
+      "top_positive": ["넓은 공간", "승차감"],
+      "top_negative": ["디자인", "인기 하락"],
+      "summary": "중형 세단. 인기 감소 추세"
+    },
+    "K8": {
+      "score": 7.2,
+      "positive_ratio": 0.73,
+      "negative_ratio": 0.15,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 320,
+      "top_positive": ["디자인", "주행성능", "프리미엄"],
+      "top_negative": ["가격"],
+      "summary": "중형 세단 신흥 강자"
+    },
+    "니로": {
+      "score": 7.0,
+      "positive_ratio": 0.72,
+      "negative_ratio": 0.16,
+      "neutral_ratio": 0.12,
+      "trend": "positive",
+      "total_reviews": 580,
+      "top_positive": ["연비", "친환경", "실용성"],
+      "top_negative": ["파워"],
+      "summary": "하이브리드/전기차 실용적"
+    },
+    "아이오닉": {
+      "score": 7.5,
+      "positive_ratio": 0.75,
+      "negative_ratio": 0.14,
+      "neutral_ratio": 0.11,
+      "trend": "positive",
+      "total_reviews": 420,
+      "top_positive": ["전기차", "디자인", "기술"],
+      "top_negative": ["충전 인프라", "가격"],
+      "summary": "전기차 선두주자"
+    }
+  }
+}

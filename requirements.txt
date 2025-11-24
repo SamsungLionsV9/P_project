@@ -1,0 +1,22 @@
+pandas
+numpy
+scikit-learn
+xgboost
+joblib
+requests
+matplotlib
+seaborn
+scipy
+yfinance
+beautifulsoup4
+lxml
+python-dotenv
+selenium
+webdriver-manager
+groq
+
+# FastAPI 및 웹 서버
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart

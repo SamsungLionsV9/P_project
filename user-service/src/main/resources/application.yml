@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: car-user-management
+  
+  datasource:
+    url: jdbc:mysql://localhost:3306/car_database?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: root
+    password: your_password  # 실제 MySQL 비밀번호로 변경하세요
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    
+  jpa:
+    hibernate:
+      ddl-auto: update  # 개발: update, 운영: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        use_sql_comments: true
+    
+  security:
+    jwt:
+      secret: your-super-secret-key-at-least-256-bits-long-for-hs256-algorithm-please-change-this
+      expiration: 86400000  # 24시간 (밀리초)
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  error:
+    include-message: always
+    
+logging:
+  level:
+    root: INFO
+    com.example.carproject: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
