@@ -1,9 +1,25 @@
 # 🚗 Car-Sentix: 중고차 구매 의사결정 지원 시스템
 
 **Track 1**: 가격 예측 (XGBoost)  
-**Track 2**: 타이밍 분석 (실시간 데이터 기반)
+**Track 2**: 타이밍 분석 (100% 실제 데이터)
 
 > 단순한 가격 예측을 넘어, **언제 사야 할지**까지 알려주는 통합 어드바이저
+
+## ⚡ NEW: 실제 데이터 버전 (v2.0)
+
+**100% 객관적 데이터만 사용하는 신뢰성 높은 버전!**
+
+```bash
+# 실제 데이터 기반 타이밍 분석
+python src/car_sentix_real.py 그랜저
+
+# 통합 분석 (가격 + 타이밍)
+python src/integrated_advisor_real.py 현대 그랜저 2022 50000 가솔린
+```
+
+📖 **상세 가이드**: [docs/REAL_DATA_USAGE.md](docs/REAL_DATA_USAGE.md)
+
+---
 
 ## 🎯 시스템 개요
 
@@ -16,14 +32,16 @@
 | **데이터** | 119,343대 |
 | **모델 수** | 253개 (고신뢰도) |
 
-### Track 2: 타이밍 분석 (Car-Sentix)
+### Track 2: 타이밍 분석 (실제 데이터 버전 ⭐)
 
-| 지표 | 데이터 소스 |
-|------|-------------|
-| **거시경제** | 한국은행 API, Yahoo Finance |
-| **검색 트렌드** | 네이버 데이터랩 API |
-| **신차 일정** | 신차 출시 DB |
-| **커뮤니티** | 보배드림 (Selenium) |
+| 지표 | 데이터 소스 | 객관성 |
+|------|-------------|--------|
+| **거시경제** | 한국은행 API + Yahoo Finance | ✅ 100% |
+| **검색 트렌드** | 네이버 데이터랩 API | ✅ 100% |
+| **신차 일정** | CSV 데이터 | 수동 관리 |
+| **커뮤니티 감성** | ~~제외~~ | 크롤링 불가 |
+
+**가중치**: 거시경제 40% + 검색 트렌드 30% + 신차 일정 30%
 
 ## 🎯 주요 특징
 
@@ -37,26 +55,34 @@
 
 ```
 used-car-price-predictor/
-├── src/                          # 소스 코드
-│   ├── predict_car_price.py      # Track 1: 가격 예측
-│   ├── car_sentix.py             # Track 2: 타이밍 분석
-│   ├── integrated_advisor.py     # 통합 어드바이저
-│   ├── timing_engine.py          # 타이밍 점수 계산
-│   ├── data_collectors_complete.py  # 실시간 데이터 수집
-│   ├── bobaedream_scraper.py     # 보배드림 크롤러
-│   └── train_model_improved.py   # 모델 학습
+├── src/                                 # 소스 코드
+│   ├── predict_car_price.py             # Track 1: 가격 예측
+│   │
+│   ├── car_sentix_real.py              # ⭐ Track 2: 타이밍 분석 (실제 데이터)
+│   ├── integrated_advisor_real.py       # ⭐ 통합 어드바이저 (실제 데이터)
+│   ├── timing_engine_real.py            # ⭐ 타이밍 엔진 (3요소)
+│   ├── data_collectors_real_only.py     # ⭐ 실제 데이터 수집기
+│   │
+│   ├── car_sentix.py                    # (구버전) 타이밍 분석
+│   ├── integrated_advisor.py            # (구버전) 통합 어드바이저
+│   ├── timing_engine.py                 # (구버전) 타이밍 엔진
+│   ├── data_collectors_complete.py      # (구버전) 데이터 수집
+│   ├── bobaedream_scraper.py            # 보배드림 크롤러
+│   ├── sentiment_database.py            # 정적 감성 DB
+│   └── train_model_improved.py          # 모델 학습
 │
-├── models/                       # 학습된 모델
+├── models/                              # 학습된 모델
 │   └── improved_car_price_model.pkl
 │
 ├── data/                         # 데이터
 │   ├── processed_encar_data.csv  # 중고차 데이터 (119,343대)
 │   └── new_car_schedule.csv      # 신차 출시 일정
 │
-├── docs/                         # 문서
-│   ├── TIMING_ADVISOR_PLAN.md    # 타이밍 시스템 설계
-│   ├── API_SETUP_GUIDE.md        # API 설정 가이드
-│   └── IMPLEMENTATION_STATUS.md  # 구현 현황
+├── docs/                                 # 문서
+│   ├── REAL_DATA_USAGE.md               # ⭐ 실제 데이터 사용 가이드
+│   ├── TIMING_ADVISOR_PLAN.md            # 타이밍 시스템 설계
+│   ├── API_SETUP_GUIDE.md                # API 설정 가이드
+│   └── IMPLEMENTATION_STATUS.md          # 구현 현황
 │
 ├── .env                          # API 키 (gitignore)
 ├── requirements.txt              # 의존성
