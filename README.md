@@ -5,7 +5,25 @@
 
 > 단순한 가격 예측을 넘어, **언제 사야 할지**까지 알려주는 통합 어드바이저
 
-## ⚡ NEW: 실제 데이터 버전 (v2.0)
+## ⚡ NEW: Groq AI 통합 (v3.0) 🤖
+
+**데이터 분석 + LLM의 완벽한 조합!**
+
+**3대 킬러 기능:**
+1. 🚦 **AI 매수/관망 신호등** - 주식처럼 매수/관망/회피 판단
+2. 🚨 **허위 매물 탐지기** - 딜러 설명글 vs 성능기록부 자동 대조
+3. 💬 **네고 대본 생성기** - AI가 깎는 방법까지 알려줌
+
+```bash
+# 스마트 어드바이저 (데이터 + Groq AI)
+python src/smart_advisor.py 현대 그랜저 2022 35000 가솔린 3200
+```
+
+📖 **Groq 가이드**: [docs/GROQ_AI_FEATURES.md](docs/GROQ_AI_FEATURES.md)
+
+---
+
+## 💎 실제 데이터 버전 (v2.0)
 
 **100% 객관적 데이터만 사용하는 신뢰성 높은 버전!**
 
@@ -58,6 +76,9 @@ used-car-price-predictor/
 ├── src/                                 # 소스 코드
 │   ├── predict_car_price.py             # Track 1: 가격 예측
 │   │
+│   ├── smart_advisor.py                 # 🤖 스마트 어드바이저 (Groq AI)
+│   ├── groq_advisor.py                  # 🤖 Groq LLM 기능 (3대 킬러)
+│   │
 │   ├── car_sentix_real.py              # ⭐ Track 2: 타이밍 분석 (실제 데이터)
 │   ├── integrated_advisor_real.py       # ⭐ 통합 어드바이저 (실제 데이터)
 │   ├── timing_engine_real.py            # ⭐ 타이밍 엔진 (3요소)
@@ -79,6 +100,7 @@ used-car-price-predictor/
 │   └── new_car_schedule.csv      # 신차 출시 일정
 │
 ├── docs/                                 # 문서
+│   ├── GROQ_AI_FEATURES.md              # 🤖 Groq AI 킬러 기능 가이드
 │   ├── REAL_DATA_USAGE.md               # ⭐ 실제 데이터 사용 가이드
 │   ├── TIMING_ADVISOR_PLAN.md            # 타이밍 시스템 설계
 │   ├── API_SETUP_GUIDE.md                # API 설정 가이드
