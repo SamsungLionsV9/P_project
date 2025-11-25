@@ -16,9 +16,19 @@ class PredictRequest(BaseModel):
     year: int = Field(..., ge=2000, le=2025, description="연식")
     mileage: int = Field(..., ge=0, description="주행거리 (km)")
     fuel: str = Field(..., description="연료 (가솔린/디젤/LPG/하이브리드/전기)")
+    # 옵션 필드 (선택사항)
+    has_sunroof: Optional[bool] = Field(None, description="선루프 유무")
+    has_navigation: Optional[bool] = Field(None, description="네비게이션 유무")
+    has_leather_seat: Optional[bool] = Field(None, description="가죽시트 유무")
+    has_smart_key: Optional[bool] = Field(None, description="스마트키 유무")
+    has_rear_camera: Optional[bool] = Field(None, description="후방카메라 유무")
+    has_led_lamp: Optional[bool] = Field(None, description="LED 램프 유무")
+    has_heated_seat: Optional[bool] = Field(None, description="열선시트 유무")
+    has_ventilated_seat: Optional[bool] = Field(None, description="통풍시트 유무")
+    is_accident_free: Optional[bool] = Field(None, description="무사고 여부")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "brand": "현대",
                 "model": "그랜저",

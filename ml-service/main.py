@@ -8,13 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import os
 
-from .models.schemas import (
+from .schemas.schemas import (
     PredictRequest, PredictResponse,
     TimingRequest, TimingResponse,
     SmartAnalysisRequest, SmartAnalysisResponse,
     HealthResponse, BrandsResponse, ModelsResponse, FuelTypesResponse
 )
-from .services.prediction import PredictionService
+from .services.prediction_v11 import PredictionServiceV11
 from .services.timing import TimingService
 from .services.groq_service import GroqService
 from .utils.validators import (
@@ -41,7 +41,7 @@ app.add_middleware(
 )
 
 # 서비스 초기화
-prediction_service = PredictionService()
+prediction_service = PredictionServiceV11()
 timing_service = TimingService()
 groq_service = GroqService()
 
@@ -103,31 +103,33 @@ async def predict_price(request: PredictRequest):
     try:
         # 옵션 정보 수집
         options = {
-            'has_sunroof': request.has_sunroof,
-            'has_navigation': request.has_navigation,
-            'has_leather_seat': request.has_leather_seat,
-            'has_smart_key': request.has_smart_key,
-            'has_rear_camera': request.has_rear_camera,
-            'has_led_lamp': request.has_led_lamp,
-            'has_heated_seat': request.has_heated_seat,
-            'has_ventilated_seat': request.has_ventilated_seat,
-            'is_accident_free': request.is_accident_free,
+            'has_sunroof': 1 if request.has_sunroof else 0,
+            'has_navigation': 1 if request.has_navigation else 0,
+            'has_leather_seat': 1 if request.has_leather_seat else 0,
+            'has_smart_key': 1 if request.has_smart_key else 0,
+            'has_rear_camera': 1 if request.has_rear_camera else 0,
+            'has_led_lamp': 1 if request.has_led_lamp else 0,
+            'has_heated_seat': 1 if request.has_heated_seat else 0,
+            'has_ventilated_seat': 1 if request.has_ventilated_seat else 0,
         }
         
-        # 가격 예측
-        result = prediction_service.predict_price(
+        # 무사고 여부
+        accident_free = request.is_accident_free if request.is_accident_free else True
+        
+        # 가격 예측 (V11 서비스)
+        result = prediction_service.predict(
             brand=request.brand,
             model_name=request.model,
             year=request.year,
             mileage=request.mileage,
-            fuel=request.fuel,
-            options=options
+            options=options,
+            accident_free=accident_free
         )
         
         return PredictResponse(
-            predicted_price=result['predicted_price'],
-            price_range=result['price_range'],
-            confidence=result['confidence']
+            predicted_price=result.predicted_price,
+            price_range=list(result.price_range),
+            confidence=result.confidence / 100.0  # 0-100 -> 0-1
         )
         
     except Exception as e:
@@ -217,13 +219,12 @@ async def smart_analysis(request: SmartAnalysisRequest):
         })
     
     try:
-        # 1. 가격 예측
-        prediction_result = prediction_service.predict_price(
+        # 1. 가격 예측 (V11 서비스)
+        prediction_result = prediction_service.predict(
             brand=request.brand,
             model_name=request.model,
             year=request.year,
-            mileage=request.mileage,
-            fuel=request.fuel
+            mileage=request.mileage
         )
         
         # 2. 타이밍 분석
@@ -242,7 +243,7 @@ async def smart_analysis(request: SmartAnalysisRequest):
             }
             
             prediction_data = {
-                'predicted_price': prediction_result['predicted_price']
+                'predicted_price': prediction_result.predicted_price
             }
             
             timing_data = {
@@ -285,9 +286,9 @@ async def smart_analysis(request: SmartAnalysisRequest):
         # 응답 생성
         return SmartAnalysisResponse(
             prediction=PredictResponse(
-                predicted_price=prediction_result['predicted_price'],
-                price_range=prediction_result['price_range'],
-                confidence=prediction_result['confidence']
+                predicted_price=prediction_result.predicted_price,
+                price_range=list(prediction_result.price_range),
+                confidence=prediction_result.confidence / 100.0
             ),
             timing=TimingResponse(
                 timing_score=timing_result['timing_score'],

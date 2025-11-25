@@ -11,8 +11,7 @@ import os
 from typing import Dict, Tuple
 
 # MSRP 데이터 임포트
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from msrp_data import DOMESTIC_MSRP, IMPORTED_MSRP, get_msrp
+from ..utils.msrp_data import DOMESTIC_MSRP, IMPORTED_MSRP, get_msrp
 
 from ..utils.model_loader import get_model_loader
 
