@@ -117,11 +117,15 @@ curl http://localhost:8000/api/health
 |------|------|----------|
 | **setup_mysql.sql** | MySQL DB 생성 스크립트 | ✅ 필수 |
 | **application.yml.example** | Spring Boot 설정 템플릿 | ✅ 필수 |
+| **env.example** | 환경 변수 템플릿 | ⭕ 선택 |
+| **oauth2_schema_update.sql** | 소셜 로그인 DB 스키마 | ⭕ 선택 |
+| **OAUTH2_SETUP_GUIDE.md** | 소셜 로그인 설정 가이드 | ⭕ 선택 |
 
 **사용 방법:**
 1. `application.yml.example` → `application.yml`로 복사
 2. MySQL 비밀번호 입력
 3. JWT Secret 생성 후 입력
+4. (선택) 소셜 로그인 사용 시 `oauth2_schema_update.sql` 실행
 
 ---
 
