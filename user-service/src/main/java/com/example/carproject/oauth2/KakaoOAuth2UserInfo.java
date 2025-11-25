@@ -5,6 +5,7 @@ import java.util.Map;
 /**
  * Kakao OAuth2 사용자 정보
  */
+@SuppressWarnings("unchecked")
 public class KakaoOAuth2UserInfo extends OAuth2UserInfo {
     
     public KakaoOAuth2UserInfo(Map<String, Object> attributes) {
@@ -18,9 +19,9 @@ public class KakaoOAuth2UserInfo extends OAuth2UserInfo {
     
     @Override
     public String getName() {
-        Map<String, Object> properties = (Map<String, Object>) attributes.get("properties");
+        Map<String, Object> properties = getMapAttribute("properties");
         if (properties == null) {
-            Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+            Map<String, Object> kakaoAccount = getMapAttribute("kakao_account");
             if (kakaoAccount != null) {
                 Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
                 if (profile != null) {
@@ -34,7 +35,7 @@ public class KakaoOAuth2UserInfo extends OAuth2UserInfo {
     
     @Override
     public String getEmail() {
-        Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+        Map<String, Object> kakaoAccount = getMapAttribute("kakao_account");
         if (kakaoAccount == null) {
             return null;
         }
@@ -43,9 +44,9 @@ public class KakaoOAuth2UserInfo extends OAuth2UserInfo {
     
     @Override
     public String getImageUrl() {
-        Map<String, Object> properties = (Map<String, Object>) attributes.get("properties");
+        Map<String, Object> properties = getMapAttribute("properties");
         if (properties == null) {
-            Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+            Map<String, Object> kakaoAccount = getMapAttribute("kakao_account");
             if (kakaoAccount != null) {
                 Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
                 if (profile != null) {
@@ -55,6 +56,10 @@ public class KakaoOAuth2UserInfo extends OAuth2UserInfo {
             return null;
         }
         return (String) properties.get("profile_image");
+    }
+    
+    private Map<String, Object> getMapAttribute(String key) {
+        return (Map<String, Object>) attributes.get(key);
     }
 }
 

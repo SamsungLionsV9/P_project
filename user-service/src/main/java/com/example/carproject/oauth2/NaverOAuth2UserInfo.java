@@ -5,15 +5,18 @@ import java.util.Map;
 /**
  * Naver OAuth2 사용자 정보
  */
+@SuppressWarnings("unchecked")
 public class NaverOAuth2UserInfo extends OAuth2UserInfo {
+    
+    private final Map<String, Object> response;
     
     public NaverOAuth2UserInfo(Map<String, Object> attributes) {
         super(attributes);
+        this.response = (Map<String, Object>) attributes.get("response");
     }
     
     @Override
     public String getId() {
-        Map<String, Object> response = (Map<String, Object>) attributes.get("response");
         if (response == null) {
             return null;
         }
@@ -22,7 +25,6 @@ public class NaverOAuth2UserInfo extends OAuth2UserInfo {
     
     @Override
     public String getName() {
-        Map<String, Object> response = (Map<String, Object>) attributes.get("response");
         if (response == null) {
             return null;
         }
@@ -31,7 +33,6 @@ public class NaverOAuth2UserInfo extends OAuth2UserInfo {
     
     @Override
     public String getEmail() {
-        Map<String, Object> response = (Map<String, Object>) attributes.get("response");
         if (response == null) {
             return null;
         }
@@ -40,7 +41,6 @@ public class NaverOAuth2UserInfo extends OAuth2UserInfo {
     
     @Override
     public String getImageUrl() {
-        Map<String, Object> response = (Map<String, Object>) attributes.get("response");
         if (response == null) {
             return null;
         }
