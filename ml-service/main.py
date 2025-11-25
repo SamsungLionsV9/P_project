@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import os
 
-from .schemas.schemas import (
+from .models.schemas import (
     PredictRequest, PredictResponse,
     TimingRequest, TimingResponse,
     SmartAnalysisRequest, SmartAnalysisResponse,
@@ -101,13 +101,27 @@ async def predict_price(request: PredictRequest):
         })
     
     try:
+        # 옵션 정보 수집
+        options = {
+            'has_sunroof': request.has_sunroof,
+            'has_navigation': request.has_navigation,
+            'has_leather_seat': request.has_leather_seat,
+            'has_smart_key': request.has_smart_key,
+            'has_rear_camera': request.has_rear_camera,
+            'has_led_lamp': request.has_led_lamp,
+            'has_heated_seat': request.has_heated_seat,
+            'has_ventilated_seat': request.has_ventilated_seat,
+            'is_accident_free': request.is_accident_free,
+        }
+        
         # 가격 예측
         result = prediction_service.predict_price(
             brand=request.brand,
             model_name=request.model,
             year=request.year,
             mileage=request.mileage,
-            fuel=request.fuel
+            fuel=request.fuel,
+            options=options
         )
         
         return PredictResponse(

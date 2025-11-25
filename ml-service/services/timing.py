@@ -8,19 +8,31 @@ import os
 from pathlib import Path
 from typing import Dict
 
-# src 폴더를 import path에 추가
-src_path = Path(__file__).parent.parent.parent / 'src'
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
-
+# 1. 같은 폴더의 data_collectors 사용
 try:
-    from data_collectors_real_only import collect_real_data_only
+    from .data_collectors import collect_real_data_only
+    print("✓ data_collectors 임포트 성공 (ml-service 내부)")
+except ImportError:
+    # 2. Fallback: src 폴더에서
+    src_path = Path(__file__).parent.parent.parent / 'src'
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
+    try:
+        from data_collectors_real_only import collect_real_data_only
+        print("✓ data_collectors 임포트 성공 (src 폴더)")
+    except ImportError as e:
+        print(f"⚠️ data_collectors 없음: {e}")
+        collect_real_data_only = None
+
+# timing_engine은 src에서 가져옴
+try:
+    src_path = Path(__file__).parent.parent.parent / 'src'
+    if str(src_path) not in sys.path:
+        sys.path.insert(0, str(src_path))
     from timing_engine_real import RealTimingEngine
+    print("✓ RealTimingEngine 임포트 성공")
 except ImportError as e:
-    print(f"⚠️ Import 경고: {e}")
-    print(f"src 경로: {src_path}")
-    # Fallback: 없으면 None
-    collect_real_data_only = None
+    print(f"⚠️ RealTimingEngine 없음: {e}")
     RealTimingEngine = None
 
 
