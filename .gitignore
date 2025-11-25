@@ -1,59 +1,35 @@
-# API Keys and Secrets
+# Environment files
 .env
 *.env
-*_api_key.txt
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 .Python
 venv/
-ENV/
-env/
+.venv/
 
-# Data files (large)
-data/*.csv
-!data/new_car_schedule.csv
-
-# Model files
-models/*.pkl
-models/*.h5
-models/*.pt
-
-# Output files
-*.png
-!docs/images/*.png
-*.jpg
-*.jpeg
-*.log
-results/*.json
-complete_timing_data_*.json
-timing_data_*.json
-real_timing_data_*.json
-collected_data_*.json
-timing_score_*.json
-comparison_*.json
-smart_analysis_*.json
-
-# Test files
-test_*.py
+# Data files (too large)
+data/
+*.csv
+!models/*.csv
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
-*.swo
-*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Jupyter
-.ipynb_checkpoints
+# SDK
+flutter_sdk/
 
-# Documentation
-!README.md
-!docs/*.md
+# Logs
+*.log
+
+# Temporary
+*.tmp
+*.bak
