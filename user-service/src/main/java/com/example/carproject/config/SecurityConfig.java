@@ -1,7 +1,6 @@
 package com.example.carproject.config;
 
 import com.example.carproject.security.JwtAuthenticationFilter;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
