@@ -29,11 +29,23 @@ public class User implements UserDetails {
     @Column(unique = true, nullable = false, length = 100)
     private String email;
     
-    @Column(nullable = false)
+    @Column(nullable = true)  // 소셜 로그인 시 비밀번호 없음
     private String password;
     
     @Column(length = 20)
     private String phoneNumber;
+    
+    // 소셜 로그인 관련 필드
+    @Column(length = 20)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private Provider provider = Provider.LOCAL;
+    
+    @Column(length = 100)
+    private String providerId;  // 소셜 로그인 제공자의 사용자 ID
+    
+    @Column(length = 500)
+    private String profileImageUrl;  // 프로필 이미지 URL
     
     @Column(length = 10)
     @Enumerated(EnumType.STRING)
@@ -94,6 +106,14 @@ public class User implements UserDetails {
     
     public enum Role {
         USER, ADMIN
+    }
+    
+    // 소셜 로그인 제공자
+    public enum Provider {
+        LOCAL,   // 일반 회원가입
+        GOOGLE,  // 구글
+        NAVER,   // 네이버
+        KAKAO    // 카카오
     }
 }
 
