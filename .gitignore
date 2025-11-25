@@ -10,10 +10,17 @@ __pycache__/
 venv/
 .venv/
 
-# Data files (too large)
-data/
-*.csv
-!models/*.csv
+# Data files - intermediate files only
+data/checkpoint*.json
+data/fast_*.csv
+data/supplement_*.csv
+data/encar_dom_*.csv
+data/encar_detailed_*.csv
+data/processed_*.csv
+
+# Keep main data files
+# data/complete_domestic_details.csv - 국산차 최종 (14.6MB)
+# data/complete_imported_details.csv - 수입차 최종 (6.0MB)
 
 # IDE
 .idea/
