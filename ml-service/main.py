@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import os
 
-from .models.schemas import (
+from .schemas.schemas import (
     PredictRequest, PredictResponse,
     TimingRequest, TimingResponse,
     SmartAnalysisRequest, SmartAnalysisResponse,
