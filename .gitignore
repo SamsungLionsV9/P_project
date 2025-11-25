@@ -3,7 +3,10 @@
 *.env
 *_api_key.txt
 application.yml
+**/application.yml
 application.properties
+**/application.properties
+client_secret*.json
 
 # Python
 __pycache__/

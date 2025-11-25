@@ -30,25 +30,25 @@ spring:
         registration:
           # Google 소셜 로그인
           google:
-            client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
-            client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+            client-id: 1035321468876-e997jqubsefdrmgsp8m1h21oqs90f17v.apps.googleusercontent.com
+            client-secret: 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
             scope: profile, email
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
           
           # Naver 소셜 로그인
           naver:
-            client-id: ${NAVER_CLIENT_ID:your-naver-client-id}
-            client-secret: ${NAVER_CLIENT_SECRET:your-naver-client-secret}
-            scope: name, email, profile_image
+            client-id: k0DmfhChAiLbSox1P7wc
+            client-secret: LH7_hF49Ox
+            scope: name, email, nickname
             client-name: Naver
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
           
           # Kakao 소셜 로그인
           kakao:
-            client-id: ${KAKAO_CLIENT_ID:your-kakao-client-id}
-            client-secret: ${KAKAO_CLIENT_SECRET:your-kakao-client-secret}
-            scope: profile_nickname, account_email
+            client-id: 2649e059472fae651af691c33bdc296b
+            client-secret: i3tzOASVZcUYlTuCWIAiIkEGHC6b3rmn
+            scope: profile_nickname
             client-name: Kakao
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
