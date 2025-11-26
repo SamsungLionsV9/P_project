@@ -40,6 +40,9 @@ dependencies:
   # WebView (소셜 로그인 OAuth용)
   webview_flutter: ^4.4.2
   
+  # 로컬 데이터 저장 (토큰 등)
+  shared_preferences: ^2.2.2
+  
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8

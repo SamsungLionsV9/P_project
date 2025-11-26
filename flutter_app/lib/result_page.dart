@@ -26,6 +26,11 @@ class ResultPage extends StatefulWidget {
 
 class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ApiService _api = ApiService();
+  
+  // 비슷한 차량 데이터
+  SimilarResult? _similarResult;
+  bool _loadingSimilar = true;
   
   // 편의를 위한 getter
   SmartAnalysisResult get result => widget.analysisResult;
@@ -36,6 +41,25 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadSimilarData();
+  }
+  
+  Future<void> _loadSimilarData() async {
+    try {
+      final similar = await _api.getSimilar(
+        brand: widget.brand,
+        model: widget.model,
+        year: widget.year,
+        mileage: widget.mileage,
+        predictedPrice: prediction.predictedPrice,
+      );
+      setState(() {
+        _similarResult = similar;
+        _loadingSimilar = false;
+      });
+    } catch (e) {
+      setState(() => _loadingSimilar = false);
+    }
   }
 
   @override
@@ -250,16 +274,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                   "최근 3개월 거래 데이터 기준",
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
-                const SizedBox(height: 30),
-                SizedBox(
-                  height: 200,
-                  child: Center(
-                    child: Text(
-                      "가격 분포 그래프 (준비중)",
-                      style: TextStyle(color: Colors.grey[400]),
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 20),
+                _buildSimilarDistribution(cardColor, textColor),
               ],
             ),
           ),
@@ -707,5 +723,163 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     if (score >= 70) return const Color(0xFF00C853);
     if (score >= 50) return const Color(0xFFFFAB00);
     return Colors.red;
+  }
+  
+  /// 비슷한 차량 분포 위젯
+  Widget _buildSimilarDistribution(Color cardColor, Color textColor) {
+    if (_loadingSimilar) {
+      return const SizedBox(
+        height: 180,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
+    if (_similarResult == null || _similarResult!.similarCount == 0) {
+      return SizedBox(
+        height: 100,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off, color: Colors.grey[400], size: 32),
+              const SizedBox(height: 8),
+              Text("비슷한 차량 데이터가 부족합니다", style: TextStyle(color: Colors.grey[400])),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    final similar = _similarResult!;
+    final dist = similar.priceDistribution;
+    final histogram = similar.histogram;
+    
+    // 히스토그램 최대값
+    final maxCount = histogram.isEmpty ? 1 : histogram.map((h) => h['count'] as int).reduce((a, b) => a > b ? a : b);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 통계 요약
+        if (dist != null) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildStatItem("최저", "${(dist['min'] as num).toInt()}만", Colors.blue),
+              _buildStatItem("중앙", "${(dist['median'] as num).toInt()}만", Colors.green),
+              _buildStatItem("최고", "${(dist['max'] as num).toInt()}만", Colors.orange),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+        
+        // 히스토그램
+        if (histogram.isNotEmpty) ...[
+          SizedBox(
+            height: 120,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: histogram.map((bar) {
+                final count = bar['count'] as int;
+                final rangeMin = bar['range_min'] as int;
+                final rangeMax = bar['range_max'] as int;
+                final height = maxCount > 0 ? (count / maxCount) * 100 : 0.0;
+                final predictedInRange = prediction.predictedPrice >= rangeMin && 
+                                         prediction.predictedPrice < rangeMax;
+                
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          count > 0 ? "$count" : "",
+                          style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          height: height,
+                          decoration: BoxDecoration(
+                            color: predictedInRange 
+                                ? const Color(0xFF0066FF) 
+                                : const Color(0xFF0066FF).withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // X축 라벨
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("${histogram.first['range_min']}만", 
+                  style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+              Text("${histogram.last['range_max']}만", 
+                  style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+            ],
+          ),
+        ],
+        
+        const SizedBox(height: 16),
+        
+        // 내 위치
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _getPositionColor(similar.positionColor).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _getPositionColor(similar.positionColor).withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.place, color: _getPositionColor(similar.positionColor), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "예측가 ${_formatPrice(prediction.predictedPrice)}만원은 ${similar.yourPosition}",
+                  style: TextStyle(
+                    color: _getPositionColor(similar.positionColor),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 8),
+        Text(
+          "비교 대상: ${similar.similarCount}대",
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+      ],
+    );
+  }
+  
+  Color _getPositionColor(String color) {
+    switch (color) {
+      case 'green': return const Color(0xFF00C853);
+      case 'blue': return const Color(0xFF0066FF);
+      case 'orange': return const Color(0xFFFF9800);
+      case 'red': return Colors.red;
+      default: return Colors.grey;
+    }
   }
 }

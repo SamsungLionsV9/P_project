@@ -331,11 +331,22 @@ class PredictionServiceV12:
             predicted_price = base_price + opt_total
             mape = 12.0  # V14 MAPE
         
-        # 신뢰도
-        confidence = max(0, 100 - mape * 5)
+        # 신뢰도 (MAPE 기반 - 개선된 공식)
+        # MAPE 5% 이하: 95%+, MAPE 10%: 85%, MAPE 15%: 75%
+        confidence = max(50, min(98, 95 - (mape - 5) * 2))
         
-        # 가격 범위
-        error_margin = predicted_price * (mape / 100)
+        # 옵션 개수에 따른 불확실성 추가
+        opt_count = sum(1 for v in options.values() if v)
+        opt_uncertainty = opt_count * 0.5  # 옵션당 0.5% 추가 불확실성
+        
+        # 연료에 따른 불확실성
+        fuel_uncertainty = {'하이브리드': 1.5, 'LPG': 2.0, '디젤': 0.5}.get(fuel_norm, 0)
+        
+        # 총 불확실성
+        total_mape = mape + opt_uncertainty + fuel_uncertainty
+        
+        # 가격 범위 (옵션/연료 반영)
+        error_margin = predicted_price * (total_mape / 100)
         price_range = (predicted_price - error_margin, predicted_price + error_margin)
         
         # 분해
