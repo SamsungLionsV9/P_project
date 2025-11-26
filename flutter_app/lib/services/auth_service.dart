@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 인증 서비스 - 로그인/로그아웃 및 소셜 로그인 관리
+/// 토큰 영속성 지원 (SharedPreferences)
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
@@ -17,15 +19,74 @@ class AuthService {
     return 'http://localhost:8080/api';
   }
 
+  // SharedPreferences 키
+  static const String _tokenKey = 'auth_token';
+  static const String _emailKey = 'auth_email';
+  static const String _providerKey = 'auth_provider';
+  static const String _userIdKey = 'auth_user_id';
+
   // 현재 로그인 상태
   String? _token;
   String? _userEmail;
   String? _provider;
+  String? _userId;
 
   bool get isLoggedIn => _token != null;
   String? get userEmail => _userEmail;
   String? get provider => _provider;
   String? get token => _token;
+  String? get userId => _userId;
+
+  /// 앱 시작 시 저장된 토큰 로드
+  Future<void> loadSavedToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString(_tokenKey);
+      _userEmail = prefs.getString(_emailKey);
+      _provider = prefs.getString(_providerKey);
+      _userId = prefs.getString(_userIdKey);
+      
+      if (_token != null) {
+        debugPrint('🔑 저장된 토큰 로드 완료: $_userEmail');
+      }
+    } catch (e) {
+      debugPrint('토큰 로드 에러: $e');
+    }
+  }
+
+  /// 토큰 저장
+  Future<void> _saveToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_token != null) {
+        await prefs.setString(_tokenKey, _token!);
+      }
+      if (_userEmail != null) {
+        await prefs.setString(_emailKey, _userEmail!);
+      }
+      if (_provider != null) {
+        await prefs.setString(_providerKey, _provider!);
+      }
+      if (_userId != null) {
+        await prefs.setString(_userIdKey, _userId!);
+      }
+    } catch (e) {
+      debugPrint('토큰 저장 에러: $e');
+    }
+  }
+
+  /// 토큰 삭제
+  Future<void> _clearToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+      await prefs.remove(_emailKey);
+      await prefs.remove(_providerKey);
+      await prefs.remove(_userIdKey);
+    } catch (e) {
+      debugPrint('토큰 삭제 에러: $e');
+    }
+  }
 
   /// 이메일/비밀번호 로그인
   Future<Map<String, dynamic>> login(String email, String password) async {
@@ -42,6 +103,8 @@ class AuthService {
         _token = data['token'];
         _userEmail = email;
         _provider = 'email';
+        _userId = data['user']?['id']?.toString();
+        await _saveToken();  // 토큰 저장
         return {'success': true, 'message': '로그인 성공'};
       }
       
@@ -144,10 +207,12 @@ class AuthService {
   }
 
   /// 로그아웃
-  void logout() {
+  Future<void> logout() async {
     _token = null;
     _userEmail = null;
     _provider = null;
+    _userId = null;
+    await _clearToken();  // 저장된 토큰 삭제
     debugPrint('로그아웃 완료');
   }
 
