@@ -16,6 +16,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 public class UserService implements UserDetailsService {
     
@@ -23,15 +25,18 @@ public class UserService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final EmailVerificationService emailVerificationService;
     
     public UserService(UserRepository userRepository,
                       PasswordEncoder passwordEncoder,
                       @Lazy AuthenticationManager authenticationManager,
-                      JwtService jwtService) {
+                      JwtService jwtService,
+                      EmailVerificationService emailVerificationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.emailVerificationService = emailVerificationService;
     }
     
     /**
@@ -39,11 +44,26 @@ public class UserService implements UserDetailsService {
      */
     @Transactional
     public UserResponseDto signup(UserSignupDto dto) {
-        // 중복 체크
-        if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다");
+        // 이메일 인증 확인
+        if (!emailVerificationService.isEmailVerified(dto.getEmail())) {
+            throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다. 먼저 이메일 인증을 완료해주세요.");
         }
-        if (userRepository.existsByUsername(dto.getUsername())) {
+        
+        // 기존 사용자 확인 (비활성화된 사용자 포함)
+        Optional<User> existingUserByEmail = userRepository.findByEmail(dto.getEmail());
+        if (existingUserByEmail.isPresent()) {
+            User existingUser = existingUserByEmail.get();
+            if (existingUser.getIsActive()) {
+                throw new IllegalArgumentException("이미 사용 중인 이메일입니다");
+            } else {
+                // 비활성화된 사용자가 있으면 삭제
+                userRepository.delete(existingUser);
+            }
+        }
+        
+        // 사용자명 중복 체크 (활성 사용자만)
+        Optional<User> existingUserByUsername = userRepository.findByUsername(dto.getUsername());
+        if (existingUserByUsername.isPresent() && existingUserByUsername.get().getIsActive()) {
             throw new IllegalArgumentException("이미 사용 중인 사용자명입니다");
         }
         

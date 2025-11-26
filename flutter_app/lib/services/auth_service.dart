@@ -13,7 +13,11 @@ class AuthService {
 
   // 백엔드 URL (Spring Boot)
   static String get _baseUrl {
-    if (!kIsWeb && Platform.isAndroid) {
+    if (kIsWeb) {
+      // 웹 환경에서는 현재 호스트의 8080 포트 사용
+      return 'http://localhost:8080/api';
+    }
+    if (Platform.isAndroid) {
       return 'http://10.0.2.2:8080/api';
     }
     return 'http://localhost:8080/api';
@@ -165,6 +169,7 @@ class AuthService {
           'email': email,
           'password': password,
           'username': name,  // 백엔드는 username 필드를 기대
+          'phoneNumber': null,  // 선택적 필드
         }),
       ).timeout(const Duration(seconds: 15));
 
@@ -177,7 +182,7 @@ class AuthService {
       return {'success': false, 'message': data['message'] ?? '회원가입 실패'};
     } catch (e) {
       debugPrint('회원가입 에러: $e');
-      return {'success': false, 'message': '서버 연결 실패'};
+      return {'success': false, 'message': '서버 연결 실패: $e'};
     }
   }
 

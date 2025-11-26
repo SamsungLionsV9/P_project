@@ -32,7 +32,7 @@ public class EmailVerificationService {
     /**
      * 인증 코드 생성 및 이메일 발송
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void sendVerificationCode(String email) {
         // 6자리 인증 코드 생성
         String code = generateCode();
@@ -66,7 +66,7 @@ public class EmailVerificationService {
     /**
      * 인증 코드 검증
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public boolean verifyCode(String email, String code) {
         Optional<EmailVerification> verificationOpt = 
             verificationRepository.findByEmailAndCodeAndVerifiedFalse(email, code);
@@ -94,6 +94,7 @@ public class EmailVerificationService {
     /**
      * 이메일 인증 완료 여부 확인
      */
+    @Transactional(readOnly = true)
     public boolean isEmailVerified(String email) {
         Optional<EmailVerification> verificationOpt = 
             verificationRepository.findTopByEmailOrderByCreatedAtDesc(email);

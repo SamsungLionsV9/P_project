@@ -59,6 +59,7 @@ public class SecurityConfig {
                                 "/api/auth/login", 
                                 "/api/auth/health", 
                                 "/api/auth/logout",
+                                "/api/auth/email/**",  // 이메일 인증 엔드포인트
                                 // OAuth2 관련 엔드포인트
                                 "/oauth2/**",
                                 "/login/oauth2/**"
@@ -85,16 +86,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",   // React 개발 서버
-                "http://localhost:8080",   // 로컬 서버
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:8080"
+        // Flutter 웹은 개발 시 동적 포트를 사용하므로 패턴으로 허용
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:*",      // 모든 localhost 포트 허용
+                "http://127.0.0.1:*"       // 모든 127.0.0.1 포트 허용
         ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);  // OAuth2에서 필요
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setMaxAge(3600L);  // preflight 캐시 1시간
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
