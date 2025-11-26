@@ -94,9 +94,22 @@ class SimilarVehicleService:
         if len(similar) == 0:
             return self._empty_result()
         
-        prices = similar['price'].values
+        # 가격 배열에서 이상치 제거 (IQR 방법)
+        prices_raw = similar['price'].values
+        q1, q3 = np.percentile(prices_raw, [25, 75])
+        iqr = q3 - q1
+        lower_bound = max(q1 - 1.5 * iqr, 100)  # 최소 100만원
+        upper_bound = min(q3 + 1.5 * iqr, 10000)  # 최대 1억
         
-        # 가격 분포 계산
+        prices = prices_raw[(prices_raw >= lower_bound) & (prices_raw <= upper_bound)]
+        
+        if len(prices) < 3:
+            prices = prices_raw[(prices_raw >= 100) & (prices_raw <= 10000)]
+        
+        if len(prices) == 0:
+            return self._empty_result()
+        
+        # 가격 분포 계산 (이상치 제거된 데이터)
         distribution = {
             "min": float(np.min(prices)),
             "q1": float(np.percentile(prices, 25)),
@@ -107,13 +120,25 @@ class SimilarVehicleService:
             "std": float(np.std(prices))
         }
         
-        # 히스토그램 생성
-        bin_width = 500 if np.max(prices) > 5000 else 200
+        # 히스토그램 생성 (적절한 bin 크기)
+        price_range = np.max(prices) - np.min(prices)
+        if price_range > 3000:
+            bin_width = 500
+        elif price_range > 1000:
+            bin_width = 200
+        else:
+            bin_width = 100
+            
         bins = np.arange(
             int(np.min(prices) // bin_width) * bin_width,
             int(np.max(prices) // bin_width + 2) * bin_width,
             bin_width
         )
+        
+        # bin 개수 제한 (최대 12개)
+        if len(bins) > 13:
+            bins = np.linspace(np.min(prices), np.max(prices), 11)
+            
         hist, edges = np.histogram(prices, bins=bins)
         
         histogram = []
@@ -152,7 +177,7 @@ class SimilarVehicleService:
             })
         
         return {
-            "similar_count": len(similar),
+            "similar_count": len(prices),  # 이상치 제거 후 개수
             "price_distribution": distribution,
             "histogram": histogram,
             "your_price": predicted_price,
