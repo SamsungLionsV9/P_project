@@ -2,21 +2,25 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'auth_service.dart';
 
 /// Car-Sentix API Service
 /// ML 서비스와 통신하는 클라이언트
 /// 
-/// 고도화 버전 v2.0
+/// 고도화 버전 v2.1
 /// - 에뮬레이터 자동 감지 (Android: 10.0.2.2)
 /// - 타임아웃 설정 (15초)
 /// - 에러 핸들링 강화
-/// - 연결 상태 확인
+/// - JWT 인증 헤더 지원
 class ApiService {
   // 서버 포트
   static const int _port = 8001;
   
   // 타임아웃 설정
   static const Duration _timeout = Duration(seconds: 15);
+  
+  // AuthService 참조
+  final AuthService _authService = AuthService();
   
   // 베이스 URL (플랫폼에 따라 자동 설정)
   static String get _baseUrl {
@@ -37,6 +41,18 @@ class ApiService {
   
   /// 현재 사용 중인 URL 확인 (디버깅용)
   String get currentBaseUrl => _baseUrl;
+  
+  /// 인증 헤더 생성
+  Map<String, String> get _headers {
+    final headers = {'Content-Type': 'application/json'};
+    if (_authService.token != null) {
+      headers['Authorization'] = 'Bearer ${_authService.token}';
+    }
+    return headers;
+  }
+  
+  /// 사용자 ID (로그인 시) 또는 guest
+  String get _userId => _authService.userId ?? 'guest';
 
   /// 가격 예측
   Future<PredictionResult> predict({
@@ -231,7 +247,8 @@ class ApiService {
   /// 검색 이력
   Future<List<SearchHistory>> getHistory({int limit = 10}) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/history?limit=$limit'),
+      Uri.parse('$_baseUrl/history?user_id=$_userId&limit=$limit'),
+      headers: _headers,
     );
 
     if (response.statusCode == 200) {
@@ -305,7 +322,8 @@ class ApiService {
   /// 즐겨찾기 목록 조회
   Future<List<Favorite>> getFavorites() async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/favorites'),
+      Uri.parse('$_baseUrl/favorites?user_id=$_userId'),
+      headers: _headers,
     ).timeout(_timeout);
 
     if (response.statusCode == 200) {
@@ -327,8 +345,8 @@ class ApiService {
     double? predictedPrice,
   }) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl/favorites'),
-      headers: {'Content-Type': 'application/json'},
+      Uri.parse('$_baseUrl/favorites?user_id=$_userId'),
+      headers: _headers,
       body: jsonEncode({
         'brand': brand,
         'model': model,
@@ -348,7 +366,8 @@ class ApiService {
   /// 즐겨찾기 삭제
   Future<bool> removeFavorite(int favoriteId) async {
     final response = await http.delete(
-      Uri.parse('$_baseUrl/favorites/$favoriteId'),
+      Uri.parse('$_baseUrl/favorites/$favoriteId?user_id=$_userId'),
+      headers: _headers,
     ).timeout(_timeout);
 
     if (response.statusCode == 200) {
@@ -364,7 +383,8 @@ class ApiService {
   /// 알림 목록 조회
   Future<List<PriceAlert>> getAlerts() async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/alerts'),
+      Uri.parse('$_baseUrl/alerts?user_id=$_userId'),
+      headers: _headers,
     ).timeout(_timeout);
 
     if (response.statusCode == 200) {
@@ -385,8 +405,8 @@ class ApiService {
     required double targetPrice,
   }) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl/alerts'),
-      headers: {'Content-Type': 'application/json'},
+      Uri.parse('$_baseUrl/alerts?user_id=$_userId'),
+      headers: _headers,
       body: jsonEncode({
         'brand': brand,
         'model': model,
@@ -405,7 +425,8 @@ class ApiService {
   /// 알림 토글
   Future<Map<String, dynamic>> toggleAlert(int alertId) async {
     final response = await http.put(
-      Uri.parse('$_baseUrl/alerts/$alertId/toggle'),
+      Uri.parse('$_baseUrl/alerts/$alertId/toggle?user_id=$_userId'),
+      headers: _headers,
     ).timeout(_timeout);
 
     if (response.statusCode == 200) {
@@ -418,7 +439,8 @@ class ApiService {
   /// 알림 삭제
   Future<bool> removeAlert(int alertId) async {
     final response = await http.delete(
-      Uri.parse('$_baseUrl/alerts/$alertId'),
+      Uri.parse('$_baseUrl/alerts/$alertId?user_id=$_userId'),
+      headers: _headers,
     ).timeout(_timeout);
 
     if (response.statusCode == 200) {
@@ -439,8 +461,8 @@ class ApiService {
   }) async {
     try {
       await http.post(
-        Uri.parse('$_baseUrl/history'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$_baseUrl/history?user_id=$_userId'),
+        headers: _headers,
         body: jsonEncode({
           'brand': brand,
           'model': model,

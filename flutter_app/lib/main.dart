@@ -8,7 +8,12 @@ import 'oauth_webview_page.dart';
 import 'signup_page.dart';
 import 'services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 저장된 토큰 로드
+  await AuthService().loadSavedToken();
+  
   runApp(const CarPriceApp());
 }
 
@@ -294,8 +299,8 @@ class _HomePageContentState extends State<HomePageContent> {
   }
 
   /// 로그아웃
-  void _logout() {
-    _authService.logout();
+  Future<void> _logout() async {
+    await _authService.logout();
     setState(() => _isLoggedIn = false);
     _showMessage('로그아웃되었습니다');
   }
