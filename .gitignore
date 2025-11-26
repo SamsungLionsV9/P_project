@@ -1,42 +1,72 @@
-# Environment files
-.env
-*.env
+# Archive - 미사용/중복 파일
+_archive/
+
+# Flutter SDK (너무 큼)
+flutter_sdk/
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 .Python
 venv/
-.venv/
-
-# Data files - intermediate files only
-data/checkpoint*.json
-data/fast_*.csv
-data/supplement_*.csv
-data/encar_dom_*.csv
-data/encar_detailed_*.csv
-data/processed_*.csv
-
-# Keep main data files
-# data/complete_domestic_details.csv - 국산차 최종 (14.6MB)
-# data/complete_imported_details.csv - 수입차 최종 (6.0MB)
+env/
+.env
+*.egg-info/
+dist/
+build/
 
 # IDE
 .idea/
 .vscode/
 *.swp
-
-# OS
+*.swo
 .DS_Store
-Thumbs.db
-
-# SDK
-flutter_sdk/
 
 # Logs
 *.log
+logs/
 
-# Temporary
+# Temporary files
 *.tmp
+*.temp
 *.bak
+
+# Database
+*.db
+*.sqlite
+
+# Flutter
+flutter_app/.dart_tool/
+flutter_app/.packages
+flutter_app/build/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/android/.gradle/
+flutter_app/android/local.properties
+flutter_app/android/app/debug/
+flutter_app/android/app/release/
+flutter_app/ios/Pods/
+flutter_app/pubspec.lock
+
+# Java/Gradle
+user-service/.gradle/
+user-service/build/
+user-service/bin/
+*.class
+*.jar
+!gradle-wrapper.jar
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Model files (너무 큼 - 필요시 Git LFS 사용)
+# models/*.pkl
+# models/*.joblib
+
+# Sensitive data
+*.pem
+*.key
+secrets/
+application-prod.yml

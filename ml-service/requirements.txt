@@ -1,0 +1,26 @@
+# FastAPI 및 웹 서버
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# 기존 의존성
+pandas
+numpy
+scikit-learn
+xgboost
+joblib
+requests
+matplotlib
+seaborn
+scipy
+yfinance
+beautifulsoup4
+lxml
+python-dotenv
+selenium
+webdriver-manager
+groq
+
+# 추가 의존성
+python-multipart  # 파일 업로드 지원
+
