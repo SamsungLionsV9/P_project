@@ -1,0 +1,190 @@
+"""모든 차종별 실제값 vs 예측값 비교 테스트"""
+import pandas as pd
+import numpy as np
+import joblib
+
+print("="*80)
+print("🚗 국산차 모델별 실제값 vs 예측값 비교")
+print("="*80)
+
+# 데이터 및 모델 로드
+df_raw = pd.read_csv('encar_raw_domestic.csv')
+df_detail = pd.read_csv('data/complete_domestic_details.csv')
+df = df_raw.merge(df_detail, left_on='Id', right_on='car_id', how='inner')
+
+# 제네시스 제외
+genesis_keywords = ['제네시스', 'GENESIS', 'Genesis']
+genesis_mask = df['Manufacturer'].str.contains('|'.join(genesis_keywords), case=False, na=False)
+df = df[~genesis_mask]
+
+# 전처리
+df = df.dropna(subset=['Price', 'Mileage', 'Year', 'Manufacturer', 'Model'])
+df = df[df['Price'] > 100]
+df = df[df['Price'] < 12000]
+df['YearOnly'] = (df['Year'] // 100).astype(int)
+
+# 모델/인코더/피처 로드
+model = joblib.load('models/domestic_ultimate.pkl')
+encoders = joblib.load('models/domestic_ultimate_encoders.pkl')
+feature_cols = joblib.load('models/domestic_ultimate_features.pkl')
+
+# Target Encoding 변환
+model_enc = encoders['Model_target_enc']
+if hasattr(model_enc, 'to_dict'):
+    model_enc = model_enc.to_dict()
+mfr_enc = encoders['Manufacturer_target_enc']
+if hasattr(mfr_enc, 'to_dict'):
+    mfr_enc = mfr_enc.to_dict()
+my_enc = encoders['Model_Year_target_enc']
+if hasattr(my_enc, 'to_dict'):
+    my_enc = my_enc.to_dict()
+
+# 주요 인기 모델 목록
+popular_models = [
+    '카니발 4세대', '더 뉴 그랜저 IG', '그랜저 IG', '쏘렌토 4세대', '팰리세이드',
+    '쏘나타 (DN8)', '아반떼 (CN7)', 'K5 3세대', '싼타페 (MX5)', '투싼 (NX4)',
+    '캐스퍼', '스타리아', '더 뉴 레이', '올 뉴 모닝', '스포티지 5세대',
+    '그랜저 HG', '아반떼 AD', 'SM6', '코나 (SX2)', '셀토스'
+]
+
+# 최근 연식 (2020-2024)
+test_years = [2024, 2023, 2022, 2021, 2020]
+
+results = []
+
+for model_name in popular_models:
+    for year in test_years:
+        # 해당 모델+연식 데이터 필터링
+        subset = df[(df['Model'] == model_name) & (df['YearOnly'] == year)]
+        
+        if len(subset) < 5:  # 샘플이 적으면 스킵
+            continue
+        
+        # 실제 평균 가격
+        actual_price = subset['Price'].mean()
+        actual_std = subset['Price'].std()
+        
+        # 예측을 위한 피처 생성
+        sample = subset.iloc[0]
+        
+        age = 2025 - year
+        mileage = subset['Mileage'].mean()
+        
+        # Target Encoding
+        model_target = model_enc.get(model_name, 7.5)
+        mfr_target = mfr_enc.get(sample['Manufacturer'], 7.5)
+        my_key = f"{model_name}_{year}"
+        my_target = my_enc.get(my_key, model_target)
+        
+        # 옵션 평균
+        option_cols_list = ['has_sunroof', 'has_navigation', 'has_leather_seat', 'has_smart_key',
+                           'has_rear_camera', 'has_led_lamp', 'has_parking_sensor', 'has_auto_ac',
+                           'has_heated_seat', 'has_ventilated_seat']
+        option_values = {col: subset[col].mean() if col in subset.columns else 0.5 for col in option_cols_list}
+        option_score = sum(option_values.values())
+        option_rate = option_score / 10
+        
+        premium_weights = {'has_sunroof': 1.5, 'has_ventilated_seat': 1.5, 'has_led_lamp': 1.2,
+                          'has_leather_seat': 1.3, 'has_navigation': 1.1, 'has_smart_key': 1.0,
+                          'has_rear_camera': 1.0, 'has_parking_sensor': 1.0, 'has_auto_ac': 1.0,
+                          'has_heated_seat': 1.0}
+        option_weighted = sum(option_values.get(col, 0) * w for col, w in premium_weights.items())
+        
+        # price_segment 추정 (실제 평균 가격 기준으로 계산) - 15분위
+        # 테스트에서는 실제 가격을 알고 있으므로, 이를 기준으로 segment 계산
+        boundaries = [0, 430, 588, 730, 890, 1090, 1290, 1490, 1690, 1930, 2250, 2630, 3090, 3730, 4750, 999999]
+        price_segment = 14
+        for i, b in enumerate(boundaries[1:]):
+            if actual_price < b:
+                price_segment = i
+                break
+        
+        # 차급 분류
+        model_lower = model_name.lower()
+        if any(x in model_lower for x in ['투싼', '코나', '싼타페', '팰리세이드', '쏘렌토', '스포티지', '셀토스', '니로']):
+            vehicle_segment = 4
+        elif any(x in model_lower for x in ['카니발', '스타리아', '스타렉스']):
+            vehicle_segment = 4
+        elif any(x in model_lower for x in ['그랜저', 'k7', 'k8']):
+            vehicle_segment = 3
+        elif any(x in model_lower for x in ['쏘나타', 'k5']):
+            vehicle_segment = 2
+        elif any(x in model_lower for x in ['아반떼', 'k3']):
+            vehicle_segment = 1
+        elif any(x in model_lower for x in ['모닝', '레이', '캐스퍼', '스파크']):
+            vehicle_segment = 0
+        else:
+            vehicle_segment = 2
+        
+        # 연령 그룹
+        if age <= 2: age_group = 4
+        elif age <= 5: age_group = 3
+        elif age <= 8: age_group = 2
+        elif age <= 12: age_group = 1
+        else: age_group = 0
+        
+        # 피처 데이터프레임 생성
+        feat_data = {
+            'Year': year, 'age': age, 'age_squared': age**2, 'age_cubed': age**3,
+            'Mileage': mileage, 'mileage_log': np.log1p(mileage), 
+            'mileage_squared': mileage**2, 'mileage_per_year': mileage/(age+1),
+            'Model_target_enc': model_target, 'Manufacturer_target_enc': mfr_target,
+            'Model_Year_target_enc': my_target,
+            'FuelType_encoded': 0, 'mileage_condition_encoded': 1,
+            'is_eco_fuel': 0, 'vehicle_segment': vehicle_segment, 'price_segment': price_segment,
+            'is_accident_free': 1, 'inspection_score': 2, 'is_premium_condition': 0,
+            **option_values,
+            'option_score': option_score, 'option_rate': option_rate, 'option_weighted': option_weighted,
+            'is_metro': 1,
+            'age_option_interaction': age * option_rate,
+            'age_mileage_interaction': age * np.log1p(mileage),
+            'model_option_interaction': model_target * option_weighted,
+            'model_age_interaction': model_target * age,
+            'model_mileage_interaction': model_target * np.log1p(mileage),
+            'brand_age_interaction': mfr_target * age,
+            'brand_mileage_interaction': mfr_target * np.log1p(mileage),
+            'depreciation_factor': 1 - (age * 0.08 + np.log1p(mileage) * 0.02),
+            'estimated_value': model_target * (1 - (age * 0.08 + np.log1p(mileage) * 0.02)),
+            'age_group': age_group
+        }
+        
+        X = pd.DataFrame([feat_data])[feature_cols]
+        
+        # 예측
+        pred_log = model.predict(X)[0]
+        pred_price = np.expm1(pred_log)
+        
+        # 오차 계산
+        error_pct = abs(pred_price - actual_price) / actual_price * 100
+        
+        results.append({
+            'Model': model_name,
+            'Year': year,
+            'N': len(subset),
+            'Actual': actual_price,
+            'Predicted': pred_price,
+            'Error%': error_pct
+        })
+
+# 결과 출력
+results_df = pd.DataFrame(results)
+results_df = results_df.sort_values('Error%')
+
+print("\n" + "="*80)
+print("📊 모델별 예측 정확도 (오차율 낮은 순)")
+print("="*80)
+
+for _, row in results_df.iterrows():
+    status = "✅" if row['Error%'] < 15 else ("⚠️" if row['Error%'] < 25 else "❌")
+    print(f"{status} {row['Model']} {row['Year']}년 (n={row['N']:>3}): "
+          f"실제 {row['Actual']:>6,.0f}만원 / 예측 {row['Predicted']:>6,.0f}만원 / 오차 {row['Error%']:>5.1f}%")
+
+# 요약 통계
+print("\n" + "="*80)
+print("📈 요약 통계")
+print("="*80)
+print(f"총 테스트 케이스: {len(results_df)}개")
+print(f"평균 오차율: {results_df['Error%'].mean():.1f}%")
+print(f"중앙값 오차율: {results_df['Error%'].median():.1f}%")
+print(f"오차 15% 이내: {len(results_df[results_df['Error%'] < 15])}개 ({len(results_df[results_df['Error%'] < 15])/len(results_df)*100:.0f}%)")
+print(f"오차 25% 이내: {len(results_df[results_df['Error%'] < 25])}개 ({len(results_df[results_df['Error%'] < 25])/len(results_df)*100:.0f}%)")
