@@ -754,8 +754,13 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     final dist = similar.priceDistribution;
     final histogram = similar.histogram;
     
+    // 히스토그램 최대 10개로 제한 (너무 많으면 UI 깨짐)
+    final limitedHistogram = histogram.length > 10 
+        ? histogram.sublist(0, 10) 
+        : histogram;
+    
     // 히스토그램 최대값
-    final maxCount = histogram.isEmpty ? 1 : histogram.map((h) => h['count'] as int).reduce((a, b) => a > b ? a : b);
+    final maxCount = limitedHistogram.isEmpty ? 1 : limitedHistogram.map((h) => h['count'] as int).reduce((a, b) => a > b ? a : b);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,38 +778,41 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           const SizedBox(height: 16),
         ],
         
-        // 히스토그램
-        if (histogram.isNotEmpty) ...[
+        // 히스토그램 (최대 10개)
+        if (limitedHistogram.isNotEmpty) ...[
           SizedBox(
-            height: 120,
+            height: 140,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: histogram.map((bar) {
+              children: limitedHistogram.map((bar) {
                 final count = bar['count'] as int;
                 final rangeMin = bar['range_min'] as int;
                 final rangeMax = bar['range_max'] as int;
-                final height = maxCount > 0 ? (count / maxCount) * 100 : 0.0;
+                final barHeight = maxCount > 0 ? (count / maxCount) * 100 : 0.0;
                 final predictedInRange = prediction.predictedPrice >= rangeMin && 
                                          prediction.predictedPrice < rangeMax;
                 
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text(
-                          count > 0 ? "$count" : "",
-                          style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                        ),
-                        const SizedBox(height: 4),
+                        // 숫자 (5 이상만 표시)
+                        if (count >= 5)
+                          Text(
+                            "$count",
+                            style: TextStyle(fontSize: 8, color: Colors.grey[500]),
+                          ),
+                        const SizedBox(height: 2),
                         Container(
-                          height: height,
+                          height: barHeight.clamp(4.0, 100.0),
+                          constraints: const BoxConstraints(minHeight: 4),
                           decoration: BoxDecoration(
                             color: predictedInRange 
                                 ? const Color(0xFF0066FF) 
                                 : const Color(0xFF0066FF).withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                       ],
@@ -814,15 +822,15 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               }).toList(),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           // X축 라벨
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("${histogram.first['range_min']}만", 
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-              Text("${histogram.last['range_max']}만", 
-                  style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+              Text("${limitedHistogram.first['range_min']}만", 
+                  style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+              Text("${limitedHistogram.last['range_max']}만", 
+                  style: TextStyle(fontSize: 9, color: Colors.grey[500])),
             ],
           ),
         ],
