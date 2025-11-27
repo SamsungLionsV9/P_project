@@ -432,6 +432,24 @@ async def add_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/admin/history", tags=["Admin"])
+async def get_all_history(
+    limit: int = Query(default=100, ge=1, le=500, description="조회 개수")
+):
+    """
+    관리자용 - 모든 사용자의 분석 이력 조회
+    """
+    try:
+        history = recommendation_service.get_all_history(limit)
+        return {
+            "success": True,
+            "history": history,
+            "total": len(history)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ========== 즐겨찾기 API ==========
 
 @app.get("/api/favorites", tags=["Favorites"])

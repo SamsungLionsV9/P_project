@@ -242,6 +242,15 @@ async def history(user_id: str = "guest", limit: int = 10):
     """사용자 검색 이력 (DB 저장)"""
     return {"history": recommendation_service.get_search_history(user_id, limit)}
 
+@app.get("/api/admin/history")
+async def admin_history(limit: int = 100):
+    """관리자용 - 모든 사용자의 분석 이력 조회"""
+    try:
+        history_data = recommendation_service.get_all_history(limit)
+        return {"success": True, "history": history_data, "total": len(history_data)}
+    except Exception as e:
+        return {"success": False, "error": str(e), "history": [], "total": 0}
+
 @app.get("/api/favorites")
 async def favorites(user_id: str = "guest"):
     """사용자 즐겨찾기 목록 (DB 기반)"""

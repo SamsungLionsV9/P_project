@@ -228,6 +228,36 @@ class RecommendationService:
         conn.close()
         return results
     
+    def get_all_history(self, limit: int = 100) -> List[Dict]:
+        """관리자용 - 모든 사용자의 검색 이력 조회"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, user_id, brand, model, year, mileage, fuel, 
+                   predicted_price, searched_at
+            FROM search_history 
+            ORDER BY searched_at DESC
+            LIMIT ?
+        ''', (limit,))
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                'id': row[0],
+                'user_id': row[1],
+                'brand': row[2],
+                'model': row[3],
+                'year': row[4],
+                'mileage': row[5],
+                'fuel': row[6],
+                'predicted_price': row[7],
+                'searched_at': row[8]
+            })
+        
+        conn.close()
+        return results
+    
     def get_trending_models(self, days: int = 7, limit: int = 10) -> List[Dict]:
         """최근 N일간 인기 검색 모델 (전체 사용자 기준)"""
         conn = sqlite3.connect(self.db_path)

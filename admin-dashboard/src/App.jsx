@@ -205,16 +205,7 @@ const userRows = [
   },
 ];
 
-// 분석 이력용 더미 데이터
-const historyRows = Array.from({ length: 9 }).map((_, i) => ({
-  time: "2025-11-25 16:19",
-  userId: "user1234",
-  model: i % 3 === 0 ? "그랜저" : i % 3 === 1 ? "소나타" : "아반떼",
-  year: 2023,
-  distance: "0.5만KM",
-  estimate: i % 3 === 0 ? "2,000만원" : i % 3 === 1 ? "8,000만원" : "5,000만원",
-  confidence: "89%",
-}));
+// 분석 이력은 API에서 로드
 
 const pageTitleMap = {
   dashboard: "DashBoard",
@@ -1047,22 +1038,44 @@ function UserPage() {
 
 function HistoryPage() {
   const [userIdFilter, setUserIdFilter] = useState("");
-  const [modelFilter, setModelFilter] = useState("all");
+  const [modelFilter, setModelFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
-  const [displayedHistory, setDisplayedHistory] = useState(historyRows);
+  const [historyData, setHistoryData] = useState([]);
+  const [displayedHistory, setDisplayedHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // API에서 분석 이력 로드
+  const loadHistory = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("http://localhost:8001/api/admin/history?limit=100");
+      const data = await response.json();
+      if (data.success) {
+        setHistoryData(data.history);
+        setDisplayedHistory(data.history);
+      }
+    } catch (error) {
+      console.error("Failed to load history:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
   const handleSearch = () => {
-    const filtered = historyRows.filter((row) => {
+    const filtered = historyData.filter((row) => {
       const matchUser =
         userIdFilter.trim() === "" ||
-        row.userId.toLowerCase().includes(userIdFilter.toLowerCase());
+        (row.user_id && row.user_id.toLowerCase().includes(userIdFilter.toLowerCase()));
       const matchModel =
-        modelFilter === "all" ||
-        (modelFilter === "grandeur" && row.model === "그랜저") ||
-        (modelFilter === "sonata" && row.model === "소나타") ||
-        (modelFilter === "avante" && row.model === "아반떼");
+        modelFilter.trim() === "" ||
+        (row.model && row.model.toLowerCase().includes(modelFilter.toLowerCase()));
       const matchDate =
-        dateFilter.trim() === "" || row.time.includes(dateFilter.trim());
+        dateFilter.trim() === "" || 
+        (row.searched_at && row.searched_at.includes(dateFilter.trim()));
 
       return matchUser && matchModel && matchDate;
     });
@@ -1071,9 +1084,24 @@ function HistoryPage() {
 
   const handleReset = () => {
     setUserIdFilter("");
-    setModelFilter("all");
+    setModelFilter("");
     setDateFilter("");
-    setDisplayedHistory(historyRows);
+    setDisplayedHistory(historyData);
+  };
+
+  const formatPrice = (price) => {
+    if (!price) return "-";
+    return `${Math.round(price).toLocaleString()}만원`;
+  };
+
+  const formatMileage = (mileage) => {
+    if (!mileage) return "-";
+    return `${(mileage / 10000).toFixed(1)}만km`;
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    return dateStr.replace("T", " ").slice(0, 16);
   };
 
   return (
@@ -1088,22 +1116,18 @@ function HistoryPage() {
             <div className="filter-field">
               <label>유저 아이디</label>
               <input
-                placeholder="Placeholder"
+                placeholder="유저 ID 검색"
                 value={userIdFilter}
                 onChange={(e) => setUserIdFilter(e.target.value)}
               />
             </div>
             <div className="filter-field">
               <label>모델</label>
-              <select
+              <input
+                placeholder="모델명 검색"
                 value={modelFilter}
                 onChange={(e) => setModelFilter(e.target.value)}
-              >
-                <option value="all">전체</option>
-                <option value="grandeur">그랜저</option>
-                <option value="sonata">소나타</option>
-                <option value="avante">아반떼</option>
-              </select>
+              />
             </div>
             <div className="filter-field">
               <label>조회 일시</label>
@@ -1122,6 +1146,9 @@ function HistoryPage() {
             <button className="btn-ghost" onClick={handleReset}>
               초기화
             </button>
+            <button className="btn-ghost" onClick={loadHistory}>
+              새로고침
+            </button>
           </div>
         </div>
         <div className="filter-underline" />
@@ -1129,38 +1156,50 @@ function HistoryPage() {
 
       <section className="table-section">
         <div className="table-header-row">
-          <div className="table-header-left">분석 이력</div>
+          <div className="table-header-left">
+            분석 이력 ({displayedHistory.length}건)
+          </div>
         </div>
 
         <div className="table-card">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>조회 일시</th>
-                <th>유저 아이디</th>
-                <th>모델</th>
-                <th>연식</th>
-                <th>주행거리</th>
-                <th>예상가</th>
-                <th>신뢰도</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedHistory.map((row, i) => (
-                <tr key={i}>
-                  <td>{row.time}</td>
-                  <td>{row.userId}</td>
-                  <td>{row.model}</td>
-                  <td>{row.year}</td>
-                  <td>{row.distance}</td>
-                  <td>{row.estimate}</td>
-                  <td>
-                    <span className="badge-success">{row.confidence}</span>
-                  </td>
+          {loading ? (
+            <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+              로딩 중...
+            </div>
+          ) : displayedHistory.length === 0 ? (
+            <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+              분석 이력이 없습니다. 사용자가 차량 가격 조회를 하면 이력이 쌓입니다.
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>조회 일시</th>
+                  <th>유저 ID</th>
+                  <th>브랜드</th>
+                  <th>모델</th>
+                  <th>연식</th>
+                  <th>주행거리</th>
+                  <th>연료</th>
+                  <th>예상가</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {displayedHistory.map((row, i) => (
+                  <tr key={row.id || i}>
+                    <td>{formatDate(row.searched_at)}</td>
+                    <td>{row.user_id || "-"}</td>
+                    <td>{row.brand || "-"}</td>
+                    <td>{row.model || "-"}</td>
+                    <td>{row.year || "-"}</td>
+                    <td>{formatMileage(row.mileage)}</td>
+                    <td>{row.fuel || "-"}</td>
+                    <td className="strong-text">{formatPrice(row.predicted_price)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
           <Pagination />
         </div>
