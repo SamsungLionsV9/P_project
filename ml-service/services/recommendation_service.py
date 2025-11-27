@@ -570,16 +570,16 @@ class RecommendationService:
                 deals.append({
                     'brand': str(brand),
                     'model': str(row.get('Model', model)),
-                    'year': year,
-                    'mileage': mileage,
-                    'fuel': fuel_norm,
-                    'actual_price': actual_price,
+                    'year': int(year),
+                    'mileage': int(mileage),
+                    'fuel': str(fuel_norm),
+                    'actual_price': int(actual_price),
                     'predicted_price': int(predicted_price),
                     'price_diff': int(predicted_price - actual_price),
-                    'value_score': round(total_score, 1),
-                    'is_good_deal': price_gap_pct > 5,  # 5% 이상 저렴하면 가성비 좋음
+                    'value_score': float(round(total_score, 1)),
+                    'is_good_deal': bool(price_gap_pct > 5),  # numpy.bool_ → bool 변환
                     'car_id': str(car_id) if car_id else None,
-                    'detail_url': detail_url
+                    'detail_url': str(detail_url) if detail_url else None
                 })
             except:
                 continue

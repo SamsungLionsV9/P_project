@@ -634,7 +634,7 @@ class ApiService {
   Future<AiStatus> getAiStatus() async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/ai/status'),
+        Uri.parse('$_baseUrl/ai/status'),  // _baseUrl에 이미 /api 포함
       ).timeout(_timeout);
 
       if (response.statusCode == 200) {
