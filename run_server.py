@@ -56,6 +56,7 @@ class PredictRequest(BaseModel):
     has_leather_seat: Optional[bool] = None
     has_smart_key: Optional[bool] = None
     has_rear_camera: Optional[bool] = None
+    user_id: Optional[str] = "guest"  # 사용자 ID (이력 저장용)
 
 class TimingRequest(BaseModel):
     model: str
@@ -79,6 +80,8 @@ class SmartAnalysisRequest(BaseModel):
     # AI 분석용
     sale_price: Optional[int] = None
     dealer_description: Optional[str] = None
+    # 사용자 ID (이력 저장용)
+    user_id: Optional[str] = "guest"
 
 class SimilarRequest(BaseModel):
     brand: str
@@ -117,6 +120,23 @@ async def predict(request: PredictRequest):
         mileage=request.mileage,
         options=options
     )
+    
+    # 검색 이력 저장
+    try:
+        recommendation_service.add_search_history(
+            user_id=request.user_id or "guest",
+            search_data={
+                'brand': request.brand,
+                'model': request.model,
+                'year': request.year,
+                'mileage': request.mileage,
+                'fuel': request.fuel,
+                'predicted_price': float(result.predicted_price)
+            }
+        )
+    except Exception as e:
+        print(f"⚠️ 이력 저장 실패: {e}")
+    
     return {
         "predicted_price": float(result.predicted_price),
         "price_range": [float(result.price_range[0]), float(result.price_range[1])],
@@ -157,6 +177,22 @@ async def smart_analysis(request: SmartAnalysisRequest):
     
     # 타이밍
     timing = timing_service.analyze_timing(request.model)
+    
+    # 검색 이력 저장
+    try:
+        recommendation_service.add_search_history(
+            user_id=request.user_id or "guest",
+            search_data={
+                'brand': request.brand,
+                'model': request.model,
+                'year': request.year,
+                'mileage': request.mileage,
+                'fuel': request.fuel,
+                'predicted_price': float(pred.predicted_price)
+            }
+        )
+    except Exception as e:
+        print(f"⚠️ smart-analysis 이력 저장 실패: {e}")
     
     # Groq AI
     groq = None

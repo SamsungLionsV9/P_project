@@ -82,6 +82,7 @@ class ApiService {
           'has_leather_seat': hasLeatherSeat,
           'has_smart_key': hasSmartKey,
           'has_rear_camera': hasRearCamera,
+          'user_id': _userId,  // 사용자 ID 추가
         }),
       ).timeout(_timeout);
 
@@ -155,6 +156,7 @@ class ApiService {
           'has_ventilated_seat': hasVentilatedSeat,
           'has_led_lamp': hasLedLamp,
           'is_accident_free': isAccidentFree,
+          'user_id': _userId,  // 사용자 ID 추가
           if (salePrice != null) 'sale_price': salePrice,
           if (dealerDescription != null) 'dealer_description': dealerDescription,
         }),
