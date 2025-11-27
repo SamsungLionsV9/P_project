@@ -362,6 +362,9 @@ class RecommendationService:
         df = df[~df['Price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거 (9999 등)
         df = df[df['YearOnly'] >= 2018]  # 최근 7년 이내
         
+        # car_id가 있는 차량만 선택 (상세페이지 연결 가능)
+        df = df[df['Id'].notna() & (df['Id'] != '')]
+        
         if budget_min:
             df = df[df['Price'] >= budget_min]
         if budget_max:
@@ -501,10 +504,11 @@ class RecommendationService:
         model_mask = df['Model'].str.contains(model.split()[0], case=False, na=False)  # 첫 단어로 매칭
         df = df[brand_mask & model_mask]
         
-        # 이상치 제거
+        # 이상치 제거 + car_id 필수 (상세페이지 연결 가능한 차량만)
         df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
         df = df[~df['Price'].isin(self.SPECIAL_PRICES)]
         df = df[df['YearOnly'] >= 2018]
+        df = df[df['Id'].notna() & (df['Id'] != '')]
         
         if len(df) == 0:
             return []

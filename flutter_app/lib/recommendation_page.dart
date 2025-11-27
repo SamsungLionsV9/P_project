@@ -586,9 +586,9 @@ class _RecommendationPageState extends State<RecommendationPage>
                   itemBuilder: (context, index) {
                     final history = _recentSearches[index];
                     return Dismissible(
-                      key: Key('history_${history.id}'),
+                      key: Key('history_${history.id ?? index}'),
                       direction: DismissDirection.endToStart,
-                      onDismissed: (direction) => _deleteHistory(history.id),
+                      onDismissed: (direction) => _deleteHistory(history.id ?? 0),
                       background: Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         alignment: Alignment.centerRight,
@@ -649,7 +649,7 @@ class _RecommendationPageState extends State<RecommendationPage>
                               ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () => _deleteHistory(history.id),
+                              onTap: () => _deleteHistory(history.id ?? 0),
                               child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
                             ),
                           ],
