@@ -89,13 +89,51 @@ class PredictionServiceV11:
         elif mileage < 150000: return 'D'
         return 'E'
     
+    def _find_best_model_match(self, model_name: str, model_enc: Dict) -> str:
+        """모델 이름 퍼지 매칭 - 최신 세대 코드 우선"""
+        # 부분 일치 찾기 (모델 이름이 포함된 것)
+        matches = []
+        for key in model_enc.keys():
+            if model_name in key or key.startswith(model_name):
+                matches.append((key, model_enc[key]))
+        
+        if not matches:
+            return model_name
+        
+        # 하이브리드/전기 제외한 일반 모델 필터링
+        regular_matches = [(k, v) for k, v in matches 
+                          if '하이브리드' not in k and 'HEV' not in k and '전기' not in k and 'EV' not in k]
+        
+        target_matches = regular_matches if regular_matches else matches
+        
+        # 1순위: 괄호 세대 코드가 있는 모델 (예: (GN7), (W213), (G30))
+        generation_matches = [(k, v) for k, v in target_matches if '(' in k and ')' in k]
+        if generation_matches:
+            # 세대 코드 모델 중 가장 높은 값 선택
+            best_match = max(generation_matches, key=lambda x: x[1])
+            return best_match[0]
+        
+        # 2순위: "더 뉴" 또는 "뉴"가 포함된 최신 모델
+        new_matches = [(k, v) for k, v in target_matches if '더 뉴' in k or '뉴' in k]
+        if new_matches:
+            best_match = max(new_matches, key=lambda x: x[1])
+            return best_match[0]
+        
+        # 3순위: 합리적인 가격 범위의 모델 (100~8000만원)
+        reasonable_matches = [(k, v) for k, v in target_matches if 100 <= v <= 8000]
+        if reasonable_matches:
+            best_match = max(reasonable_matches, key=lambda x: x[1])
+            return best_match[0]
+        
+        # 폴백: 전체에서 가장 높은 값
+        best_match = max(target_matches, key=lambda x: x[1])
+        return best_match[0]
+    
     def _create_domestic_features(self, model_name: str, year: int, mileage: int,
                                    options: Dict, accident_free: bool, grade: str) -> pd.DataFrame:
-        """국산차 피처 생성"""
+        """국산차 피처 생성 (재학습 모델용 - 간소화)"""
         age = 2025 - year
         mg = self._get_mileage_group(mileage)
-        my = f"{model_name}_{year}"
-        mymg = f"{my}_{mg}"
         
         # 인코딩 값
         model_enc = self.domestic_encoders.get('model_enc', {})
@@ -103,25 +141,18 @@ class PredictionServiceV11:
         model_year_mg_enc = self.domestic_encoders.get('model_year_mg_enc', {})
         brand_enc = self.domestic_encoders.get('brand_enc', {})
         
+        # 퍼지 매칭으로 최적 모델 찾기
+        best_model = self._find_best_model_match(model_name, model_enc)
+        my = f"{best_model}_{year}"
+        mymg = f"{my}_{mg}"
+        
         default_val = 2500
-        model_enc_val = model_enc.get(model_name, default_val)
+        model_enc_val = model_enc.get(best_model, default_val)
         my_enc_val = model_year_enc.get(my, model_enc_val)
         mymg_enc_val = model_year_mg_enc.get(mymg, my_enc_val)
         brand_enc_val = brand_enc.get('현대', default_val)
         
-        # 옵션 처리
-        opt_cols = ['has_sunroof','has_leather_seat','has_led_lamp','has_smart_key',
-                    'has_navigation','has_heated_seat','has_ventilated_seat','has_rear_camera']
-        opt_values = {c: options.get(c, 0) for c in opt_cols}
-        opt_count = sum(opt_values.values())
-        opt_premium = (opt_values.get('has_sunroof',0)*3 + opt_values.get('has_leather_seat',0)*2 +
-                       opt_values.get('has_ventilated_seat',0)*3 + opt_values.get('has_led_lamp',0)*2)
-        
-        # 상태
-        grade_map = {'normal': 0, 'good': 1, 'excellent': 2}
-        grade_enc = grade_map.get(grade, 0)
-        
-        # 피처 딕셔너리
+        # 피처 딕셔너리 (재학습 모델 피처에 맞춤)
         f = {
             'Model_enc': model_enc_val,
             'Model_Year_enc': my_enc_val,
@@ -130,14 +161,9 @@ class PredictionServiceV11:
             'Age': age,
             'Age_log': np.log1p(age),
             'Age_sq': age ** 2,
-            'Mileage': mileage,
+            'mileage': mileage,
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
-            'is_accident_free': 1 if accident_free else 0,
-            'inspection_grade_enc': grade_enc,
-            'Opt_Count': opt_count,
-            'Opt_Premium': opt_premium,
-            **opt_values
         }
         
         return pd.DataFrame([f])[self.domestic_features]
@@ -190,53 +216,37 @@ class PredictionServiceV11:
     
     def _create_imported_features(self, model_name: str, brand: str, year: int, mileage: int,
                                    options: Dict, accident_free: bool, grade: str) -> pd.DataFrame:
-        """외제차 V13 피처 생성"""
+        """외제차 V13 피처 생성 (재학습 모델용 - 간소화)"""
         age = 2025 - year
         mg = self._get_mileage_group(mileage)
-        my = f"{model_name}_{year}"
-        mymg = f"{my}_{mg}"
-        
-        # 클래스 추출
-        cls, cls_rank = self._extract_class_v13(model_name, brand)
-        cls_year = f"{cls}_{year}"
         
         # 인코딩 값
         enc = self.imported_encoders
-        global_mean = enc.get('global_mean', 5000)
+        default_val = 3500
+        model_enc = enc.get('model_enc', {})
         
-        model_enc_val = enc.get('model_enc', {}).get(model_name, global_mean)
+        # 퍼지 매칭으로 최적 모델 찾기
+        best_model = self._find_best_model_match(model_name, model_enc)
+        my = f"{best_model}_{year}"
+        mymg = f"{my}_{mg}"
+        
+        model_enc_val = model_enc.get(best_model, default_val)
         my_enc_val = enc.get('model_year_enc', {}).get(my, model_enc_val)
         mymg_enc_val = enc.get('model_year_mg_enc', {}).get(mymg, my_enc_val)
-        brand_enc_val = enc.get('brand_enc', {}).get(brand, global_mean)
-        class_enc_val = enc.get('class_enc', {}).get(cls, global_mean)
-        class_year_enc_val = enc.get('class_year_enc', {}).get(cls_year, class_enc_val)
+        brand_enc_val = enc.get('brand_enc', {}).get(brand, default_val)
         
-        # 브랜드 등급
-        brand_tier_map = {'벤츠': 4, 'BMW': 4, '아우디': 4, '포르쉐': 5, '렉서스': 4,
-                          '볼보': 3, '폭스바겐': 2, '미니': 2, '테슬라': 4, '랜드로버': 3}
-        brand_tier = brand_tier_map.get(brand, 3)
-        
-        # 상태
-        grade_map = {'normal': 0, 'good': 1, 'excellent': 2}
-        grade_enc = grade_map.get(grade, 0)
-        
-        # V13 피처 (옵션은 별도 프리미엄으로 처리)
+        # 피처 딕셔너리 (재학습 모델 피처에 맞춤)
         f = {
             'Model_enc': model_enc_val,
             'Model_Year_enc': my_enc_val,
             'Model_Year_MG_enc': mymg_enc_val,
             'Brand_enc': brand_enc_val,
-            'Class_enc': class_enc_val,
-            'Class_Year_enc': class_year_enc_val,
-            'Brand_Tier': brand_tier,
-            'Class_Rank': cls_rank,
             'Age': age,
             'Age_log': np.log1p(age),
-            'Mileage': mileage,
+            'Age_sq': age ** 2,
+            'mileage': mileage,
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
-            'is_accident_free': 1 if accident_free else 0,
-            'inspection_grade_enc': grade_enc,
         }
         
         return pd.DataFrame([f])[self.imported_features]

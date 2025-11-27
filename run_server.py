@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 
 # 서비스 임포트
-from services.prediction_v12 import PredictionServiceV12  # V12 (FuelType 포함)
+from services.prediction_v11 import PredictionServiceV11  # V11 (재학습됨)
 from services.timing import TimingService
 from services.groq_service import GroqService
 from services.recommendation_service import get_recommendation_service  # 신규: 추천 서비스
@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # 서비스 초기화
-prediction_service = PredictionServiceV12()
+prediction_service = PredictionServiceV11()
 timing_service = TimingService()
 groq_service = GroqService()
 recommendation_service = get_recommendation_service()  # 신규: DB 기반 추천
@@ -115,8 +115,7 @@ async def predict(request: PredictRequest):
         model_name=request.model,
         year=request.year,
         mileage=request.mileage,
-        options=options,
-        fuel=request.fuel  # 연료 타입 전달
+        options=options
     )
     return {
         "predicted_price": float(result.predicted_price),
@@ -146,15 +145,14 @@ async def smart_analysis(request: SmartAnalysisRequest):
     # 디버그: 옵션 로그 출력
     print(f"📊 [smart-analysis] model={request.model}, fuel={request.fuel}, options={options}")
     
-    # 가격 예측 (옵션 + 연료 포함)
+    # 가격 예측 (옵션 포함)
     pred = prediction_service.predict(
         brand=request.brand,
         model_name=request.model,
         year=request.year,
         mileage=request.mileage,
         options=options,
-        accident_free=request.is_accident_free or True,
-        fuel=request.fuel  # 연료 타입 전달
+        accident_free=request.is_accident_free or True
     )
     
     # 타이밍
