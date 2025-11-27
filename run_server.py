@@ -287,6 +287,24 @@ async def admin_history(limit: int = 100):
     except Exception as e:
         return {"success": False, "error": str(e), "history": [], "total": 0}
 
+@app.get("/api/admin/dashboard-stats")
+async def admin_dashboard_stats():
+    """관리자 대시보드 통계"""
+    try:
+        stats = recommendation_service.get_dashboard_stats()
+        return {"success": True, **stats}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/admin/daily-requests")
+async def admin_daily_requests(days: int = 7):
+    """일별 분석 요청 수"""
+    try:
+        daily_data = recommendation_service.get_daily_request_stats(days)
+        return {"success": True, "data": daily_data}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": []}
+
 @app.get("/api/favorites")
 async def favorites(user_id: str = "guest"):
     """사용자 즐겨찾기 목록 (DB 기반)"""

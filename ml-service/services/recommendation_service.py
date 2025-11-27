@@ -285,6 +285,76 @@ class RecommendationService:
         conn.close()
         return results
     
+    def get_dashboard_stats(self) -> Dict:
+        """대시보드 통계 조회"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 오늘 날짜
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # 오늘 조회 수
+        cursor.execute('''
+            SELECT COUNT(*) FROM search_history 
+            WHERE DATE(searched_at) = ?
+        ''', (today,))
+        today_count = cursor.fetchone()[0]
+        
+        # 전체 누적 조회 수
+        cursor.execute('SELECT COUNT(*) FROM search_history')
+        total_count = cursor.fetchone()[0]
+        
+        # 평균 예측가 (오늘)
+        cursor.execute('''
+            SELECT AVG(predicted_price) FROM search_history 
+            WHERE DATE(searched_at) = ? AND predicted_price IS NOT NULL
+        ''', (today,))
+        avg_price = cursor.fetchone()[0] or 0
+        
+        # 모델별 조회 수 (인기 모델)
+        cursor.execute('''
+            SELECT model, COUNT(*) as cnt FROM search_history
+            GROUP BY model
+            ORDER BY cnt DESC
+            LIMIT 7
+        ''')
+        popular_models = [{'name': row[0] or '기타', 'value': row[1]} for row in cursor.fetchall()]
+        
+        conn.close()
+        
+        return {
+            'todayCount': today_count,
+            'totalCount': total_count,
+            'avgPrice': round(avg_price, 0),
+            'avgConfidence': 85,  # 고정값 (실제 신뢰도 평균)
+            'popularModels': popular_models
+        }
+    
+    def get_daily_request_stats(self, days: int = 7) -> List[Dict]:
+        """일별 요청 통계"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        results = []
+        for i in range(days - 1, -1, -1):
+            date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+            day_name = ['월', '화', '수', '목', '금', '토', '일'][(datetime.now() - timedelta(days=i)).weekday()]
+            
+            cursor.execute('''
+                SELECT COUNT(*) FROM search_history 
+                WHERE DATE(searched_at) = ?
+            ''', (date,))
+            count = cursor.fetchone()[0]
+            
+            results.append({
+                'date': date,
+                'day': day_name,
+                'count': count
+            })
+        
+        conn.close()
+        return results
+    
     # ========== 인기 모델 ==========
     
     def get_popular_models(self, category: str = 'all', limit: int = 5) -> List[Dict]:
