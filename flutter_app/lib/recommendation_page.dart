@@ -553,70 +553,159 @@ class _RecommendationPageState extends State<RecommendationPage>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '차량을 검색하면 여기에 기록됩니다',
+                  '추천 차량을 클릭하면 여기에 기록됩니다',
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
             ),
           )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _recentSearches.length,
-            itemBuilder: (context, index) {
-              final history = _recentSearches[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF252542),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+        : Column(
+            children: [
+              // 전체 삭제 버튼
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.history, color: Colors.white54),
+                    Text(
+                      '총 ${_recentSearches.length}건',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 14),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${history.brand} ${history.model}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${history.year}년 • ${(history.mileage / 10000).toStringAsFixed(1)}만km',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                          ),
-                        ],
-                      ),
+                    TextButton.icon(
+                      onPressed: _clearAllHistory,
+                      icon: const Icon(Icons.delete_sweep, size: 18, color: Colors.red),
+                      label: const Text('전체 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
                     ),
-                    if (history.predictedPrice != null)
-                      Text(
-                        '${history.predictedPrice!.toStringAsFixed(0)}만원',
-                        style: const TextStyle(
-                          color: Color(0xFF6C63FF),
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
                   ],
                 ),
-              );
-            },
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _recentSearches.length,
+                  itemBuilder: (context, index) {
+                    final history = _recentSearches[index];
+                    return Dismissible(
+                      key: Key('history_${history.id}'),
+                      direction: DismissDirection.endToStart,
+                      onDismissed: (direction) => _deleteHistory(history.id),
+                      background: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.delete, color: Colors.red),
+                      ),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF252542),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.white10,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.history, color: Colors.white54),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${history.brand} ${history.model}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${history.year}년 • ${(history.mileage / 10000).toStringAsFixed(1)}만km',
+                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (history.predictedPrice != null)
+                              Text(
+                                '${history.predictedPrice!.toStringAsFixed(0)}만원',
+                                style: const TextStyle(
+                                  color: Color(0xFF6C63FF),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => _deleteHistory(history.id),
+                              child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
+  }
+
+  /// 검색 이력 삭제
+  Future<void> _deleteHistory(int id) async {
+    try {
+      await _api.removeHistory(id);
+      setState(() {
+        _recentSearches.removeWhere((h) => h.id == id);
+      });
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  /// 전체 이력 삭제
+  Future<void> _clearAllHistory() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF252542),
+        title: const Text('전체 삭제', style: TextStyle(color: Colors.white)),
+        content: const Text('모든 조회 기록을 삭제하시겠습니까?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      try {
+        await _api.clearHistory();
+        setState(() {
+          _recentSearches.clear();
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
   }
 
   void _showBudgetFilter() {

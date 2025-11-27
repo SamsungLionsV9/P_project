@@ -546,23 +546,20 @@ class RecommendationService:
                     except:
                         pass
                 
-                # 가치 점수 계산
+                # 가치 점수 계산 (모든 값을 Python 기본 타입으로 변환)
                 # 1. 가격 괴리율 (40점 만점)
-                price_gap_pct = (predicted_price - actual_price) / max(predicted_price, 1) * 100
-                price_score = min(max(price_gap_pct * 4, 0), 40)  # -10% ~ +10% → 0~40점
+                price_gap_pct = float((predicted_price - actual_price) / max(predicted_price, 1) * 100)
+                price_score = float(min(max(price_gap_pct * 4, 0), 40))
                 
                 # 2. 주행거리 점수 (30점 만점)
-                # 30,000km 이하: 30점, 60,000km: 20점, 100,000km 이상: 0점
-                mileage_score = max(30 - (mileage / 3500), 0)
+                mileage_score = float(max(30 - (mileage / 3500), 0))
                 
                 # 3. 연식 점수 (30점 만점)
-                # 2024년: 30점, 2020년: 10점, 2018년 이하: 0점
-                year_score = max((year - 2018) * 5, 0)
-                year_score = min(year_score, 30)
+                year_score = float(min(max((year - 2018) * 5, 0), 30))
                 
-                total_score = price_score + mileage_score + year_score
+                total_score = float(price_score + mileage_score + year_score)
                 
-                # 엔카 URL 생성
+                # 엔카 URL 생성 (차량 ID 기반 상세 페이지)
                 detail_url = None
                 if car_id:
                     detail_url = self.ENCAR_DETAIL_URL.format(car_id=car_id)
@@ -576,8 +573,8 @@ class RecommendationService:
                     'actual_price': int(actual_price),
                     'predicted_price': int(predicted_price),
                     'price_diff': int(predicted_price - actual_price),
-                    'value_score': float(round(total_score, 1)),
-                    'is_good_deal': bool(price_gap_pct > 5),  # numpy.bool_ → bool 변환
+                    'value_score': round(total_score, 1),
+                    'is_good_deal': price_gap_pct > 5,
                     'car_id': str(car_id) if car_id else None,
                     'detail_url': str(detail_url) if detail_url else None
                 })
