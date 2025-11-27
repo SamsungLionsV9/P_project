@@ -305,7 +305,6 @@ class ComparisonPage extends StatelessWidget {
 
   Widget _buildDepreciationChart(bool isDark, Color textColor, List<CarData> cars) {
     return Container(
-      height: 200,
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -314,26 +313,59 @@ class ComparisonPage extends StatelessWidget {
         border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[200]!),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: CustomPaint(
-              size: const Size(double.infinity, 150),
-              painter: DepreciationPainter(cars: cars, isDark: isDark),
-            ),
-          ),
-          const SizedBox(height: 16),
+          // 차트 설명
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: cars.map((car) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    Container(width: 12, height: 12, decoration: BoxDecoration(color: car.color, shape: BoxShape.circle)),
-                    const SizedBox(width: 4),
-                    Text(car.name.split(' ').first, style: TextStyle(fontSize: 10, color: textColor)),
-                  ],
+            children: [
+              Icon(Icons.info_outline, size: 14, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text(
+                '선이 낮을수록 가치 유지율이 높습니다',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Y축 설명
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('100%', style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+                  const SizedBox(height: 55),
+                  Text('70%', style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+                  const SizedBox(height: 55),
+                  Text('40%', style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 150,
+                  child: CustomPaint(
+                    size: const Size(double.infinity, 150),
+                    painter: DepreciationPainter(cars: cars, isDark: isDark),
+                  ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 범례
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: cars.map((car) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 12, height: 12, decoration: BoxDecoration(color: car.color, shape: BoxShape.circle)),
+                  const SizedBox(width: 4),
+                  Text(car.name.split(' ').first, style: TextStyle(fontSize: 11, color: textColor)),
+                ],
               );
             }).toList(),
           ),

@@ -24,7 +24,13 @@ class RecommendationService:
     
     # 이상치 필터 (similar_service와 통일)
     PRICE_MIN = 100    # 100만원 이상
-    PRICE_MAX = 15000  # 1.5억 이하 (9999 등 이상치 제거)
+    PRICE_MAX = 50000  # 5억 이하 (학습 데이터와 동일)
+    
+    # 특수 가격 이상치 (가격 미정 표시 등)
+    SPECIAL_PRICES = {9999, 8888, 7777, 6666, 5555, 1111, 10000}
+    
+    # 엔카 모바일 상세페이지 URL 템플릿
+    ENCAR_DETAIL_URL = "https://m.encar.com/dc/dc_cardetailview.do?carid={car_id}"
     
     def __init__(self):
         self.data_path = Path(__file__).parent.parent.parent / "data"
@@ -351,8 +357,9 @@ class RecommendationService:
         if df is None or len(df) == 0:
             return []
         
-        # 필터링 (이상치 제거 - similar_service와 통일)
+        # 필터링 (이상치 제거 - 학습 데이터와 통일)
         df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
+        df = df[~df['Price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거 (9999 등)
         df = df[df['YearOnly'] >= 2018]  # 최근 7년 이내
         
         if budget_min:
@@ -377,6 +384,7 @@ class RecommendationService:
         
         for _, row in sample.iterrows():
             try:
+                car_id = row.get('Id', '')  # 엔카 차량 ID
                 brand = row.get('Manufacturer', '')
                 model = row.get('Model', '')
                 year = int(row.get('YearOnly', 2020))
@@ -429,6 +437,11 @@ class RecommendationService:
                 elif year >= 2019:
                     score += 1
                 
+                # 엔카 상세페이지 URL 생성
+                detail_url = None
+                if car_id:
+                    detail_url = self.ENCAR_DETAIL_URL.format(car_id=car_id)
+                
                 recommendations.append({
                     'brand': str(brand),
                     'model': str(model),
@@ -440,7 +453,9 @@ class RecommendationService:
                     'price_diff': int(price_diff),
                     'is_good_deal': bool(price_diff > 100),  # 명시적 bool 변환
                     'score': float(round(score, 1)),
-                    'type': str(row.get('Type', 'domestic'))
+                    'type': str(row.get('Type', 'domestic')),
+                    'car_id': str(car_id) if car_id else None,
+                    'detail_url': detail_url
                 })
                 
             except Exception as e:

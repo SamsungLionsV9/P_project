@@ -15,6 +15,9 @@ class SimilarVehicleService:
     PRICE_MIN = 100    # 100만원 이상
     PRICE_MAX = 50000  # 5억 이하 (학습 시 동일)
     
+    # 특수 가격 이상치 (가격 미정 표시 등)
+    SPECIAL_PRICES = {9999, 8888, 7777, 6666, 5555, 1111, 10000}
+    
     def __init__(self):
         self.data_path = Path(__file__).parent.parent.parent / "data"
         self._combined_df = None
@@ -29,6 +32,7 @@ class SimilarVehicleService:
                 df = pd.read_csv(combined_path)
                 # 이상치 필터링
                 df = df[(df['price'] >= self.PRICE_MIN) & (df['price'] <= self.PRICE_MAX)]
+                df = df[~df['price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거 (9999 등)
                 self._combined_df = df
                 print(f"✓ 전처리 데이터 로드: {len(df):,}건 (이상치 제거됨)")
             else:
@@ -45,6 +49,7 @@ class SimilarVehicleService:
             if domestic_path.exists():
                 df = pd.read_csv(domestic_path)
                 df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
+                df = df[~df['Price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거
                 # 컬럼명 통일
                 df = df.rename(columns={'Manufacturer': 'brand', 'Model': 'model_name', 
                                         'Year': 'year', 'Mileage': 'mileage', 'Price': 'price'})

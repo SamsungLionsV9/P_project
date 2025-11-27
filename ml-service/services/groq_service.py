@@ -7,6 +7,11 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
+
+# .env 파일 로드 (ml-service/.env)
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(env_path)
 
 # src 폴더를 import path에 추가
 src_path = Path(__file__).parent.parent.parent / 'src'
