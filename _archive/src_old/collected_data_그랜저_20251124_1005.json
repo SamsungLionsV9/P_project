@@ -1,0 +1,114 @@
+{
+  "car_model": "그랜저",
+  "macro": {
+    "interest_rate": {
+      "rate": 2.5,
+      "date": "20251025",
+      "trend": "stable",
+      "previous_rate": 2.5,
+      "change": 0.0,
+      "source": "한국은행 Open API"
+    },
+    "oil_price": {
+      "price": 57.85,
+      "date": "2025-11-24",
+      "trend": "down",
+      "previous_price": 60.74,
+      "change": -2.89,
+      "change_pct": -4.76,
+      "source": "Yahoo Finance (WTI)"
+    },
+    "exchange_rate": {
+      "rate": 1471.28,
+      "date": "2025-11-24",
+      "trend": "stable",
+      "previous_rate": 1461.69,
+      "change": 9.59,
+      "source": "Yahoo Finance"
+    },
+    "collected_at": "2025-11-24T10:05:29.193581"
+  },
+  "trend": {
+    "keyword": "그랜저",
+    "ratio": 1.17,
+    "trend": "up",
+    "change_pct": 16.6,
+    "recent_avg": 97.5,
+    "previous_avg": 83.6,
+    "data": [
+      {
+        "period": "2025-09-22",
+        "ratio": 85.73737
+      },
+      {
+        "period": "2025-09-29",
+        "ratio": 75.73986
+      },
+      {
+        "period": "2025-10-06",
+        "ratio": 59.0649
+      },
+      {
+        "period": "2025-10-13",
+        "ratio": 100
+      },
+      {
+        "period": "2025-10-20",
+        "ratio": 99.53991
+      },
+      {
+        "period": "2025-10-27",
+        "ratio": 94.00646
+      },
+      {
+        "period": "2025-11-03",
+        "ratio": 98.13479
+      },
+      {
+        "period": "2025-11-10",
+        "ratio": 99.52748
+      },
+      {
+        "period": "2025-11-17",
+        "ratio": 98.23427
+      }
+    ],
+    "source": "네이버 데이터랩 API"
+  },
+  "community": {
+    "sentiment": {
+      "score": 6.5,
+      "positive_ratio": 0.68,
+      "negative_ratio": 0.18,
+      "neutral_ratio": 0.14,
+      "trend": "positive",
+      "total_posts": 850,
+      "summary": "대형 세단 선호층에게 높은 만족도. 공간과 승차감 우수",
+      "top_positive": [
+        "넓은 공간",
+        "승차감",
+        "고급스러움",
+        "안전성"
+      ],
+      "top_negative": [
+        "연비",
+        "유지비"
+      ],
+      "source": "static_db",
+      "model_name": "그랜저"
+    },
+    "post_count": 0,
+    "posts_sample": []
+  },
+  "schedule": {
+    "has_upcoming": false,
+    "months_until": 999,
+    "impact": "none",
+    "impact_score": 0
+  },
+  "collected_at": "2025-11-24T10:05:45.643535",
+  "api_status": {
+    "bok": true,
+    "naver_datalab": true
+  }
+}

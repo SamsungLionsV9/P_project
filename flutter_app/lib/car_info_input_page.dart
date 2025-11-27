@@ -102,6 +102,39 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
         if (year >= 2021) return '카니발 (KA4)';
         return '카니발';
       }
+      if (model == 'K9') {
+        if (year >= 2022) return '더 뉴 K9 2세대';
+        if (year >= 2018) return '더 K9';
+        return 'K9';
+      }
+      if (model == 'K8') {
+        if (year >= 2024) return '더 뉴 K8';
+        if (year >= 2021) return 'K8';
+        return 'K8';
+      }
+      if (model == 'K3') {
+        if (year >= 2022) return '더 뉴 K3 (BD)';
+        if (year >= 2019) return 'K3 (BD)';
+        return 'K3';
+      }
+      if (model == 'EV6') {
+        return 'EV6';
+      }
+      if (model == 'EV9') {
+        return 'EV9';
+      }
+      if (model == '셀토스') {
+        if (year >= 2023) return '더 뉴 셀토스';
+        return '셀토스';
+      }
+      if (model == '모닝') {
+        if (year >= 2020) return '더 뉴 모닝';
+        return '올 뉴 모닝';
+      }
+      if (model == '레이') {
+        if (year >= 2022) return '더 뉴 레이';
+        return '레이';
+      }
     }
     // 제네시스
     if (brand == '제네시스') {

@@ -1,0 +1,68 @@
+{
+  "macro": {
+    "interest_rate": 2.5,
+    "exchange_rate": 1476.19,
+    "oil_price": 58.07,
+    "oil_trend": "down"
+  },
+  "trend": {
+    "keyword": "그랜저",
+    "ratio": 1.17,
+    "trend": "up",
+    "change_pct": 16.6,
+    "recent_avg": 97.5,
+    "previous_avg": 83.6,
+    "data": [
+      {
+        "period": "2025-09-22",
+        "ratio": 85.73737
+      },
+      {
+        "period": "2025-09-29",
+        "ratio": 75.73986
+      },
+      {
+        "period": "2025-10-06",
+        "ratio": 59.0649
+      },
+      {
+        "period": "2025-10-13",
+        "ratio": 100
+      },
+      {
+        "period": "2025-10-20",
+        "ratio": 99.53991
+      },
+      {
+        "period": "2025-10-27",
+        "ratio": 94.00646
+      },
+      {
+        "period": "2025-11-03",
+        "ratio": 98.13479
+      },
+      {
+        "period": "2025-11-10",
+        "ratio": 99.52748
+      },
+      {
+        "period": "2025-11-17",
+        "ratio": 98.23427
+      }
+    ],
+    "source": "네이버 데이터랩 API"
+  },
+  "schedule": {
+    "has_upcoming": false,
+    "months_until": 999,
+    "impact": "none",
+    "impact_score": 0
+  },
+  "car_model": "그랜저",
+  "collection_time": "2025-11-24 13:45:39",
+  "data_sources": {
+    "macro": "한국은행 API + Yahoo Finance",
+    "trend": "네이버 데이터랩 API",
+    "schedule": "CSV 데이터"
+  }
+}

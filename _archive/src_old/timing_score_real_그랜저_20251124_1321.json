@@ -1,0 +1,32 @@
+{
+  "car_model": "그랜저",
+  "final_score": 64.0,
+  "decision": "관망",
+  "color": "🟡",
+  "action": "시장 상황 지켜보기",
+  "confidence": "high",
+  "scores": {
+    "macro": 70,
+    "trend": 50,
+    "schedule": 70
+  },
+  "reasons": [
+    "✅ 저금리 2.5% (구매 적기)",
+    "⚠️ 고환율 1475.68원 (수입차 가격 상승)",
+    "✅ 저유가 $58.09 (유지비 감소)",
+    "✅ 유가 하락 추세",
+    "⚠️ 검색 트렌드 데이터 없음",
+    "✅ 신차 출시 예정 없음 (중고차 가격 안정)"
+  ],
+  "weights": {
+    "macro": 0.4,
+    "trend": 0.3,
+    "schedule": 0.3
+  },
+  "data_sources": {
+    "macro": "✅ 한국은행 + Yahoo Finance (실제)",
+    "trend": "✅ 네이버 데이터랩 (실제)",
+    "schedule": "✅ CSV 데이터 (수동 관리)",
+    "community": "❌ 제외 (크롤링 불가)"
+  }
+}
