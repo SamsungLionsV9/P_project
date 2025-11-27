@@ -304,9 +304,9 @@ class PredictionServiceV11:
             predicted_price = base_price + option_total
             mape = 12.1  # 외제차 V13 MAPE
         
-        # 신뢰도 계산 (MAPE 기반) - 개선된 공식
-        # MAPE 5% → 85%, MAPE 10% → 70%, MAPE 15% → 55%
-        confidence = max(30, min(95, 100 - mape * 3))
+        # 신뢰도 (MAPE 기반 - 개선된 공식)
+        # MAPE 5% 이하: 95%+, MAPE 10%: 85%, MAPE 15%: 75%
+        confidence = max(50, min(98, 95 - (mape - 5) * 2))
         
         # 가격 범위 계산
         error_margin = predicted_price * (mape / 100)
