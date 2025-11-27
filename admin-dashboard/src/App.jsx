@@ -225,9 +225,15 @@ const pageTitleMap = {
   settings: "설정",
 };
 
-function App() {
+function App({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const maxModelValue = Math.max(...popularModels.map((m) => m.value));
+
+  const handleLogout = () => {
+    if (window.confirm("로그아웃 하시겠습니까?")) {
+      onLogout();
+    }
+  };
 
   return (
     <div className="app-root">
@@ -235,7 +241,7 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="logo-box" />
-          <span className="service-name">서비스 이름</span>
+          <span className="service-name">Car-Sentix</span>
         </div>
 
         <nav className="sidebar-nav">
@@ -292,9 +298,12 @@ function App() {
         <header className="topbar">
           <h1 className="page-title">{pageTitleMap[activeMenu]}</h1>
           <div className="topbar-right">
-            <button className="top-icon-btn">⚙️</button>
-            <button className="top-icon-btn">🔔</button>
-            <button className="top-avatar">👤</button>
+            <span className="admin-name">{user?.username || '관리자'}</span>
+            <button className="top-icon-btn" title="설정">⚙️</button>
+            <button className="top-icon-btn" title="알림">🔔</button>
+            <button className="top-avatar logout-btn" onClick={handleLogout} title="로그아웃">
+              🚪
+            </button>
           </div>
         </header>
 

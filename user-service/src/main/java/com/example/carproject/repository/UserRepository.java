@@ -18,5 +18,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
     
     boolean existsByUsername(String username);
+    
+    // 관리자 대시보드용 카운트 메서드
+    long countByIsActive(Boolean isActive);
+    
+    long countByRole(User.Role role);
 }
 

@@ -126,6 +126,21 @@ body {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
+.admin-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  margin-right: 8px;
+}
+
+.logout-btn {
+  background: #ffebee !important;
+}
+
+.logout-btn:hover {
+  background: #ffcdd2 !important;
+}
+
 /* ========== 통계 카드 ========== */
 .stat-cards {
   display: grid;

@@ -17,7 +17,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService implements UserDetailsService {
@@ -192,6 +196,74 @@ public class UserService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
+    }
+    
+    // ========== 관리자 전용 메서드 ==========
+    
+    /**
+     * 전체 사용자 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public List<UserResponseDto> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(UserResponseDto::from)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * 사용자 역할 변경
+     */
+    @Transactional
+    public void updateUserRole(Long userId, User.Role newRole) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        user.setRole(newRole);
+        userRepository.save(user);
+    }
+    
+    /**
+     * 사용자 비활성화
+     */
+    @Transactional
+    public void deactivateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        user.setIsActive(false);
+        userRepository.save(user);
+    }
+    
+    /**
+     * 사용자 활성화
+     */
+    @Transactional
+    public void activateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        user.setIsActive(true);
+        userRepository.save(user);
+    }
+    
+    /**
+     * 대시보드 통계
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDashboardStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        long totalUsers = userRepository.count();
+        long activeUsers = userRepository.countByIsActive(true);
+        long adminCount = userRepository.countByRole(User.Role.ADMIN);
+        
+        stats.put("totalUsers", totalUsers);
+        stats.put("activeUsers", activeUsers);
+        stats.put("inactiveUsers", totalUsers - activeUsers);
+        stats.put("adminCount", adminCount);
+        stats.put("userCount", totalUsers - adminCount);
+        
+        return stats;
     }
 }
 

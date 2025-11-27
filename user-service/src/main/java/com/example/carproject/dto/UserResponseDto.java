@@ -17,7 +17,9 @@ public class UserResponseDto {
     private String username;
     private String email;
     private String phoneNumber;
-    private User.Role role;
+    private String role;
+    private String provider;
+    private Boolean isActive;
     private LocalDateTime createdAt;
     
     public static UserResponseDto from(User user) {
@@ -26,7 +28,9 @@ public class UserResponseDto {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
-                .role(user.getRole())
+                .role(user.getRole().name())
+                .provider(user.getProvider().name())
+                .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

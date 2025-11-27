@@ -28,6 +28,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 public class SecurityConfig {
     
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -65,11 +66,14 @@ public class SecurityConfig {
                                 "/api/auth/health", 
                                 "/api/auth/logout",
                                 "/api/auth/email/**",  // 이메일 인증 엔드포인트
+                                "/api/admin/login",    // 관리자 로그인
                                 // OAuth2 관련 엔드포인트
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/login"  // 기본 로그인 페이지도 허용 (OAuth2 선택 페이지)
                         ).permitAll()
+                        // 관리자 전용 엔드포인트 (ADMIN 역할 필요)
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
