@@ -92,7 +92,23 @@ class CarData {
     }
   }
 
+  /// 인덱스 기반 색상 (비교 차트에서 고유 색상 보장)
+  static Color getColorByIndex(int index) {
+    const colors = [
+      Color(0xFF0066FF),  // 파랑
+      Color(0xFF00C853),  // 초록
+      Color(0xFFFF6D00),  // 주황
+      Color(0xFFAA00FF),  // 보라
+      Color(0xFFFF1744),  // 빨강
+      Color(0xFF00BCD4),  // 청록
+      Color(0xFFFFEB3B),  // 노랑
+      Color(0xFFE91E63),  // 분홍
+    ];
+    return colors[index % colors.length];
+  }
+
   static Color _getRandomColor() {
+    // ID 기반 해시를 사용하여 일관된 색상 할당
     final colors = [
       const Color(0xFF0066FF),
       const Color(0xFF00C853),
@@ -100,7 +116,7 @@ class CarData {
       const Color(0xFFAA00FF),
       const Color(0xFFFF1744),
     ];
-    return colors[DateTime.now().millisecond % colors.length];
+    return colors[DateTime.now().microsecondsSinceEpoch % colors.length];
   }
 
   /// 가격을 숫자로 변환 (비교용)

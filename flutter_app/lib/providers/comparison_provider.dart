@@ -11,7 +11,7 @@ class ComparisonProvider extends ChangeNotifier {
   bool get canAddMore => _comparingCars.length < maxCompareCount;
   bool get hasEnoughToCompare => _comparingCars.length >= 2;
 
-  /// 비교 목록에 차량 추가
+  /// 비교 목록에 차량 추가 (인덱스 기반 고유 색상 할당)
   bool addCar(CarData car) {
     if (_comparingCars.length >= maxCompareCount) {
       return false;
@@ -19,7 +19,11 @@ class ComparisonProvider extends ChangeNotifier {
     if (_comparingCars.any((c) => c.id == car.id)) {
       return false; // 이미 추가됨
     }
-    _comparingCars.add(car);
+    // 인덱스 기반 고유 색상 할당 (감가율 차트에서 구분 가능하도록)
+    final coloredCar = car.copyWith(
+      color: CarData.getColorByIndex(_comparingCars.length),
+    );
+    _comparingCars.add(coloredCar);
     notifyListeners();
     return true;
   }

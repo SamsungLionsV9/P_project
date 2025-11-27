@@ -79,6 +79,9 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
         if (year >= 2023) return '더 뉴 팰리세이드';
         return '팰리세이드';
       }
+      if (model == '스타리아') {
+        return '스타리아';
+      }
     }
     // 기아
     if (brand == '기아') {
@@ -138,8 +141,116 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
     }
     // 제네시스
     if (brand == '제네시스') {
-      if (model == 'G80' && year >= 2020) return 'G80 (RG3)';
-      if (model == 'G90' && year >= 2022) return 'G90 (RS4)';
+      if (model == 'G70') {
+        if (year >= 2024) return 'G70 (IK F/L)';
+        return 'G70 (IK)';
+      }
+      if (model == 'G80') {
+        if (year >= 2024) return 'G80 (RG3 F/L)';
+        if (year >= 2020) return 'G80 (RG3)';
+        return 'EQ900';
+      }
+      if (model == 'G90') {
+        if (year >= 2022) return 'G90 (RS4)';
+        return 'EQ900';
+      }
+      if (model == 'GV60') return 'GV60';
+      if (model == 'GV70') {
+        if (year >= 2024) return 'GV70 (JK1 F/L)';
+        return 'GV70 (JK1)';
+      }
+      if (model == 'GV80') {
+        if (year >= 2024) return 'GV80 (JX1 F/L)';
+        return 'GV80 (JX1)';
+      }
+    }
+    // BMW
+    if (brand == 'BMW') {
+      if (model == '3시리즈') {
+        if (year >= 2019) return '3시리즈 (G20)';
+        if (year >= 2012) return '3시리즈 (F30)';
+        return '3시리즈 (E90)';
+      }
+      if (model == '5시리즈') {
+        if (year >= 2024) return '5시리즈 (G60)';
+        if (year >= 2017) return '5시리즈 (G30)';
+        if (year >= 2010) return '5시리즈 (F10)';
+        return '5시리즈 (E60)';
+      }
+      if (model == '7시리즈') {
+        if (year >= 2023) return '7시리즈 (G70)';
+        if (year >= 2016) return '7시리즈 (G11)';
+        return '7시리즈 (F01)';
+      }
+      if (model == 'X3') {
+        if (year >= 2018) return 'X3 (G01)';
+        return 'X3 (F25)';
+      }
+      if (model == 'X5') {
+        if (year >= 2019) return 'X5 (G05)';
+        if (year >= 2014) return 'X5 (F15)';
+        return 'X5';
+      }
+      if (model == 'X7') return 'X7 (G07)';
+    }
+    // 벤츠
+    if (brand == '벤츠') {
+      if (model == 'C-클래스') {
+        if (year >= 2022) return 'C-클래스 W206';
+        if (year >= 2014) return 'C-클래스 W205';
+        return 'C-클래스 W204';
+      }
+      if (model == 'E-클래스') {
+        if (year >= 2024) return 'E-클래스 W214';
+        if (year >= 2016) return 'E-클래스 W213';
+        if (year >= 2010) return 'E-클래스 W212';
+        return 'E-클래스 W211';
+      }
+      if (model == 'S-클래스') {
+        if (year >= 2021) return 'S-클래스 W223';
+        if (year >= 2014) return 'S-클래스 W222';
+        return 'S-클래스 W221';
+      }
+      if (model == 'GLC') {
+        if (year >= 2023) return 'GLC-클래스 X254';
+        return 'GLC-클래스 X253';
+      }
+      if (model == 'GLE') {
+        if (year >= 2019) return 'GLE-클래스 V167';
+        return 'GLE-클래스 W166';
+      }
+      if (model == 'GLS') {
+        if (year >= 2020) return 'GLS-클래스 X167';
+        return 'GLS-클래스 X166';
+      }
+    }
+    // 아우디
+    if (brand == '아우디') {
+      if (model == 'A4') {
+        if (year >= 2020) return '뉴 A4';
+        return 'A4 (B9)';
+      }
+      if (model == 'A6') {
+        if (year >= 2019) return '뉴 A6';
+        return 'A6 (C8)';
+      }
+      if (model == 'A8') {
+        if (year >= 2018) return '뉴 A8';
+        return 'A8 (D5)';
+      }
+      if (model == 'Q3') {
+        if (year >= 2019) return '뉴 Q3';
+        return 'Q3';
+      }
+      if (model == 'Q5') {
+        if (year >= 2021) return '뉴 Q5';
+        return 'Q5 (FY)';
+      }
+      if (model == 'Q7') {
+        if (year >= 2020) return '뉴 Q7';
+        return 'Q7 (4M)';
+      }
+      if (model == 'Q8') return 'Q8';
     }
     // 기본: 모델명 그대로 반환
     return model;
