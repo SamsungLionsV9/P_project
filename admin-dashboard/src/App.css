@@ -765,3 +765,27 @@ body {
   border-top: 1px solid #f0f0f0;
 }
 
+/* ========== 차량 카테고리 배지 ========== */
+.category-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.category-badge.domestic {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.category-badge.imported {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+/* ========== 필터 그리드 3열 ========== */
+.filter-grid.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+

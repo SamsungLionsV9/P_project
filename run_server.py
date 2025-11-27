@@ -371,6 +371,51 @@ async def remove_alert(alert_id: int, user_id: str = "guest"):
     success = recommendation_service.remove_alert(user_id, alert_id)
     return {"success": success}
 
+
+# ========== 차량 데이터 관리 API (관리자용) ==========
+
+@app.get("/api/admin/vehicle-stats")
+async def get_vehicle_stats():
+    """차량 데이터 통계"""
+    try:
+        stats = recommendation_service.get_vehicle_stats()
+        return {"success": True, **stats}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/admin/vehicles")
+async def get_vehicles(
+    brand: str = None,
+    model: str = None,
+    year_min: int = None,
+    year_max: int = None,
+    price_min: int = None,
+    price_max: int = None,
+    category: str = "all",
+    page: int = 1,
+    limit: int = 20
+):
+    """관리자용 차량 데이터 조회"""
+    try:
+        vehicles = recommendation_service.get_vehicles_for_admin(
+            brand=brand, model=model, year_min=year_min, year_max=year_max,
+            price_min=price_min, price_max=price_max, category=category,
+            page=page, limit=limit
+        )
+        return {"success": True, **vehicles}
+    except Exception as e:
+        return {"success": False, "error": str(e), "vehicles": [], "total": 0}
+
+@app.get("/api/admin/vehicles/{vehicle_id}")
+async def get_vehicle_detail(vehicle_id: int, category: str = "domestic"):
+    """차량 상세 정보 조회"""
+    try:
+        vehicle = recommendation_service.get_vehicle_detail(vehicle_id, category)
+        return {"success": True, "vehicle": vehicle}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 if __name__ == "__main__":
     import uvicorn
     print("\n🚀 Car-Sentix API 서버 시작...")

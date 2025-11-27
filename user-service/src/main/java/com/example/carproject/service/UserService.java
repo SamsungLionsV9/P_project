@@ -266,9 +266,9 @@ public class UserService implements UserDetailsService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
         
-        // 사용자명 변경 (이름은 중복 허용)
-        if (username != null && !username.trim().isEmpty() && !username.equals(user.getUsername())) {
-            user.setUsername(username);
+        // 사용자명(닉네임) 변경 (중복 허용)
+        if (username != null && !username.trim().isEmpty() && !username.equals(user.getDisplayName())) {
+            user.setDisplayName(username);
         }
         
         // 전화번호 변경

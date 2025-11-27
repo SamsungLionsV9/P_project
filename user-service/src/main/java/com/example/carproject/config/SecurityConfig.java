@@ -79,6 +79,14 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)  // OAuth2를 위해 세션 허용
                 )
+                // API 요청에 대해 401 반환 (리디렉션 방지)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(401);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"success\":false,\"message\":\"인증이 필요합니다\"}");
+                        })
+                )
                 // 기본 폼 로그인 비활성화 (OAuth2만 사용)
                 .formLogin(form -> form.disable())
                 // OAuth2 로그인 설정

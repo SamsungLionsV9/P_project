@@ -478,61 +478,108 @@ function DashboardContent() {
 
 function VehiclePage() {
   const [modelFilter, setModelFilter] = useState("");
-  const [brandFilter, setBrandFilter] = useState("all");
-  const [displayedVehicles, setDisplayedVehicles] = useState(vehicleRows);
-  const brandOptions = Array.from(new Set(vehicleRows.map((v) => v.brand)));
+  const [brandFilter, setBrandFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [vehicles, setVehicles] = useState([]);
+  const [displayedVehicles, setDisplayedVehicles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ domesticCount: 0, importedCount: 0, totalCount: 0 });
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const closeDetail = () => setSelectedVehicle(null);
 
+  // 차량 데이터 로드
+  const loadVehicles = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (brandFilter) params.append('brand', brandFilter);
+      if (modelFilter) params.append('model', modelFilter);
+      params.append('category', categoryFilter);
+      params.append('limit', '50');
+      
+      const response = await fetch(`http://localhost:8001/api/admin/vehicles?${params}`);
+      const data = await response.json();
+      if (data.success) {
+        setVehicles(data.vehicles);
+        setDisplayedVehicles(data.vehicles);
+      }
+      
+      // 통계도 로드
+      const statsRes = await fetch("http://localhost:8001/api/admin/vehicle-stats");
+      const statsData = await statsRes.json();
+      if (statsData.success) {
+        setStats(statsData);
+      }
+    } catch (error) {
+      console.error("Failed to load vehicles:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadVehicles();
+  }, []);
+
   const handleSearch = () => {
-    const filtered = vehicleRows.filter((row) => {
-      const matchModel =
-        modelFilter.trim() === "" ||
-        row.model.toLowerCase().includes(modelFilter.toLowerCase());
-      const matchBrand =
-        brandFilter === "all" || row.brand === brandFilter;
-      return matchModel && matchBrand;
-    });
-    setDisplayedVehicles(filtered);
+    loadVehicles();
   };
 
   const handleReset = () => {
     setModelFilter("");
-    setBrandFilter("all");
-    setDisplayedVehicles(vehicleRows);
+    setBrandFilter("");
+    setCategoryFilter("all");
+    loadVehicles();
+  };
+
+  const formatPrice = (price) => {
+    if (!price) return "-";
+    return `${price.toLocaleString()}만원`;
+  };
+
+  const formatMileage = (mileage) => {
+    if (!mileage) return "-";
+    return `${(mileage / 10000).toFixed(1)}만km`;
   };
 
   return (
     <div className="page">
       <section className="content-header">
         <h2>차량 데이터 관리</h2>
+        <div style={{ fontSize: "14px", color: "#666", marginTop: "8px" }}>
+          총 {stats.totalCount.toLocaleString()}대 (국산 {stats.domesticCount.toLocaleString()} / 수입 {stats.importedCount.toLocaleString()})
+        </div>
       </section>
 
       <section className="filter-section">
         <div className="filter-card">
-          <div className="filter-grid">
+          <div className="filter-grid three">
+            <div className="filter-field">
+              <label>브랜드</label>
+              <input
+                placeholder="브랜드 검색"
+                value={brandFilter}
+                onChange={(e) => setBrandFilter(e.target.value)}
+              />
+            </div>
             <div className="filter-field">
               <label>모델명</label>
               <input
-                placeholder="Placeholder"
+                placeholder="모델명 검색"
                 value={modelFilter}
                 onChange={(e) => setModelFilter(e.target.value)}
               />
             </div>
             <div className="filter-field">
-              <label>브랜드</label>
+              <label>카테고리</label>
               <select
-                value={brandFilter}
-                onChange={(e) => setBrandFilter(e.target.value)}
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
               >
                 <option value="all">전체</option>
-                {brandOptions.map((brand) => (
-                  <option key={brand} value={brand}>
-                    {brand}
-                  </option>
-                ))}
+                <option value="domestic">국산차</option>
+                <option value="imported">수입차</option>
               </select>
-
             </div>
           </div>
 
@@ -543,6 +590,9 @@ function VehiclePage() {
             <button className="btn-ghost" onClick={handleReset}>
               초기화
             </button>
+            <button className="btn-ghost" onClick={loadVehicles}>
+              새로고침
+            </button>
           </div>
         </div>
         <div className="filter-underline" />
@@ -550,68 +600,63 @@ function VehiclePage() {
 
       <section className="table-section">
         <div className="table-header-row">
-          <div className="table-header-left">차량 데이터 관리</div>
-          <div className="table-header-right">
-            <button
-              className="btn-link"
-              onClick={() => alert("수정 기능은 아직 백엔드와 연동 필요")}
-            >
-              수정
-            </button>
-            <button
-              className="btn-link danger"
-              onClick={() => alert("삭제 기능은 아직 백엔드와 연동 필요")}
-            >
-              삭제
-            </button>
-            <span className="table-header-divider">|</span>
-            <button
-              className="btn-link strong"
-              onClick={() => alert("새 모델 추가 기능은 추후 구현 예정")}
-            >
-              + 새 모델 추가
-            </button>
+          <div className="table-header-left">
+            차량 목록 ({displayedVehicles.length}대)
           </div>
         </div>
 
         <div className="table-card">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>브랜드</th>
-                <th>모델명</th>
-                <th>연식</th>
-                <th>주행거리</th>
-                <th>연료</th>
-                <th>가격</th>
-                <th>차체</th>
-                <th>성능 점검</th>
-                <th>기타 옵션</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedVehicles.map((row, i) => (
-                <tr key={i}>
-                  <td>{row.brand}</td>
-                  <td>{row.model}</td>
-                  <td>{row.year}</td>
-                  <td>{row.distance}</td>
-                  <td>{row.fuel}</td>
-                  <td className="strong-text">{row.price}</td>
-                  <td>{row.body}</td>
-                  <td>{row.score}</td>
-                  <td>
-                    <button
-                      className="btn-outline"
-                      onClick={() => setSelectedVehicle(row)}
-                    >
-                      상세 보기
-                    </button>
-                  </td>
+          {loading ? (
+            <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+              로딩 중...
+            </div>
+          ) : displayedVehicles.length === 0 ? (
+            <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
+              검색 결과가 없습니다
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  <th>브랜드</th>
+                  <th>모델명</th>
+                  <th>연식</th>
+                  <th>주행거리</th>
+                  <th>연료</th>
+                  <th>가격</th>
+                  <th>지역</th>
+                  <th>상세</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {displayedVehicles.map((row, i) => (
+                  <tr key={row.id || i}>
+                    <td>
+                      <span className={`category-badge ${row.category}`}>
+                        {row.category === 'domestic' ? '국산' : '수입'}
+                      </span>
+                    </td>
+                    <td>{row.brand}</td>
+                    <td>{row.model}</td>
+                    <td>{row.year}년</td>
+                    <td>{formatMileage(row.mileage)}</td>
+                    <td>{row.fuel || '-'}</td>
+                    <td className="strong-text">{formatPrice(row.price)}</td>
+                    <td>{row.region || '-'}</td>
+                    <td>
+                      <button
+                        className="btn-outline"
+                        onClick={() => setSelectedVehicle(row)}
+                      >
+                        상세
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
           <Pagination />
         </div>

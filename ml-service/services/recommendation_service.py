@@ -718,6 +718,143 @@ class RecommendationService:
         return deleted
 
 
+    # ========== 차량 데이터 관리 (관리자용) ==========
+    
+    def get_vehicles_for_admin(self, brand: str = None, model: str = None,
+                                year_min: int = None, year_max: int = None,
+                                price_min: int = None, price_max: int = None,
+                                category: str = "all", page: int = 1, limit: int = 20) -> Dict:
+        """관리자용 차량 데이터 조회"""
+        vehicles = []
+        
+        # 국산차 데이터 (컬럼: Manufacturer, Model, Year, Mileage, FuelType, Price, OfficeCityState)
+        # Price 단위: 만원 (예: 2500 = 2500만원)
+        if category in ['all', 'domestic'] and self._domestic_df is not None:
+            df = self._domestic_df.copy()
+            # 기본 필터: 합리적인 가격 범위만 (500만원 ~ 1억5천만원)
+            # 99999 등 가격 미정 데이터 제외
+            df = df[(df['Price'] >= 500) & (df['Price'] <= 15000)]
+            # 연식 최신순 정렬
+            df = df.sort_values('YearOnly', ascending=False)
+            
+            if brand:
+                df = df[df['Manufacturer'].str.contains(brand, na=False, case=False)]
+            if model:
+                df = df[df['Model'].str.contains(model, na=False, case=False)]
+            if year_min:
+                df = df[df['YearOnly'] >= year_min]
+            if year_max:
+                df = df[df['YearOnly'] <= year_max]
+            if price_min:
+                df = df[df['Price'] >= price_min]
+            if price_max:
+                df = df[df['Price'] <= price_max]
+            
+            for idx, row in df.head(limit if category == 'domestic' else limit // 2).iterrows():
+                price = int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0
+                vehicles.append({
+                    'id': int(idx) if isinstance(idx, (int, float)) else hash(str(idx)) % 1000000,
+                    'category': 'domestic',
+                    'brand': str(row.get('Manufacturer', '')),
+                    'model': str(row.get('Model', '')),
+                    'year': int(row.get('YearOnly', 0)),
+                    'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
+                    'price': price,  # 만원 단위
+                    'fuel': str(row.get('FuelType', '가솔린')),
+                    'region': str(row.get('OfficeCityState', ''))
+                })
+        
+        # 외제차 데이터
+        if category in ['all', 'imported'] and self._imported_df is not None:
+            df = self._imported_df.copy()
+            # 기본 필터: 합리적인 가격 범위만 (500만원 ~ 5억원, 외제차는 범위가 넓음)
+            df = df[(df['Price'] >= 500) & (df['Price'] <= 50000)]
+            # 연식 최신순 정렬
+            df = df.sort_values('YearOnly', ascending=False)
+            
+            if brand:
+                df = df[df['Manufacturer'].str.contains(brand, na=False, case=False)]
+            if model:
+                df = df[df['Model'].str.contains(model, na=False, case=False)]
+            if year_min:
+                df = df[df['YearOnly'] >= year_min]
+            if year_max:
+                df = df[df['YearOnly'] <= year_max]
+            if price_min:
+                df = df[df['Price'] >= price_min]
+            if price_max:
+                df = df[df['Price'] <= price_max]
+            
+            for idx, row in df.head(limit if category == 'imported' else limit // 2).iterrows():
+                price = int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0
+                vehicles.append({
+                    'id': (int(idx) if isinstance(idx, (int, float)) else hash(str(idx)) % 1000000) + 1000000,
+                    'category': 'imported',
+                    'brand': str(row.get('Manufacturer', '')),
+                    'model': str(row.get('Model', '')),
+                    'year': int(row.get('YearOnly', 0)),
+                    'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
+                    'price': price,  # 만원 단위
+                    'fuel': str(row.get('FuelType', '가솔린')),
+                    'region': str(row.get('OfficeCityState', ''))
+                })
+        
+        # 페이지네이션
+        total = len(vehicles)
+        start = (page - 1) * limit
+        end = start + limit
+        
+        return {
+            'vehicles': vehicles[start:end] if start < total else vehicles[:limit],
+            'total': total,
+            'page': page,
+            'limit': limit
+        }
+    
+    def get_vehicle_detail(self, vehicle_id: int, category: str = "domestic") -> Dict:
+        """차량 상세 정보"""
+        df = self._imported_df if category == 'imported' or vehicle_id >= 1000000 else self._domestic_df
+        actual_id = vehicle_id - 1000000 if vehicle_id >= 1000000 else vehicle_id
+        
+        if df is None or actual_id not in df.index:
+            return None
+        
+        row = df.loc[actual_id]
+        return {
+            'id': vehicle_id,
+            'category': 'imported' if vehicle_id >= 1000000 else 'domestic',
+            'brand': str(row.get('Manufacturer', '')),
+            'model': str(row.get('Model', '')),
+            'year': int(row.get('YearOnly', 0)),
+            'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
+            'price': int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0,
+            'fuel': str(row.get('FuelType', '')),
+            'region': str(row.get('OfficeCityState', ''))
+        }
+    
+    def get_vehicle_stats(self) -> Dict:
+        """차량 데이터 통계"""
+        domestic_count = len(self._domestic_df) if self._domestic_df is not None else 0
+        imported_count = len(self._imported_df) if self._imported_df is not None else 0
+        
+        domestic_brands = {}
+        imported_brands = {}
+        
+        if self._domestic_df is not None and 'Manufacturer' in self._domestic_df.columns:
+            domestic_brands = self._domestic_df['Manufacturer'].value_counts().head(10).to_dict()
+        
+        if self._imported_df is not None and 'Manufacturer' in self._imported_df.columns:
+            imported_brands = self._imported_df['Manufacturer'].value_counts().head(10).to_dict()
+        
+        return {
+            'domesticCount': domestic_count,
+            'importedCount': imported_count,
+            'totalCount': domestic_count + imported_count,
+            'domesticBrands': [{'brand': k, 'count': v} for k, v in domestic_brands.items()],
+            'importedBrands': [{'brand': k, 'count': v} for k, v in imported_brands.items()]
+        }
+
+
 # 싱글톤
 _recommendation_service = None
 

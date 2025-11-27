@@ -18,6 +18,7 @@ function LoginPage({ onLogin }) {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "omit",  // 세션 쿠키 전송 안함
         body: JSON.stringify({ email, password }),
       });
 

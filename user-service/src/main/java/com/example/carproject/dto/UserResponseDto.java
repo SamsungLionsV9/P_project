@@ -25,7 +25,7 @@ public class UserResponseDto {
     public static UserResponseDto from(User user) {
         return UserResponseDto.builder()
                 .id(user.getId())
-                .username(user.getUsername())
+                .username(user.getDisplayName())  // 실제 사용자명(닉네임) 사용
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
                 .role(user.getRole().name())
