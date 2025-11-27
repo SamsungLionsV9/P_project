@@ -265,5 +265,62 @@ public class UserService implements UserDetailsService {
         
         return stats;
     }
+    
+    /**
+     * 관리자용 사용자 정보 수정
+     */
+    @Transactional
+    public UserResponseDto updateUserByAdmin(Long userId, String username, String phoneNumber, String role) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        // 사용자명 변경 (중복 체크)
+        if (username != null && !username.trim().isEmpty() && !username.equals(user.getUsername())) {
+            Optional<User> existingUser = userRepository.findByUsername(username);
+            if (existingUser.isPresent() && !existingUser.get().getId().equals(userId)) {
+                throw new IllegalArgumentException("이미 사용 중인 사용자명입니다");
+            }
+            user.setUsername(username);
+        }
+        
+        // 전화번호 변경
+        if (phoneNumber != null) {
+            user.setPhoneNumber(phoneNumber.trim().isEmpty() ? null : phoneNumber);
+        }
+        
+        // 역할 변경
+        if (role != null && !role.trim().isEmpty()) {
+            try {
+                user.setRole(User.Role.valueOf(role));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("유효하지 않은 역할입니다: " + role);
+            }
+        }
+        
+        User savedUser = userRepository.save(user);
+        return UserResponseDto.from(savedUser);
+    }
+    
+    /**
+     * 관리자용 사용자 삭제 (완전 삭제)
+     */
+    @Transactional
+    public void deleteUserByAdmin(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        userRepository.delete(user);
+    }
+    
+    /**
+     * ID로 사용자 조회
+     */
+    @Transactional(readOnly = true)
+    public UserResponseDto getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        return UserResponseDto.from(user);
+    }
 }
 

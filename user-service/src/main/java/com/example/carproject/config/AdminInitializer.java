@@ -26,28 +26,38 @@ public class AdminInitializer implements CommandLineRunner {
     
     @Override
     public void run(String... args) {
-        // 관리자 계정이 없으면 생성
-        if (!userRepository.existsByEmail(ADMIN_EMAIL)) {
-            User admin = User.builder()
-                    .email(ADMIN_EMAIL)
-                    .username(ADMIN_USERNAME)
-                    .password(passwordEncoder.encode(ADMIN_PASSWORD))
-                    .role(User.Role.ADMIN)
-                    .provider(User.Provider.LOCAL)
-                    .isActive(true)
-                    .build();
-            
-            userRepository.save(admin);
-            
-            log.info("======================================");
-            log.info("기본 관리자 계정이 생성되었습니다.");
-            log.info("이메일: {}", ADMIN_EMAIL);
-            log.info("비밀번호: {}", ADMIN_PASSWORD);
-            log.info("⚠️ 운영 환경에서는 비밀번호를 변경하세요!");
-            log.info("======================================");
-        } else {
-            log.info("관리자 계정이 이미 존재합니다: {}", ADMIN_EMAIL);
-        }
+        log.info("======================================");
+        log.info("관리자 계정 초기화 시작...");
+        
+        // 기존 admin 관련 계정 모두 삭제
+        userRepository.findByEmail(ADMIN_EMAIL).ifPresent(user -> {
+            userRepository.delete(user);
+            log.info("기존 계정 삭제: {}", user.getEmail());
+        });
+        
+        userRepository.findByUsername(ADMIN_USERNAME).ifPresent(user -> {
+            if (!user.getEmail().equals(ADMIN_EMAIL)) {  // 중복 삭제 방지
+                userRepository.delete(user);
+                log.info("기존 계정 삭제: {}", user.getUsername());
+            }
+        });
+        
+        // 새 관리자 계정 생성
+        User admin = User.builder()
+                .email(ADMIN_EMAIL)
+                .username(ADMIN_USERNAME)
+                .password(passwordEncoder.encode(ADMIN_PASSWORD))
+                .role(User.Role.ADMIN)
+                .provider(User.Provider.LOCAL)
+                .isActive(true)
+                .build();
+        
+        userRepository.save(admin);
+        
+        log.info("✅ 관리자 계정이 생성되었습니다!");
+        log.info("이메일: {}", ADMIN_EMAIL);
+        log.info("비밀번호: {}", ADMIN_PASSWORD);
+        log.info("======================================");
     }
 }
 

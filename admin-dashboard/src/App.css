@@ -669,3 +669,99 @@ body {
   color: #999;
 }
 
+/* ========== 역할/상태 뱃지 ========== */
+.role-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.role-badge.admin {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.role-badge.user {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.status-badge.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.active:hover {
+  background: #c8e6c9;
+}
+
+.status-badge.inactive {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.status-badge.inactive:hover {
+  background: #ffcdd2;
+}
+
+/* ========== 수정 폼 ========== */
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.edit-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edit-form .form-group label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.edit-form .form-group input,
+.edit-form .form-group select {
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.edit-form .form-group input:focus,
+.edit-form .form-group select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.edit-form .form-group input:disabled {
+  background: #f5f5f5;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+

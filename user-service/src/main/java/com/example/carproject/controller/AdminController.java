@@ -202,5 +202,91 @@ public class AdminController {
         
         return ResponseEntity.ok(response);
     }
+    
+    /**
+     * 사용자 정보 수정 (관리자 전용)
+     * PUT /api/admin/users/{userId}
+     */
+    @PutMapping("/users/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> updateUser(
+            @PathVariable Long userId,
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        
+        try {
+            String username = (String) request.get("username");
+            String phoneNumber = (String) request.get("phoneNumber");
+            String role = (String) request.get("role");
+            
+            UserResponseDto updatedUser = userService.updateUserByAdmin(userId, username, phoneNumber, role);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "사용자 정보가 수정되었습니다");
+            response.put("user", updatedUser);
+            
+            log.info("사용자 정보 수정: userId={}", userId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * 사용자 삭제 (관리자 전용)
+     * DELETE /api/admin/users/{userId}
+     */
+    @DeleteMapping("/users/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteUser(
+            @PathVariable Long userId,
+            Authentication authentication) {
+        
+        try {
+            userService.deleteUserByAdmin(userId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "사용자가 삭제되었습니다");
+            
+            log.info("사용자 삭제: userId={}", userId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * 단일 사용자 조회 (관리자 전용)
+     * GET /api/admin/users/{userId}
+     */
+    @GetMapping("/users/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getUser(
+            @PathVariable Long userId,
+            Authentication authentication) {
+        
+        try {
+            UserResponseDto user = userService.getUserById(userId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("user", user);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 }
 
