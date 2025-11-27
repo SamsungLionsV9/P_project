@@ -22,6 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 class RecommendationService:
     """엔카 데이터 기반 추천 시스템"""
     
+    # 이상치 필터 (similar_service와 통일)
+    PRICE_MIN = 100    # 100만원 이상
+    PRICE_MAX = 15000  # 1.5억 이하 (9999 등 이상치 제거)
+    
     def __init__(self):
         self.data_path = Path(__file__).parent.parent.parent / "data"
         self.db_path = Path(__file__).parent.parent.parent / "data" / "user_data.db"
@@ -228,6 +232,36 @@ class RecommendationService:
         conn.close()
         return results
     
+    def remove_search_history(self, user_id: str, history_id: int) -> bool:
+        """검색 이력 삭제"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM search_history WHERE id = ? AND user_id = ?
+        ''', (history_id, user_id))
+        
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        
+        return deleted
+    
+    def clear_search_history(self, user_id: str) -> int:
+        """검색 이력 전체 삭제"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM search_history WHERE user_id = ?
+        ''', (user_id,))
+        
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return deleted_count
+    
     def get_trending_models(self, days: int = 7, limit: int = 10) -> List[Dict]:
         """최근 N일간 인기 검색 모델 (전체 사용자 기준)"""
         conn = sqlite3.connect(self.db_path)
@@ -312,8 +346,8 @@ class RecommendationService:
         if df is None or len(df) == 0:
             return []
         
-        # 필터링
-        df = df[(df['Price'] >= 100) & (df['Price'] <= 50000)]
+        # 필터링 (이상치 제거 - similar_service와 통일)
+        df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
         df = df[df['YearOnly'] >= 2018]  # 최근 7년 이내
         
         if budget_min:

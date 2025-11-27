@@ -97,6 +97,47 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     _loadData();
   }
 
+  /// 검색 이력 개별 삭제
+  Future<void> _removeHistory(SearchHistory item) async {
+    if (item.id != null) {
+      final success = await _api.removeHistory(item.id!);
+      if (success) {
+        _showSnackBar("'${item.brand} ${item.model}' 기록이 삭제되었습니다.");
+        _loadData();
+      } else {
+        _showSnackBar("삭제에 실패했습니다.", isError: true);
+      }
+    }
+  }
+
+  /// 검색 이력 전체 삭제
+  Future<void> _clearAllHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('전체 삭제'),
+        content: const Text('최근 분석 기록을 모두 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final count = await _api.clearHistory();
+      _showSnackBar("$count개의 기록이 삭제되었습니다.");
+      _loadData();
+    }
+  }
+
   Future<void> _toggleAlert(Favorite fav) async {
     // 알림이 있는지 확인
     final existing = _alerts.where((a) => 
@@ -124,9 +165,13 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     _loadData();
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        backgroundColor: isError ? Colors.red : null,
+      ),
     );
   }
 
@@ -301,13 +346,37 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
 
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        itemCount: _history.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
-        itemBuilder: (context, index) {
-          return _buildHistoryCard(_history[index], isDark, cardColor, textColor);
-        },
+      child: Column(
+        children: [
+          // 전체 삭제 버튼
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "총 ${_history.length}개의 기록",
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+                TextButton.icon(
+                  onPressed: _clearAllHistory,
+                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                  label: const Text("전체 삭제", style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              itemCount: _history.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                return _buildHistoryCard(_history[index], isDark, cardColor, textColor);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -523,6 +592,16 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
               color: isLiked ? const Color(0xFFFF5252) : Colors.grey[400],
               size: 24,
             ),
+          ),
+          // 삭제 버튼
+          IconButton(
+            onPressed: () => _removeHistory(item),
+            icon: Icon(
+              Icons.close,
+              color: Colors.grey[400],
+              size: 20,
+            ),
+            tooltip: '기록 삭제',
           ),
         ],
       ),

@@ -671,6 +671,21 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
   
+  // 매물 수 포맷팅 (직접적인 대수 대신 친근한 표현)
+  String _formatListingsCount(int count) {
+    if (count >= 3000) {
+      return '인기 🔥';
+    } else if (count >= 2000) {
+      return '많은 매물';
+    } else if (count >= 1000) {
+      return '적당한 매물';
+    } else if (count >= 500) {
+      return '희소 매물';
+    } else {
+      return '레어 ✨';
+    }
+  }
+  
   // 인기 모델 추천 리스트 (Provider 연동)
   Widget _buildPopularCarsList({required bool isDark}) {
     return Consumer<PopularCarsProvider>(
@@ -725,8 +740,8 @@ class _HomePageContentState extends State<HomePageContent> {
               final car = allCars[index];
               return CarCard(
                 name: '${car.brand} ${car.model}',
-                info: '${car.avgPrice}만원 ~',
-                price: '${car.listings}대 매물',
+                info: '평균 ${car.avgPrice}만원',
+                price: _formatListingsCount(car.listings),
                 color: colors[index % colors.length],
                 isDark: isDark,
               );

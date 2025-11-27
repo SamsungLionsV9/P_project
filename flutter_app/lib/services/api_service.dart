@@ -286,6 +286,30 @@ class ApiService {
     }
   }
 
+  /// 검색 이력 삭제
+  Future<bool> removeHistory(int historyId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/history/$historyId?user_id=$_userId'),
+      headers: _headers,
+    ).timeout(_timeout);
+
+    return response.statusCode == 200;
+  }
+
+  /// 검색 이력 전체 삭제
+  Future<int> clearHistory() async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/history?user_id=$_userId'),
+      headers: _headers,
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['deleted_count'] ?? 0;
+    }
+    return 0;
+  }
+
   /// 추천 차량 목록
   Future<List<RecommendedCar>> getRecommendations({
     String category = 'all',

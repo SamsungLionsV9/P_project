@@ -279,6 +279,18 @@ async def add_history(request: SimilarRequest, user_id: str = "guest"):
     })
     return {"success": True, "history": result}
 
+@app.delete("/api/history/{history_id}")
+async def remove_history(history_id: int, user_id: str = "guest"):
+    """검색 이력 삭제"""
+    success = recommendation_service.remove_search_history(user_id, history_id)
+    return {"success": success}
+
+@app.delete("/api/history")
+async def clear_history(user_id: str = "guest"):
+    """검색 이력 전체 삭제"""
+    deleted_count = recommendation_service.clear_search_history(user_id)
+    return {"success": True, "deleted_count": deleted_count}
+
 # ========== 가격 알림 API ==========
 
 class AlertRequest(BaseModel):

@@ -1,13 +1,3 @@
-# API Keys and Secrets
-.env
-*.env
-*_api_key.txt
-application.yml
-**/application.yml
-application.properties
-**/application.properties
-client_secret*.json
-
 # Python
 __pycache__/
 *.py[cod]
@@ -16,83 +6,75 @@ __pycache__/
 .Python
 venv/
 ENV/
-env/
-
-# Data files (large)
-data/*.csv
-!data/new_car_schedule.csv
-
-# Model files
-models/*.pkl
-models/*.h5
-models/*.pt
-*.pkl
-!improved_car_price_model.pkl
-
-# Output files
-*.png
-!docs/images/*.png
-*.jpg
-*.jpeg
-*.log
-results/*.json
-complete_timing_data_*.json
-timing_data_*.json
-real_timing_data_*.json
-collected_data_*.json
-timing_score_*.json
-comparison_*.json
-smart_analysis_*.json
-
-# Test files
-test_*.py
+.env
+*.env
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
 
-# OS
-.DS_Store
-Thumbs.db
+# Flutter
+flutter_sdk/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
 
-# Jupyter
-.ipynb_checkpoints
-
-# Documentation
-!README.md
-!docs/*.md
-
-# === Spring Boot / Gradle ===
 # Gradle
 .gradle/
 build/
 !gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-gradle-app.setting
-.gradletasknamecache
 
-# Compiled class files
+# Java
 *.class
 *.jar
 *.war
 *.ear
-!gradle-wrapper.jar
-
-# Spring Boot
-target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-# Test results
 *.log
-*.tmp
 
-# Database files (never commit actual DB files)
+# macOS
+.DS_Store
+*.dmg
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Data files (large)
+*.csv
+!data/new_car_schedule.csv
+
+# Model files
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# Database
 *.db
 *.sqlite
 *.sqlite3
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Node
+node_modules/
+
+# Secrets
+secrets/
+*.pem
+*.key
