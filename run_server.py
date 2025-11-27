@@ -237,6 +237,51 @@ async def model_deals(brand: str, model: str, limit: int = 10):
     deals = recommendation_service.get_model_deals(brand, model, limit)
     return {"brand": brand, "model": model, "deals": deals}
 
+@app.post("/api/analyze-deal")
+async def analyze_deal(request: Request):
+    """
+    개별 매물 상세 분석
+    - 가격 적정성
+    - 허위매물 위험도
+    - 네고 포인트
+    """
+    data = await request.json()
+    
+    brand = data.get('brand', '')
+    model = data.get('model', '')
+    year = int(data.get('year', 2020))
+    mileage = int(data.get('mileage', 50000))
+    actual_price = int(data.get('actual_price', 0))
+    predicted_price = int(data.get('predicted_price', 0))
+    fuel = data.get('fuel', '가솔린')
+    
+    # 예측가가 없으면 직접 예측
+    if predicted_price == 0:
+        try:
+            result = prediction_service.predict(brand, model, year, mileage, fuel=fuel)
+            predicted_price = result.predicted_price
+        except:
+            predicted_price = actual_price  # 예측 실패 시 실제가 사용
+    
+    analysis = recommendation_service.analyze_deal(
+        brand=brand,
+        model=model,
+        year=year,
+        mileage=mileage,
+        actual_price=actual_price,
+        predicted_price=predicted_price,
+        fuel=fuel
+    )
+    
+    return {
+        "brand": brand,
+        "model": model,
+        "year": year,
+        "mileage": mileage,
+        "fuel": fuel,
+        **analysis
+    }
+
 @app.get("/api/brands")
 async def brands():
     return {"brands": ["현대", "기아", "제네시스", "쉐보레", "르노코리아", "KG모빌리티", "벤츠", "BMW", "아우디", "폭스바겐", "볼보", "렉서스", "포르쉐", "테슬라"]}

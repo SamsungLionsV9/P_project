@@ -589,6 +589,239 @@ class RecommendationService:
         deals.sort(key=lambda x: x['value_score'], reverse=True)
         return deals[:limit]
     
+    # ========== 개별 매물 분석 ==========
+    
+    def analyze_deal(self, brand: str, model: str, year: int, mileage: int,
+                     actual_price: int, predicted_price: int, fuel: str = '가솔린') -> Dict:
+        """
+        개별 매물 상세 분석
+        - 가격 적정성
+        - 허위매물 위험도
+        - 네고 포인트
+        """
+        result = {
+            'price_fairness': self._calculate_price_fairness(actual_price, predicted_price),
+            'fraud_risk': self._calculate_fraud_risk(actual_price, predicted_price, year, mileage),
+            'nego_points': self._generate_nego_points(actual_price, predicted_price, year, mileage),
+            'summary': {}
+        }
+        
+        # 요약 정보
+        price_diff = predicted_price - actual_price
+        price_diff_pct = (price_diff / predicted_price * 100) if predicted_price > 0 else 0
+        
+        result['summary'] = {
+            'actual_price': int(actual_price),
+            'predicted_price': int(predicted_price),
+            'price_diff': int(price_diff),
+            'price_diff_pct': round(price_diff_pct, 1),
+            'is_good_deal': price_diff > 0,
+            'verdict': self._get_verdict(price_diff_pct, result['fraud_risk']['score'])
+        }
+        
+        return result
+    
+    def _calculate_price_fairness(self, actual_price: int, predicted_price: int) -> Dict:
+        """가격 적정성 계산"""
+        if predicted_price <= 0:
+            return {'score': 50, 'label': '판단불가', 'percentile': 50, 'description': '예측가 정보 부족'}
+        
+        price_ratio = actual_price / predicted_price
+        
+        # 점수 계산 (저렴할수록 높은 점수)
+        if price_ratio <= 0.85:
+            score = 95
+            label = '매우 저렴'
+            percentile = 5
+        elif price_ratio <= 0.95:
+            score = 80
+            label = '저렴'
+            percentile = 15
+        elif price_ratio <= 1.05:
+            score = 60
+            label = '적정'
+            percentile = 50
+        elif price_ratio <= 1.15:
+            score = 40
+            label = '다소 비쌈'
+            percentile = 75
+        else:
+            score = 20
+            label = '비쌈'
+            percentile = 90
+        
+        descriptions = {
+            '매우 저렴': '동일 조건 차량 중 매우 저렴합니다. 차량 상태를 꼼꼼히 확인하세요.',
+            '저렴': '동일 조건 차량 중 저렴한 편입니다.',
+            '적정': '시세에 맞는 적정 가격입니다.',
+            '다소 비쌈': '시세보다 다소 높은 가격입니다. 네고 여지가 있습니다.',
+            '비쌈': '시세보다 높은 가격입니다. 충분한 네고가 필요합니다.'
+        }
+        
+        return {
+            'score': score,
+            'label': label,
+            'percentile': percentile,
+            'description': descriptions.get(label, '')
+        }
+    
+    def _calculate_fraud_risk(self, actual_price: int, predicted_price: int, 
+                               year: int, mileage: int) -> Dict:
+        """허위매물 위험도 산출"""
+        risk_score = 0
+        factors = []
+        
+        # 1. 가격 범위 체크 (예측가의 70~130% 범위)
+        if predicted_price > 0:
+            price_ratio = actual_price / predicted_price
+            
+            if price_ratio < 0.7:
+                risk_score += 40
+                factors.append({
+                    'check': 'price_too_cheap',
+                    'status': 'fail',
+                    'msg': '시세 대비 30% 이상 저렴 - 주의 필요'
+                })
+            elif price_ratio < 0.85:
+                risk_score += 15
+                factors.append({
+                    'check': 'price_cheap',
+                    'status': 'warn',
+                    'msg': '시세 대비 다소 저렴 - 상태 확인 권장'
+                })
+            elif price_ratio > 1.3:
+                risk_score += 10
+                factors.append({
+                    'check': 'price_expensive',
+                    'status': 'warn',
+                    'msg': '시세 대비 높은 가격'
+                })
+            else:
+                factors.append({
+                    'check': 'price_range',
+                    'status': 'pass',
+                    'msg': '가격이 시세 범위 내'
+                })
+        
+        # 2. 주행거리 체크 (연간 1.5만km 기준)
+        current_year = 2025
+        age = max(current_year - year, 1)
+        expected_mileage = age * 15000
+        mileage_ratio = mileage / max(expected_mileage, 1)
+        
+        if mileage_ratio < 0.3:  # 너무 적음 (연식 대비)
+            risk_score += 20
+            factors.append({
+                'check': 'mileage_low',
+                'status': 'warn',
+                'msg': f'주행거리가 연식 대비 매우 적음 ({mileage:,}km)'
+            })
+        elif mileage_ratio > 2.0:  # 너무 많음
+            risk_score += 10
+            factors.append({
+                'check': 'mileage_high',
+                'status': 'warn',
+                'msg': f'주행거리가 평균보다 많음 ({mileage:,}km)'
+            })
+        else:
+            avg_per_year = mileage / age
+            factors.append({
+                'check': 'mileage_normal',
+                'status': 'pass',
+                'msg': f'주행거리 정상 (연평균 {avg_per_year/10000:.1f}만km)'
+            })
+        
+        # 3. 연식 체크
+        if year >= 2020:
+            factors.append({
+                'check': 'year_recent',
+                'status': 'pass',
+                'msg': f'최근 연식 ({year}년)'
+            })
+        elif year >= 2015:
+            risk_score += 5
+            factors.append({
+                'check': 'year_mid',
+                'status': 'info',
+                'msg': f'중간 연식 ({year}년) - 관리 상태 확인 권장'
+            })
+        else:
+            risk_score += 15
+            factors.append({
+                'check': 'year_old',
+                'status': 'warn',
+                'msg': f'오래된 연식 ({year}년) - 정비 이력 확인 필수'
+            })
+        
+        # 위험도 레벨 결정
+        if risk_score >= 60:
+            level = 'high'
+        elif risk_score >= 30:
+            level = 'medium'
+        else:
+            level = 'low'
+        
+        return {
+            'score': min(risk_score, 100),
+            'level': level,
+            'factors': factors
+        }
+    
+    def _generate_nego_points(self, actual_price: int, predicted_price: int,
+                               year: int, mileage: int) -> List[str]:
+        """네고 포인트 생성"""
+        points = []
+        
+        price_diff = predicted_price - actual_price
+        price_diff_pct = (price_diff / predicted_price * 100) if predicted_price > 0 else 0
+        
+        # 가격 기반 네고 포인트
+        if price_diff_pct > 10:
+            points.append('예측가 대비 이미 저렴하여 추가 네고 어려울 수 있음')
+        elif price_diff_pct > 0:
+            points.append(f'예측가 대비 {abs(price_diff):,}만원 저렴 - 소폭 네고 시도 가능')
+        elif price_diff_pct > -5:
+            points.append(f'예측가 수준 - {abs(price_diff):,}만원 정도 네고 시도')
+        elif price_diff_pct > -15:
+            points.append(f'예측가 대비 {abs(price_diff):,}만원 비쌈 - 적극 네고 필요')
+        else:
+            points.append(f'예측가 대비 많이 비쌈 - {abs(price_diff):,}만원 이상 네고 필수')
+        
+        # 일반적인 네고 포인트
+        points.append('등록비용/이전비용 포함 협상 시도')
+        points.append('소모품(타이어, 브레이크패드) 교체 여부 확인')
+        
+        # 주행거리 기반
+        if mileage > 80000:
+            points.append('주행거리 많음 - 타이밍벨트/체인 교체 여부 확인')
+        
+        # 연식 기반
+        current_year = 2025
+        age = current_year - year
+        if age >= 5:
+            points.append(f'{age}년 된 차량 - 주요 소모품 교체 이력 확인')
+        
+        return points
+    
+    def _get_verdict(self, price_diff_pct: float, fraud_risk_score: int) -> str:
+        """종합 판정"""
+        if fraud_risk_score >= 60:
+            return '주의 필요'
+        elif fraud_risk_score >= 30:
+            if price_diff_pct > 5:
+                return '확인 후 구매 권장'
+            else:
+                return '신중한 검토 필요'
+        else:
+            if price_diff_pct > 10:
+                return '추천 매물'
+            elif price_diff_pct > 0:
+                return '괜찮은 매물'
+            elif price_diff_pct > -10:
+                return '적정 매물'
+            else:
+                return '네고 필요'
+    
     # ========== 즐겨찾기 ==========
     
     def add_favorite(self, user_id: str, data: Dict) -> Dict:

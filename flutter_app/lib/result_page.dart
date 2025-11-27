@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'negotiation_page.dart';
 import 'services/api_service.dart';
 
@@ -32,6 +33,10 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
   SimilarResult? _similarResult;
   bool _loadingSimilar = true;
   
+  // 실매물 데이터
+  List<RecommendedCar> _realDeals = [];
+  bool _loadingDeals = true;
+  
   // 편의를 위한 getter
   SmartAnalysisResult get result => widget.analysisResult;
   PredictionResult get prediction => result.prediction;
@@ -42,6 +47,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadSimilarData();
+    _loadRealDeals();
   }
   
   Future<void> _loadSimilarData() async {
@@ -59,6 +65,22 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       });
     } catch (e) {
       setState(() => _loadingSimilar = false);
+    }
+  }
+  
+  Future<void> _loadRealDeals() async {
+    try {
+      final deals = await _api.getModelDeals(
+        brand: widget.brand,
+        model: widget.model,
+        limit: 5,
+      );
+      setState(() {
+        _realDeals = deals;
+        _loadingDeals = false;
+      });
+    } catch (e) {
+      setState(() => _loadingDeals = false);
     }
   }
 
@@ -177,7 +199,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               tabs: const [
                 Tab(text: "가격 분석"),
                 Tab(text: "구매 타이밍"),
-                Tab(text: "AI 조언"),
+                Tab(text: "시장 조언"),
               ],
             ),
           ),
@@ -279,7 +301,174 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               ],
             ),
           ),
+          const SizedBox(height: 20),
+          
+          // 실매물 섹션
+          _buildRealDealsSection(cardColor, textColor, isDark),
         ],
+      ),
+    );
+  }
+  
+  /// 실매물 섹션 위젯
+  Widget _buildRealDealsSection(Color cardColor, Color textColor, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.directions_car, color: Color(0xFF0066FF), size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    "이 조건의 실매물",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                  ),
+                ],
+              ),
+              if (_realDeals.isNotEmpty)
+                Text(
+                  "${_realDeals.length}건",
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          if (_loadingDeals)
+            const SizedBox(
+              height: 100,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_realDeals.isEmpty)
+            SizedBox(
+              height: 80,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off, color: Colors.grey[400], size: 32),
+                    const SizedBox(height: 8),
+                    Text("매물 데이터가 없습니다", style: TextStyle(color: Colors.grey[400])),
+                  ],
+                ),
+              ),
+            )
+          else
+            Column(
+              children: _realDeals.map((deal) => _buildDealCard(deal, textColor, isDark)).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  /// 개별 매물 카드
+  Widget _buildDealCard(RecommendedCar deal, Color textColor, bool isDark) {
+    final priceDiff = prediction.predictedPrice - deal.actualPrice;
+    final isGood = priceDiff > 0;
+    
+    return GestureDetector(
+      onTap: () => _showDealAnalysisModal(deal),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isGood ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (isGood)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            "🔥 가성비",
+                            style: TextStyle(color: Colors.green, fontSize: 10),
+                          ),
+                        ),
+                      Expanded(
+                        child: Text(
+                          "${deal.brand} ${deal.model}",
+                          style: TextStyle(
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${deal.year}년 • ${(deal.mileage / 10000).toStringAsFixed(1)}만km • ${deal.fuel}",
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  "${_formatPrice(deal.actualPrice.toDouble())}만원",
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  isGood 
+                    ? "예측가 대비 -${priceDiff.abs()}만원"
+                    : "예측가 대비 +${priceDiff.abs()}만원",
+                  style: TextStyle(
+                    color: isGood ? Colors.green : Colors.red,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// 개별 매물 분석 모달 표시
+  Future<void> _showDealAnalysisModal(RecommendedCar deal) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DealAnalysisModal(
+        deal: deal,
+        predictedPrice: prediction.predictedPrice.toInt(),
       ),
     );
   }
@@ -463,13 +652,17 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     );
   }
 
-  // Tab 3: AI 조언
+  // Tab 3: 시장 조언 (개별 매물이 아닌 시장 전체 관점)
   Widget _buildAIAdviceTab(bool isDark, Color cardColor, Color textColor) {
+    // 시장 상황 분석
+    final priceAdvice = _getMarketPriceAdvice();
+    final timingAdvice = _getMarketTimingAdvice();
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // AI 조언 카드
+          // 시장 조언 카드
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -485,7 +678,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                     color: Color(0xFF0066FF),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
+                  child: const Icon(Icons.analytics, color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -493,12 +686,12 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "AI 조언",
+                        "시장 조언",
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "이 차량은 시세 대비 적정합니다. 현재 시장에서 동일한 연식과 주행거리를 가진 차량들과 비교했을 때 합리적인 가격대를 형성하고 있습니다.\n\n다만, 구매 전 반드시 차량 상태를 직접 확인하고, 정비 이력과 사고 이력을 꼼꼼히 확인하시기 바랍니다.",
+                        priceAdvice,
                         style: TextStyle(color: textColor, height: 1.5, fontSize: 14),
                       ),
                     ],
@@ -509,7 +702,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 20),
 
-          // 허위매물 위험도
+          // 추천 예산 범위
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -520,56 +713,66 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    const Icon(Icons.savings, color: Color(0xFF0066FF), size: 20),
+                    const SizedBox(width: 8),
                     Text(
-                      "허위매물 위험도",
+                      "추천 예산 범위",
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
                     ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF00C853),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text(
-                          "낮음",
-                          style: TextStyle(
-                            color: Color(0xFF00C853),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: 0.35,
-                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[100],
-                    color: const Color(0xFF00C853),
-                    minHeight: 10,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("위험도 점수", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    Text("35 / 100", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  "가격, 사진, 상세 정보가 일치하며 신뢰할 수 있는 매물입니다. 판매자와 직접 통화하여 추가 확인을 권장합니다.",
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                _buildBudgetRange(textColor, isDark),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.blue.withOpacity(0.1) : const Color(0xFFE3F2FD),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lightbulb, color: Color(0xFF0066FF), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "예측가의 90~110% 범위에서 협상을 시작하세요",
+                          style: TextStyle(color: textColor, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // 구매 타이밍 요약
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.schedule, color: Color(0xFF00C853), size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      "타이밍 요약",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  timingAdvice,
+                  style: TextStyle(color: textColor, height: 1.5, fontSize: 14),
                 ),
               ],
             ),
@@ -723,6 +926,121 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     if (score >= 70) return const Color(0xFF00C853);
     if (score >= 50) return const Color(0xFFFFAB00);
     return Colors.red;
+  }
+  
+  /// 시장 가격 조언 생성
+  String _getMarketPriceAdvice() {
+    final price = prediction.predictedPrice;
+    final confidence = prediction.confidence;
+    final brand = widget.brand;
+    final model = widget.model;
+    
+    String advice = "$brand $model ${widget.year}년식의 ";
+    
+    if (confidence >= 80) {
+      advice += "예상 시세는 ${_formatPrice(price)}만원입니다. ";
+      advice += "동일 조건의 차량 데이터가 충분하여 신뢰도가 높습니다.\n\n";
+    } else if (confidence >= 60) {
+      advice += "예상 시세는 ${_formatPrice(price)}만원입니다. ";
+      advice += "유사 차량 데이터를 기반으로 분석했습니다.\n\n";
+    } else {
+      advice += "예상 시세는 약 ${_formatPrice(price)}만원입니다. ";
+      advice += "데이터가 부족하여 참고용으로 활용하세요.\n\n";
+    }
+    
+    advice += "실제 매물을 확인할 때는 차량 상태, 옵션, 사고 이력에 따라 가격이 달라질 수 있습니다.";
+    
+    return advice;
+  }
+  
+  /// 시장 타이밍 조언 생성
+  String _getMarketTimingAdvice() {
+    final score = timing.score;
+    final seasonalTrend = timing.seasonalScore;
+    
+    if (score >= 70) {
+      return "현재는 이 모델을 구매하기 좋은 시기입니다. "
+             "시장 가격이 안정적이며, 매물도 충분합니다. "
+             "마음에 드는 차량이 있다면 적극 검토해보세요.";
+    } else if (score >= 50) {
+      return "현재 시장 상황은 보통입니다. "
+             "급하지 않다면 ${timing.recommendedMonths.isNotEmpty ? timing.recommendedMonths.first : '다음 달'}까지 기다려보는 것도 방법입니다. "
+             "가격 변동을 지켜보며 결정하세요.";
+    } else {
+      return "현재는 구매를 서두르지 않는 것이 좋습니다. "
+             "${timing.recommendedMonths.isNotEmpty ? timing.recommendedMonths.join(', ') + '월' : '이후'}에 가격이 하락할 가능성이 있습니다. "
+             "조금 더 기다려보세요.";
+    }
+  }
+  
+  /// 추천 예산 범위 위젯
+  Widget _buildBudgetRange(Color textColor, bool isDark) {
+    final predicted = prediction.predictedPrice;
+    final minBudget = (predicted * 0.9).round();
+    final maxBudget = (predicted * 1.1).round();
+    
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            children: [
+              Text("최소", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(
+                "${_formatPrice(minBudget.toDouble())}만원",
+                style: TextStyle(
+                  color: const Color(0xFF0066FF),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          height: 40,
+          width: 1,
+          color: isDark ? Colors.grey[700] : Colors.grey[300],
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              Text("예측가", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(
+                "${_formatPrice(predicted)}만원",
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          height: 40,
+          width: 1,
+          color: isDark ? Colors.grey[700] : Colors.grey[300],
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              Text("최대", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(
+                "${_formatPrice(maxBudget.toDouble())}만원",
+                style: TextStyle(
+                  color: const Color(0xFFE53935),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
   
   /// 비슷한 차량 분포 위젯
@@ -888,6 +1206,468 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       case 'orange': return const Color(0xFFFF9800);
       case 'red': return Colors.red;
       default: return Colors.grey;
+    }
+  }
+}
+
+/// 개별 매물 분석 모달
+class DealAnalysisModal extends StatefulWidget {
+  final RecommendedCar deal;
+  final int predictedPrice;
+
+  const DealAnalysisModal({
+    super.key,
+    required this.deal,
+    required this.predictedPrice,
+  });
+
+  @override
+  State<DealAnalysisModal> createState() => _DealAnalysisModalState();
+}
+
+class _DealAnalysisModalState extends State<DealAnalysisModal> {
+  final ApiService _api = ApiService();
+  DealAnalysis? _analysis;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAnalysis();
+  }
+
+  Future<void> _loadAnalysis() async {
+    try {
+      final analysis = await _api.analyzeDeal(
+        brand: widget.deal.brand,
+        model: widget.deal.model,
+        year: widget.deal.year,
+        mileage: widget.deal.mileage,
+        actualPrice: widget.deal.actualPrice,
+        predictedPrice: widget.predictedPrice,
+        fuel: widget.deal.fuel,
+      );
+      setState(() {
+        _analysis = analysis;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 핸들
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "📊 매물 상세 분석",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // 내용
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(child: Text("분석 실패: $_error"))
+                        : _buildContent(scrollController, isDark),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildContent(ScrollController scrollController, bool isDark) {
+    if (_analysis == null) return const SizedBox();
+    
+    final analysis = _analysis!;
+    final summary = analysis.summary;
+    final textColor = isDark ? Colors.white : Colors.black;
+    
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.all(16),
+      children: [
+        // 차량 정보 및 가격 비교
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[50],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "${widget.deal.brand} ${widget.deal.model} ${widget.deal.year}년",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text("실제가", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Text(
+                          "${summary.actualPrice}만원",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text("예측가", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Text(
+                          "${summary.predictedPrice}만원",
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0066FF)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text("차이", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Text(
+                          "${summary.priceDiff > 0 ? '-' : '+'}${summary.priceDiff.abs()}만원",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: summary.priceDiff > 0 ? Colors.green : Colors.red,
+                          ),
+                        ),
+                        Text(
+                          "(${summary.priceDiffPct.abs().toStringAsFixed(1)}%${summary.priceDiff > 0 ? '↓' : '↑'})",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: summary.priceDiff > 0 ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: summary.isGoodDeal 
+                    ? Colors.green.withOpacity(0.1) 
+                    : Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      summary.isGoodDeal ? Icons.thumb_up : Icons.info,
+                      color: summary.isGoodDeal ? Colors.green : Colors.orange,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      summary.verdict,
+                      style: TextStyle(
+                        color: summary.isGoodDeal ? Colors.green : Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 가격 적정성
+        _buildSection(
+          title: "💰 가격 적정성",
+          isDark: isDark,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    analysis.priceFairness.label,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: _getFairnessColor(analysis.priceFairness.label),
+                    ),
+                  ),
+                  Text(
+                    "상위 ${analysis.priceFairness.percentile}%",
+                    style: TextStyle(color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: analysis.priceFairness.score / 100,
+                  backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                  color: _getFairnessColor(analysis.priceFairness.label),
+                  minHeight: 8,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                analysis.priceFairness.description,
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 허위매물 위험도
+        _buildSection(
+          title: "⚠️ 허위매물 위험도",
+          isDark: isDark,
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: analysis.fraudRisk.levelColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: analysis.fraudRisk.levelColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  analysis.fraudRisk.levelText,
+                  style: TextStyle(
+                    color: analysis.fraudRisk.levelColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: analysis.fraudRisk.score / 100,
+                  backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                  color: analysis.fraudRisk.levelColor,
+                  minHeight: 8,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "${analysis.fraudRisk.score} / 100",
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              ...analysis.fraudRisk.factors.map((factor) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Icon(factor.statusIcon, color: factor.statusColor, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        factor.msg,
+                        style: TextStyle(color: textColor, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 네고 포인트
+        _buildSection(
+          title: "💡 네고 포인트",
+          isDark: isDark,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: analysis.negoPoints.map((point) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("•", style: TextStyle(fontSize: 16, color: Color(0xFF0066FF))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      point,
+                      style: TextStyle(color: textColor, fontSize: 13, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            )).toList(),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // 버튼
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NegotiationPage(
+                        initialTabIndex: 0,
+                        carName: "${widget.deal.brand} ${widget.deal.model} ${widget.deal.year}년",
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text("네고 문자"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0066FF),
+                  side: const BorderSide(color: Color(0xFF0066FF)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _openEncar(),
+                icon: const Icon(Icons.open_in_browser, size: 18),
+                label: const Text("엔카에서 보기"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0066FF),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildSection({
+    required String title,
+    required bool isDark,
+    required Widget child,
+    Widget? trailing,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[50],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              if (trailing != null) trailing,
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Color _getFairnessColor(String label) {
+    switch (label) {
+      case '매우 저렴': return const Color(0xFF00C853);
+      case '저렴': return const Color(0xFF66BB6A);
+      case '적정': return const Color(0xFF0066FF);
+      case '다소 비쌈': return const Color(0xFFFFA726);
+      case '비쌈': return const Color(0xFFE53935);
+      default: return Colors.grey;
+    }
+  }
+
+  Future<void> _openEncar() async {
+    final url = widget.deal.detailUrl ?? 
+        'https://www.encar.com/dc/dc_carsearchlist.do?q=${Uri.encodeComponent('${widget.deal.brand} ${widget.deal.model}')}';
+    
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      // ignore
     }
   }
 }
