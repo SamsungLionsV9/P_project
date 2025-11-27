@@ -8,16 +8,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import os
 
-from .schemas.schemas import (
+from schemas.schemas import (
     PredictRequest, PredictResponse,
     TimingRequest, TimingResponse,
     SmartAnalysisRequest, SmartAnalysisResponse,
     HealthResponse, BrandsResponse, ModelsResponse, FuelTypesResponse
 )
-from .services.prediction_v11 import PredictionServiceV11
-from .services.timing import TimingService
-from .services.groq_service import GroqService
-from .utils.validators import (
+from services.prediction_v11 import PredictionServiceV11
+from services.timing import TimingService
+from services.groq_service import GroqService
+from utils.validators import (
     validate_vehicle_data,
     get_supported_brands,
     get_supported_fuel_types,
