@@ -682,12 +682,23 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
       // 연식에 따른 정확한 모델명 변환
       final backendModel = _getBackendModelName(_selectedBrand!, _selectedModel!, year);
       
+      // 성능점검 별표 → 등급 변환 (1-2: normal, 3-4: good, 5: excellent)
+      String inspectionGrade;
+      if (_performanceRating >= 5) {
+        inspectionGrade = 'excellent';
+      } else if (_performanceRating >= 3) {
+        inspectionGrade = 'good';
+      } else {
+        inspectionGrade = 'normal';
+      }
+      
       // 디버그: API 호출 전 파라미터 출력
       debugPrint('🚗 API 호출: brand=$_selectedBrand, model=$_selectedModel → $backendModel, year=$year, mileage=$mileage, fuel=$_selectedFuel');
       debugPrint('⚙️ 옵션: 선루프=$_hasSunroof, 내비=$_hasNavigation, 가죽시트=$_hasLeatherSeats, 스마트키=$_hasSmartKey, 후방카메라=$_hasRearCamera');
+      debugPrint('⭐ 성능점검: $_performanceRating → $inspectionGrade');
       debugPrint('🌐 API URL: ${_apiService.currentBaseUrl}');
       
-      // 통합 분석 API 호출 (변환된 모델명 + 옵션 포함)
+      // 통합 분석 API 호출 (변환된 모델명 + 옵션 + 성능점검 포함)
       final result = await _apiService.smartAnalysis(
         brand: _selectedBrand!,
         model: backendModel,  // 연식 기반 변환된 모델명
@@ -700,6 +711,8 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
         hasLeatherSeat: _hasLeatherSeats,
         hasSmartKey: _hasSmartKey,
         hasRearCamera: _hasRearCamera,
+        // 성능점검 등급 전달
+        inspectionGrade: inspectionGrade,
       );
       
       // 디버그: API 응답 출력

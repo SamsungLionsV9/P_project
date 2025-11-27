@@ -76,6 +76,8 @@ class SmartAnalysisRequest(BaseModel):
     has_ventilated_seat: Optional[bool] = False
     has_led_lamp: Optional[bool] = False
     is_accident_free: Optional[bool] = True
+    # 성능점검 등급 (normal/good/excellent)
+    inspection_grade: Optional[str] = "normal"
     # AI 분석용
     sale_price: Optional[int] = None
     dealer_description: Optional[str] = None
@@ -143,10 +145,13 @@ async def smart_analysis(request: SmartAnalysisRequest):
         'has_led_lamp': request.has_led_lamp or False,
     }
     
-    # 디버그: 옵션 로그 출력
-    print(f"📊 [smart-analysis] model={request.model}, fuel={request.fuel}, options={options}")
+    # 성능점검 등급 매핑 (별표 개수 → 등급)
+    grade = request.inspection_grade or "normal"
     
-    # 가격 예측 (옵션 + 연료 포함)
+    # 디버그: 옵션 로그 출력
+    print(f"📊 [smart-analysis] model={request.model}, fuel={request.fuel}, grade={grade}, options={options}")
+    
+    # 가격 예측 (옵션 + 연료 + 성능점검 포함)
     pred = prediction_service.predict(
         brand=request.brand,
         model_name=request.model,
@@ -154,7 +159,8 @@ async def smart_analysis(request: SmartAnalysisRequest):
         mileage=request.mileage,
         options=options,
         accident_free=request.is_accident_free or True,
-        fuel=request.fuel  # 연료 타입 전달
+        grade=grade,  # 성능점검 등급 전달
+        fuel=request.fuel
     )
     
     # 타이밍

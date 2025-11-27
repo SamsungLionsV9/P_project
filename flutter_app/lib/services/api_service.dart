@@ -131,6 +131,8 @@ class ApiService {
     bool hasVentilatedSeat = false,
     bool hasLedLamp = false,
     bool isAccidentFree = true,
+    // 성능점검 등급 (1-5 별표 → normal/good/excellent)
+    String inspectionGrade = 'normal',
     // AI 분석용
     int? salePrice,
     String? dealerDescription,
@@ -155,6 +157,7 @@ class ApiService {
           'has_ventilated_seat': hasVentilatedSeat,
           'has_led_lamp': hasLedLamp,
           'is_accident_free': isAccidentFree,
+          'inspection_grade': inspectionGrade,
           if (salePrice != null) 'sale_price': salePrice,
           if (dealerDescription != null) 'dealer_description': dealerDescription,
         }),
