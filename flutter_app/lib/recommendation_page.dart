@@ -20,7 +20,9 @@ class _RecommendationPageState extends State<RecommendationPage>
   List<PopularCar> _popularDomestic = [];
   List<PopularCar> _popularImported = [];
   List<RecommendedCar> _recommendations = [];
-  List<SearchHistory> _recentSearches = [];
+  
+  // 최근 조회한 매물 (세션 내 로컬 저장) - 추천 탭용
+  List<RecommendedCar> _recentViewedCars = [];
 
   bool _isLoading = true;
   String? _error;
@@ -59,14 +61,12 @@ class _RecommendationPageState extends State<RecommendationPage>
           budgetMax: _budgetMax,
           limit: 20,
         ),
-        _api.getHistory(limit: 5),
       ]);
 
       setState(() {
         _popularDomestic = results[0] as List<PopularCar>;
         _popularImported = results[1] as List<PopularCar>;
         _recommendations = results[2] as List<RecommendedCar>;
-        _recentSearches = results[3] as List<SearchHistory>;
         _isLoading = false;
       });
     } catch (e) {
@@ -75,6 +75,24 @@ class _RecommendationPageState extends State<RecommendationPage>
         _isLoading = false;
       });
     }
+  }
+  
+  /// 최근 조회 기록에 매물 추가 (로컬)
+  void _addToRecentViewed(RecommendedCar car) {
+    setState(() {
+      // 중복 제거 (동일 차량이 있으면 제거 후 맨 앞에 추가)
+      _recentViewedCars.removeWhere((c) => 
+        c.brand == car.brand && 
+        c.model == car.model && 
+        c.year == car.year &&
+        c.actualPrice == car.actualPrice
+      );
+      _recentViewedCars.insert(0, car);
+      // 최대 20개 유지
+      if (_recentViewedCars.length > 20) {
+        _recentViewedCars = _recentViewedCars.sublist(0, 20);
+      }
+    });
   }
 
   @override
@@ -186,59 +204,8 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// 조회 기록 저장
-  Future<void> _addToHistory({
-    required String brand,
-    required String model,
-    required int year,
-    required int mileage,
-    double? predictedPrice,
-  }) async {
-    try {
-      await _api.addHistory(
-        brand: brand,
-        model: model,
-        year: year,
-        mileage: mileage,
-        predictedPrice: predictedPrice ?? 0,
-      );
-      // 로컬 리스트에도 추가 (중복 방지)
-      final exists = _recentSearches.any((h) => 
-        h.brand == brand && h.model == model && h.year == year
-      );
-      if (!exists) {
-        setState(() {
-          _recentSearches.insert(0, SearchHistory(
-            brand: brand,
-            model: model,
-            year: year,
-            mileage: mileage,
-            predictedPrice: predictedPrice,
-          ));
-          // 최대 20개 유지
-          if (_recentSearches.length > 20) {
-            _recentSearches.removeLast();
-          }
-        });
-      }
-    } catch (e) {
-      // 무시
-    }
-  }
-
-  /// 인기 모델 클릭 시 가성비 매물 모달 표시 + 조회 기록
-  Future<void> _showModelDeals(PopularCar car) async {
-    // 조회 기록 저장
-    await _addToHistory(
-      brand: car.brand,
-      model: car.model,
-      year: 2023,  // 인기 모델은 대표 연식
-      mileage: 30000,  // 대표 주행거리
-      predictedPrice: car.avgPrice.toDouble(),
-    );
-    
-    if (!mounted) return;
-    
+  /// 인기 모델 클릭 시 가성비 매물 모달 표시
+  void _showModelDeals(PopularCar car) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -249,7 +216,7 @@ class _RecommendationPageState extends State<RecommendationPage>
         avgPrice: car.avgPrice,
         medianPrice: car.medianPrice,
         listings: car.listings,
-        onCarViewed: _addToHistory,  // 콜백 전달
+        onCarViewed: _addToRecentViewed,  // 최근 조회 콜백
       ),
     );
   }
@@ -408,16 +375,10 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// 추천 차량 클릭 시 상세 분석 모달 표시 + 조회 기록 저장
+  /// 추천 차량 클릭 시 상세 분석 모달 표시 + 최근 조회 저장
   void _showRecommendationAnalysis(RecommendedCar car) {
-    // 조회 기록 저장
-    _addToHistory(
-      brand: car.brand,
-      model: car.model,
-      year: car.year,
-      mileage: car.mileage,
-      predictedPrice: car.predictedPrice.toDouble(),
-    );
+    // 최근 조회 기록에 추가 (로컬)
+    _addToRecentViewed(car);
     
     // 상세 분석 모달 표시
     showModalBottomSheet(
@@ -426,7 +387,7 @@ class _RecommendationPageState extends State<RecommendationPage>
       backgroundColor: Colors.transparent,
       builder: (context) => DealAnalysisModal(
         deal: car,
-        predictedPrice: car.predictedPrice,  // 차량의 예측가 사용
+        predictedPrice: car.predictedPrice,
       ),
     );
   }
@@ -577,9 +538,9 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// 최근 조회 탭
+  /// 최근 조회 탭 (세션 내 로컬 저장 - 추천 차량 클릭 기록)
   Widget _buildHistoryTab() {
-    return _recentSearches.isEmpty
+    return _recentViewedCars.isEmpty
         ? Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -600,18 +561,18 @@ class _RecommendationPageState extends State<RecommendationPage>
           )
         : Column(
             children: [
-              // 전체 삭제 버튼
+              // 헤더
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '총 ${_recentSearches.length}건',
+                      '총 ${_recentViewedCars.length}건',
                       style: TextStyle(color: Colors.grey[400], fontSize: 14),
                     ),
                     TextButton.icon(
-                      onPressed: _clearAllHistory,
+                      onPressed: _clearRecentViewed,
                       icon: const Icon(Icons.delete_sweep, size: 18, color: Colors.red),
                       label: const Text('전체 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
                     ),
@@ -621,29 +582,20 @@ class _RecommendationPageState extends State<RecommendationPage>
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _recentSearches.length,
+                  itemCount: _recentViewedCars.length,
                   itemBuilder: (context, index) {
-                    final history = _recentSearches[index];
-                    return Dismissible(
-                      key: Key('history_${history.id ?? index}'),
-                      direction: DismissDirection.endToStart,
-                      onDismissed: (direction) => _deleteHistory(history.id ?? 0),
-                      background: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.delete, color: Colors.red),
-                      ),
+                    final car = _recentViewedCars[index];
+                    return GestureDetector(
+                      onTap: () => _showRecommendationAnalysis(car),
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: const Color(0xFF252542),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: car.isGoodDeal ? Colors.green.withOpacity(0.4) : Colors.white10,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -651,10 +603,13 @@ class _RecommendationPageState extends State<RecommendationPage>
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: Colors.white10,
+                                color: car.isGoodDeal ? Colors.green.withOpacity(0.1) : Colors.white10,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(Icons.history, color: Colors.white54),
+                              child: Icon(
+                                car.isGoodDeal ? Icons.thumb_up : Icons.directions_car,
+                                color: car.isGoodDeal ? Colors.green : Colors.white54,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -662,7 +617,7 @@ class _RecommendationPageState extends State<RecommendationPage>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${history.brand} ${history.model}',
+                                    '${car.brand} ${car.model}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
@@ -671,24 +626,36 @@ class _RecommendationPageState extends State<RecommendationPage>
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${history.year}년 • ${(history.mileage / 10000).toStringAsFixed(1)}만km',
+                                    '${car.year}년 • ${(car.mileage / 10000).toStringAsFixed(1)}만km • ${car.fuel}',
                                     style: TextStyle(color: Colors.grey[400], fontSize: 13),
                                   ),
                                 ],
                               ),
                             ),
-                            if (history.predictedPrice != null)
-                              Text(
-                                '${history.predictedPrice!.toStringAsFixed(0)}만원',
-                                style: const TextStyle(
-                                  color: Color(0xFF6C63FF),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '${car.actualPrice}만원',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
+                                if (car.priceDiff > 0)
+                                  Text(
+                                    '-${car.priceDiff}만원',
+                                    style: const TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () => _deleteHistory(history.id ?? 0),
+                              onTap: () => _removeFromRecentViewed(index),
                               child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
                             ),
                           ],
@@ -702,21 +669,16 @@ class _RecommendationPageState extends State<RecommendationPage>
           );
   }
 
-  /// 검색 이력 삭제
-  Future<void> _deleteHistory(int id) async {
-    try {
-      await _api.removeHistory(id);
-      setState(() {
-        _recentSearches.removeWhere((h) => h.id == id);
-      });
-    } catch (e) {
-      // ignore
-    }
+  /// 최근 조회에서 제거
+  void _removeFromRecentViewed(int index) {
+    setState(() {
+      _recentViewedCars.removeAt(index);
+    });
   }
 
-  /// 전체 이력 삭제
-  Future<void> _clearAllHistory() async {
-    final confirm = await showDialog<bool>(
+  /// 최근 조회 전체 삭제
+  void _clearRecentViewed() {
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF252542),
@@ -724,27 +686,19 @@ class _RecommendationPageState extends State<RecommendationPage>
         content: const Text('모든 조회 기록을 삭제하시겠습니까?', style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              setState(() => _recentViewedCars.clear());
+              Navigator.pop(context);
+            },
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-    
-    if (confirm == true) {
-      try {
-        await _api.clearHistory();
-        setState(() {
-          _recentSearches.clear();
-        });
-      } catch (e) {
-        // ignore
-      }
-    }
   }
 
   void _showBudgetFilter() {
@@ -814,13 +768,7 @@ class _ModelDealsModal extends StatefulWidget {
   final int avgPrice;
   final int medianPrice;
   final int listings;
-  final Future<void> Function({
-    required String brand,
-    required String model,
-    required int year,
-    required int mileage,
-    double? predictedPrice,
-  })? onCarViewed;
+  final void Function(RecommendedCar car)? onCarViewed;
 
   const _ModelDealsModal({
     required this.brand,
@@ -872,16 +820,8 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
 
   /// 매물 클릭 시 상세 분석 모달 표시
   void _showDealAnalysis(RecommendedCar car) {
-    // 조회 기록 저장 (콜백 호출)
-    if (widget.onCarViewed != null) {
-      widget.onCarViewed!(
-        brand: car.brand,
-        model: car.model,
-        year: car.year,
-        mileage: car.mileage,
-        predictedPrice: car.predictedPrice.toDouble(),
-      );
-    }
+    // 최근 조회 기록에 추가 (콜백 호출)
+    widget.onCarViewed?.call(car);
     
     // 상세 분석 모달 표시
     showModalBottomSheet(
@@ -890,7 +830,7 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
       backgroundColor: Colors.transparent,
       builder: (context) => DealAnalysisModal(
         deal: car,
-        predictedPrice: widget.avgPrice,  // 모델 평균가를 예측가로 사용
+        predictedPrice: car.predictedPrice,  // 각 매물의 예측가 사용
       ),
     );
   }
