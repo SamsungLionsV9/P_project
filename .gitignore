@@ -96,3 +96,6 @@ target/
 *.db
 *.sqlite
 *.sqlite3
+
+# Backup files
+models/backup/
