@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'car_info_input_page.dart';
 import 'mypage.dart';
 import 'settings_page.dart';
 import 'recommendation_page.dart';
+import 'comparison_page.dart';
 import 'oauth_webview_page.dart';
 import 'signup_page.dart';
 import 'services/auth_service.dart';
+import 'theme/theme_provider.dart';
+import 'providers/comparison_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,74 +18,61 @@ void main() async {
   // 저장된 토큰 로드
   await AuthService().loadSavedToken();
   
-  runApp(const CarPriceApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ComparisonProvider()),
+      ],
+      child: const CarPriceApp(),
+    ),
+  );
 }
 
-class CarPriceApp extends StatefulWidget {
+class CarPriceApp extends StatelessWidget {
   const CarPriceApp({super.key});
 
   @override
-  State<CarPriceApp> createState() => _CarPriceAppState();
-}
-
-class _CarPriceAppState extends State<CarPriceApp> {
-  // 테마 모드 상태 관리 (기본값: 라이트 모드)
-  ThemeMode _themeMode = ThemeMode.light;
-
-  void _toggleTheme(bool isDark) {
-    setState(() {
-      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
-    });
-  }
-
-
-  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '중고차 시세 예측',
-      debugShowCheckedModeBanner: false,
-      themeMode: _themeMode,
-      // 라이트 테마 정의
-      theme: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: const Color(0xFF0066FF),
-        scaffoldBackgroundColor: const Color(0xFFF5F7FA),
-        fontFamily: 'Pretendard',
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF5F7FA),
-          foregroundColor: Colors.black,
-        ),
-      ),
-      // 다크 테마 정의
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF0066FF),
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        fontFamily: 'Pretendard',
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF121212),
-          foregroundColor: Colors.white,
-        ),
-      ),
-      home: MainScreen(
-        isDarkMode: _themeMode == ThemeMode.dark,
-        onThemeChanged: _toggleTheme,
-      ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: '중고차 시세 예측',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeProvider.themeMode,
+          // 라이트 테마 정의
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primaryColor: const Color(0xFF0066FF),
+            scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+            fontFamily: 'Pretendard',
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFFF5F7FA),
+              foregroundColor: Colors.black,
+            ),
+          ),
+          // 다크 테마 정의
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primaryColor: const Color(0xFF0066FF),
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            fontFamily: 'Pretendard',
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF121212),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          home: const MainScreen(),
+        );
+      },
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  final bool isDarkMode;
-  final ValueChanged<bool> onThemeChanged;
-
-  const MainScreen({
-    super.key,
-    required this.isDarkMode,
-    required this.onThemeChanged,
-  });
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -89,36 +80,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    // 페이지 리스트 초기화 시 콜백 전달
-    _pages = [
-      const HomePageContent(),
-      const CarInfoInputPage(),
-      const RecommendationPage(),  // 추천 페이지 추가
-      const MyPage(),
-      SettingsPage(
-        isDarkMode: widget.isDarkMode,
-        onThemeChanged: widget.onThemeChanged,
-      ),
-    ];
-  }
-
-  @override
-  void didUpdateWidget(MainScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 테마 변경 시 SettingsPage 업데이트
-    if (oldWidget.isDarkMode != widget.isDarkMode) {
-      _pages[4] = SettingsPage(
-        isDarkMode: widget.isDarkMode,
-        onThemeChanged: widget.onThemeChanged,
-      );
-    }
-  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -128,14 +89,24 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
     final navBgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final unselectedItemColor = isDark ? Colors.grey[600] : Colors.grey[400];
+    
+    // 페이지 리스트 (빌드 시점에 생성)
+    final pages = [
+      const HomePageContent(),
+      const CarInfoInputPage(),
+      const RecommendationPage(),
+      const MyPage(),
+      const SettingsPage(),
+    ];
 
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

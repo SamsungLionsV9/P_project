@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
 
 /// 차량 추천 페이지
@@ -333,20 +334,48 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
+  /// URL로 상세페이지 열기
+  Future<void> _openDetailUrl(RecommendedCar car) async {
+    // 엔카 상세 URL 생성 (실제 URL이 있으면 사용, 없으면 검색 URL)
+    final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
+    final url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
+    
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('링크를 열 수 없습니다')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildRecommendationCard(RecommendedCar car) {
     final isGood = car.isGoodDeal;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF252542),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isGood ? Colors.green.withOpacity(0.5) : Colors.white10,
-          width: isGood ? 2 : 1,
+    return GestureDetector(
+      onTap: () => _openDetailUrl(car),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252542),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isGood ? Colors.green.withOpacity(0.5) : Colors.white10,
+            width: isGood ? 2 : 1,
+          ),
         ),
-      ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -450,7 +479,18 @@ class _RecommendationPageState extends State<RecommendationPage>
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          // 상세보기 안내
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Icon(Icons.open_in_new, size: 14, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text('탭하여 상세보기', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+            ],
+          ),
         ],
+      ),
       ),
     );
   }

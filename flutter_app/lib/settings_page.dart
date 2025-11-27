@@ -1,29 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'theme/theme_provider.dart';
 
-class SettingsPage extends StatefulWidget {
-  final bool isDarkMode;
-  final ValueChanged<bool> onThemeChanged;
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
 
-  const SettingsPage({
-    super.key,
-    required this.isDarkMode,
-    required this.onThemeChanged,
-  });
-
-  @override
-  State<SettingsPage> createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
-    // 다크 모드에 따른 색상 정의
-    final isDark = widget.isDarkMode;
-    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA);
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
-    final iconColor = isDark ? Colors.white70 : Colors.black87;
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        // 다크 모드에 따른 색상 정의
+        final isDark = themeProvider.isDarkMode;
+        final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA);
+        final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+        final textColor = isDark ? Colors.white : Colors.black;
+        final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
+        final iconColor = isDark ? Colors.white70 : Colors.black87;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -62,8 +54,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   _buildSwitchTile(
                     title: "다크 모드",
-                    value: widget.isDarkMode,
-                    onChanged: widget.onThemeChanged,
+                    value: themeProvider.isDarkMode,
+                    onChanged: (value) => themeProvider.setDarkMode(value),
                     textColor: textColor,
                     activeColor: const Color(0xFF0066FF),
                   ),
@@ -139,6 +131,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 

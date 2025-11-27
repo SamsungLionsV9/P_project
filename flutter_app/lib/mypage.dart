@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'services/api_service.dart';
+import 'providers/comparison_provider.dart';
+import 'models/car_data.dart';
+import 'comparison_page.dart';
 
 /// 마이페이지 - 백엔드 연동 버전
 /// 찜한 차량, 최근 분석, 가격 알림 모두 DB에서 관리
@@ -217,6 +221,8 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
 
   // 1. 찜한 차량 탭 (DB 기반)
   Widget _buildFavoritesTab(bool isDark, Color cardColor, Color textColor) {
+    final comparisonProvider = Provider.of<ComparisonProvider>(context);
+    
     if (_favorites.isEmpty) {
       return Center(
         child: Column(
@@ -232,16 +238,47 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(20),
-        itemCount: _favorites.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 16),
-        itemBuilder: (context, index) {
-          return _buildFavoriteCard(_favorites[index], isDark, cardColor, textColor);
-        },
-      ),
+    return Column(
+      children: [
+        // 가격 비교 버튼
+        if (comparisonProvider.hasEnoughToCompare)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ComparisonPage()),
+                  );
+                },
+                icon: const Icon(Icons.compare_arrows),
+                label: Text("${comparisonProvider.compareCount}대 가격 비교하기"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0066FF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ),
+        
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadData,
+            child: ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: _favorites.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                return _buildFavoriteCard(_favorites[index], isDark, cardColor, textColor);
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -277,8 +314,21 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
 
   // 찜한 차량 카드 위젯
   Widget _buildFavoriteCard(Favorite fav, bool isDark, Color cardColor, Color textColor) {
+    final comparisonProvider = Provider.of<ComparisonProvider>(context);
     final borderColor = isDark ? Colors.grey[800]! : Colors.grey[100]!;
     final hasAlert = _hasActiveAlert(fav);
+    
+    // Favorite를 CarData로 변환
+    final carData = CarData(
+      id: fav.id.toString(),
+      name: "${fav.brand} ${fav.model}",
+      price: "${fav.predictedPrice?.toStringAsFixed(0) ?? 0}만원",
+      info: "${fav.year}년 · ${(fav.mileage / 10000).toStringAsFixed(1)}만km",
+      date: fav.createdAt ?? '',
+      color: const Color(0xFF0066FF),
+      isLiked: true,
+    );
+    final isComparing = comparisonProvider.isComparing(carData);
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -336,6 +386,34 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
           ),
           Column(
             children: [
+              // 비교 버튼
+              GestureDetector(
+                onTap: () {
+                  final success = comparisonProvider.toggleCompare(carData);
+                  if (!success && !isComparing) {
+                    _showSnackBar("최대 3대까지 비교할 수 있습니다");
+                  } else {
+                    _showSnackBar(isComparing 
+                      ? "비교 목록에서 제거되었습니다"
+                      : "비교 목록에 추가되었습니다 (${comparisonProvider.compareCount + 1}/3)");
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isComparing 
+                        ? (isDark ? const Color(0xFF1A237E) : const Color(0xFFE3F2FD)) 
+                        : (isDark ? Colors.grey[800] : Colors.grey[100]),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    isComparing ? Icons.compare_arrows : Icons.add_chart,
+                    color: isComparing ? const Color(0xFF0066FF) : Colors.grey[400],
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               // 알림 버튼
               GestureDetector(
                 onTap: () => _toggleAlert(fav),

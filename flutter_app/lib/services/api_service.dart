@@ -525,6 +525,38 @@ class ApiService {
       return 'Status ${response.statusCode}';
     }
   }
+
+  // ========== Groq AI API (네고 대본 생성) ==========
+  
+  /// Groq AI로 네고 대본 생성
+  Future<NegotiationScript> generateNegotiationScript({
+    required String carName,
+    required String price,
+    required String info,
+    List<String> checkpoints = const [],
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/negotiation/generate'),
+        headers: _headers,
+        body: jsonEncode({
+          'car_name': carName,
+          'price': price,
+          'info': info,
+          'checkpoints': checkpoints,
+        }),
+      ).timeout(const Duration(seconds: 30)); // AI 응답은 시간이 걸릴 수 있음
+
+      if (response.statusCode == 200) {
+        return NegotiationScript.fromJson(jsonDecode(response.body));
+      } else {
+        throw ApiException('네고 대본 생성 실패: ${_parseError(response)}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네고 대본 생성 오류: $e');
+    }
+  }
 }
 
 // ========== Data Models ==========
@@ -682,6 +714,8 @@ class RecommendedCar {
   final bool isGoodDeal;
   final double score;
   final String type;
+  final String? detailUrl;  // 상세페이지 URL
+  final String? imageUrl;   // 이미지 URL
 
   RecommendedCar({
     required this.brand,
@@ -695,6 +729,8 @@ class RecommendedCar {
     required this.isGoodDeal,
     required this.score,
     required this.type,
+    this.detailUrl,
+    this.imageUrl,
   });
 
   factory RecommendedCar.fromJson(Map<String, dynamic> json) {
@@ -710,6 +746,8 @@ class RecommendedCar {
       isGoodDeal: json['is_good_deal'] ?? false,
       score: (json['score'] ?? 0).toDouble(),
       type: json['type'] ?? 'domestic',
+      detailUrl: json['detail_url'] ?? json['url'],
+      imageUrl: json['image_url'],
     );
   }
   
@@ -823,6 +861,30 @@ class PriceAlert {
       targetPrice: (json['target_price'] ?? 0).toDouble(),
       isActive: json['is_active'] ?? false,
       createdAt: json['created_at'],
+    );
+  }
+}
+
+/// AI 생성 네고 대본 모델
+class NegotiationScript {
+  final String messageScript;      // 문자용 대본
+  final List<String> phoneScript;  // 전화용 단계별 대본
+  final String tip;                // 협상 팁
+  final List<String> checkpoints;  // 체크포인트
+
+  NegotiationScript({
+    required this.messageScript,
+    required this.phoneScript,
+    required this.tip,
+    required this.checkpoints,
+  });
+
+  factory NegotiationScript.fromJson(Map<String, dynamic> json) {
+    return NegotiationScript(
+      messageScript: json['message_script'] ?? '',
+      phoneScript: List<String>.from(json['phone_script'] ?? []),
+      tip: json['tip'] ?? '',
+      checkpoints: List<String>.from(json['checkpoints'] ?? []),
     );
   }
 }

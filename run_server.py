@@ -310,6 +310,59 @@ async def remove_alert(alert_id: int, user_id: str = "guest"):
     success = recommendation_service.remove_alert(user_id, alert_id)
     return {"success": success}
 
+# ========== 네고 대본 생성 API (Groq AI) ==========
+
+class NegotiationRequest(BaseModel):
+    car_name: str
+    price: str
+    info: str
+    checkpoints: List[str] = []
+
+@app.post("/api/negotiation/generate")
+async def generate_negotiation(request: NegotiationRequest):
+    """Groq AI로 네고 대본 생성"""
+    try:
+        # 가격에서 숫자만 추출
+        price_num = int(''.join(filter(str.isdigit, request.price)) or 0)
+        
+        vehicle_data = {
+            'model': request.car_name,
+            'sale_price': price_num,
+            'info': request.info
+        }
+        
+        prediction_data = {
+            'predicted_price': price_num * 0.95  # 5% 할인 목표
+        }
+        
+        # Groq 서비스 호출
+        result = groq_service.generate_negotiation_script(
+            vehicle_data=vehicle_data,
+            prediction_data=prediction_data,
+            issues=request.checkpoints,
+            style='balanced'
+        )
+        
+        # 프론트엔드 형식에 맞게 변환
+        phone_scripts = []
+        if result.get('phone_script'):
+            phone_scripts = [
+                f"1단계: 인사 - \"안녕하세요, {request.car_name} 아직 있나요?\"",
+                f"2단계: 네고 - \"{result.get('phone_script', '')}\"",
+                "3단계: 마무리 - \"감사합니다. 주소 문자로 보내주세요.\""
+            ]
+        
+        return {
+            'message_script': result.get('message_script', ''),
+            'phone_script': phone_scripts,
+            'tip': result.get('tips', ['자신감 있게, 하지만 정중하게 협상하세요'])[0] if result.get('tips') else '자신감 있게 협상하세요',
+            'checkpoints': request.checkpoints,
+            'target_price': result.get('target_price', price_num * 0.95),
+            'key_arguments': result.get('key_arguments', [])
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"네고 대본 생성 실패: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     print("\n🚀 Car-Sentix API 서버 시작...")
