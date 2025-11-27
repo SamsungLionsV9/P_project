@@ -203,30 +203,35 @@ class RecommendationService:
         return {'id': history_id, **search_data}
     
     def get_search_history(self, user_id: str, limit: int = 10) -> List[Dict]:
-        """사용자 검색 이력 조회"""
+        """사용자 검색 이력 조회 (id 포함 - 개별 삭제용)"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
+        # 가장 최근 검색 기록만 가져오면서 id도 반환 (개별 삭제 지원)
         cursor.execute('''
-            SELECT DISTINCT brand, model, year, mileage, fuel, predicted_price, 
-                   MAX(searched_at) as last_searched
+            SELECT id, brand, model, year, mileage, fuel, predicted_price, searched_at
             FROM search_history 
-            WHERE user_id = ?
-            GROUP BY brand, model, year
-            ORDER BY last_searched DESC
+            WHERE user_id = ? AND id IN (
+                SELECT MAX(id) 
+                FROM search_history 
+                WHERE user_id = ?
+                GROUP BY brand, model, year
+            )
+            ORDER BY searched_at DESC
             LIMIT ?
-        ''', (user_id, limit))
+        ''', (user_id, user_id, limit))
         
         results = []
         for row in cursor.fetchall():
             results.append({
-                'brand': row[0],
-                'model': row[1],
-                'year': row[2],
-                'mileage': row[3],
-                'fuel': row[4],
-                'predicted_price': row[5],
-                'last_searched': row[6]
+                'id': row[0],
+                'brand': row[1],
+                'model': row[2],
+                'year': row[3],
+                'mileage': row[4],
+                'fuel': row[5],
+                'predicted_price': row[6],
+                'last_searched': row[7]
             })
         
         conn.close()

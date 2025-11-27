@@ -334,16 +334,27 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// URL로 상세페이지 열기
+  /// URL로 상세페이지 열기 (모바일 버전 우선)
   Future<void> _openDetailUrl(RecommendedCar car) async {
-    // 엔카 상세 URL 생성 (실제 URL이 있으면 사용, 없으면 검색 URL)
+    // 엔카 모바일 URL 생성 (실제 URL이 있으면 모바일로 변환)
     final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
-    final url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
+    String url = car.detailUrl ?? 'https://m.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
+    
+    // www.encar.com을 m.encar.com으로 변환 (모바일 최적화)
+    url = url.replaceAll('www.encar.com', 'm.encar.com');
+    url = url.replaceAll('http://', 'https://');  // HTTPS 강제
     
     try {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        // 인앱 브라우저로 열기 (모바일 환경에 최적화)
+        await launchUrl(
+          uri, 
+          mode: LaunchMode.inAppBrowserView,
+          webViewConfiguration: const WebViewConfiguration(
+            enableJavaScript: true,
+          ),
+        );
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

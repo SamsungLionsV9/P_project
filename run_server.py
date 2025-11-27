@@ -337,8 +337,15 @@ async def generate_negotiation(request: NegotiationRequest):
         # 가격에서 숫자만 추출
         price_num = int(''.join(filter(str.isdigit, request.price)) or 0)
         
+        # car_name 파싱 (브랜드와 모델 분리)
+        car_name = request.car_name or '차량'
+        parts = car_name.split(' ', 1)
+        brand = parts[0] if parts else '알 수 없음'
+        model = parts[1] if len(parts) > 1 else car_name
+        
         vehicle_data = {
-            'model': request.car_name,
+            'brand': brand,
+            'model': model,
             'sale_price': price_num,
             'info': request.info
         }
