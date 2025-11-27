@@ -185,16 +185,34 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  Widget _buildPopularCard(PopularCar car) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF252542),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
+  /// 인기 모델 클릭 시 가성비 매물 모달 표시
+  Future<void> _showModelDeals(PopularCar car) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ModelDealsModal(
+        brand: car.brand,
+        model: car.model,
+        avgPrice: car.avgPrice,
+        medianPrice: car.medianPrice,
+        listings: car.listings,
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildPopularCard(PopularCar car) {
+    return GestureDetector(
+      onTap: () => _showModelDeals(car),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252542),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
         children: [
           Container(
             width: 48,
@@ -245,7 +263,10 @@ class _RecommendationPageState extends State<RecommendationPage>
               ),
             ],
           ),
+          const SizedBox(width: 8),
+          Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
         ],
+      ),
       ),
     );
   }
@@ -652,6 +673,305 @@ class _RecommendationPageState extends State<RecommendationPage>
         style: TextStyle(
           color: isSelected ? Colors.white : Colors.grey[400],
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+}
+
+/// 모델별 가성비 매물 모달
+class _ModelDealsModal extends StatefulWidget {
+  final String brand;
+  final String model;
+  final int avgPrice;
+  final int medianPrice;
+  final int listings;
+
+  const _ModelDealsModal({
+    required this.brand,
+    required this.model,
+    required this.avgPrice,
+    required this.medianPrice,
+    required this.listings,
+  });
+
+  @override
+  State<_ModelDealsModal> createState() => _ModelDealsModalState();
+}
+
+class _ModelDealsModalState extends State<_ModelDealsModal> {
+  final ApiService _api = ApiService();
+  List<RecommendedCar> _deals = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeals();
+  }
+
+  Future<void> _loadDeals() async {
+    try {
+      final deals = await _api.getModelDeals(
+        brand: widget.brand,
+        model: widget.model,
+        limit: 10,
+      );
+      if (mounted) {
+        setState(() {
+          _deals = deals;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openDetailUrl(RecommendedCar car) async {
+    final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
+    String url = car.detailUrl ?? 'https://m.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
+    url = url.replaceAll('www.encar.com', 'm.encar.com');
+    
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A2E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 핸들
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${widget.brand} ${widget.model}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '등록 ${widget.listings}건 • 평균 ${widget.avgPrice}만원 • 중앙값 ${widget.medianPrice}만원',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.recommend, color: Colors.green, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            '가성비 좋은 매물 추천',
+                            style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 24),
+              // 매물 리스트
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+                        : _deals.isEmpty
+                            ? Center(child: Text('추천 매물이 없습니다', style: TextStyle(color: Colors.grey[500])))
+                            : ListView.builder(
+                                controller: scrollController,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: _deals.length,
+                                itemBuilder: (context, index) {
+                                  final deal = _deals[index];
+                                  return _buildDealCard(deal, index + 1);
+                                },
+                              ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDealCard(RecommendedCar deal, int rank) {
+    final priceDiff = deal.priceDiff;
+    final isGood = priceDiff > 0;
+    
+    return GestureDetector(
+      onTap: () => _openDetailUrl(deal),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252542),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isGood ? Colors.green.withOpacity(0.4) : Colors.white10,
+            width: isGood ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // 순위 뱃지
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: rank <= 3 ? const Color(0xFF6C63FF) : Colors.grey[700],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$rank',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        deal.model,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${deal.year}년 • ${deal.formattedMileage} • ${deal.fuel}',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isGood)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '추천',
+                      style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('실제가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text(
+                        '${deal.actualPrice}만원',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('예측가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text(
+                        '${deal.predictedPrice}만원',
+                        style: TextStyle(color: Colors.grey[300], fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('차이', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                    Text(
+                      '${priceDiff > 0 ? "-" : "+"}${priceDiff.abs()}만원',
+                      style: TextStyle(
+                        color: priceDiff > 0 ? Colors.green : Colors.red,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

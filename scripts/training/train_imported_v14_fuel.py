@@ -22,7 +22,14 @@ df = pd.read_csv('../../data/encar_imported_data.csv')
 df_detail = pd.read_csv('../../data/complete_imported_details.csv')
 df = df.merge(df_detail, left_on='Id', right_on='car_id', how='inner')
 df = df.dropna(subset=['Price', 'Mileage', 'Year', 'Model', 'FuelType'])
-df = df[(df['Price'] >= 100) & (df['Price'] <= 100000)]
+
+# 이상치 필터링 (가격) - 외제차는 상한 높음
+PRICE_MIN = 100       # 100만원 이상
+PRICE_MAX = 100000    # 10억 이하 (외제차 고가 모델 포함)
+SPECIAL_PRICES = {9999, 8888, 7777, 6666, 5555, 1111, 10000, 1234, 4321}  # 특수 가격
+
+df = df[(df['Price'] >= PRICE_MIN) & (df['Price'] <= PRICE_MAX)]
+df = df[~df['Price'].isin(SPECIAL_PRICES)]  # 특수 가격 제거 (가격 미정 등)
 df = df[df['Mileage'] < 300000]
 df = df.drop_duplicates(subset=['Model', 'Year', 'Mileage', 'Price'])
 df['YearOnly'] = (df['Year'] // 100).astype(int)

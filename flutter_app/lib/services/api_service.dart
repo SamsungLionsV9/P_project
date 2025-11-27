@@ -355,6 +355,26 @@ class ApiService {
     }
   }
 
+  /// 특정 모델의 가성비 좋은 매물
+  Future<List<RecommendedCar>> getModelDeals({
+    required String brand,
+    required String model,
+    int limit = 10,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/model-deals?brand=${Uri.encodeComponent(brand)}&model=${Uri.encodeComponent(model)}&limit=$limit'),
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data['deals'] as List)
+          .map((e) => RecommendedCar.fromJson(e))
+          .toList();
+    } else {
+      throw ApiException('모델별 추천 차량 조회 실패');
+    }
+  }
+
   /// 트렌딩 모델
   Future<List<Map<String, dynamic>>> getTrending({int days = 7, int limit = 10}) async {
     final response = await http.get(
@@ -607,6 +627,23 @@ class ApiService {
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException('네고 대본 생성 오류: $e');
+    }
+  }
+
+  /// AI 상태 확인 (Groq API 연결 여부)
+  Future<AiStatus> getAiStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/ai/status'),
+      ).timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        return AiStatus.fromJson(jsonDecode(response.body));
+      } else {
+        return AiStatus(isConnected: false, model: null, status: 'error');
+      }
+    } catch (e) {
+      return AiStatus(isConnected: false, model: null, status: 'disconnected');
     }
   }
 }
@@ -976,4 +1013,25 @@ class ApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// AI 상태 모델
+class AiStatus {
+  final bool isConnected;
+  final String? model;
+  final String status;
+
+  AiStatus({
+    required this.isConnected,
+    this.model,
+    required this.status,
+  });
+
+  factory AiStatus.fromJson(Map<String, dynamic> json) {
+    return AiStatus(
+      isConnected: json['groq_available'] ?? false,
+      model: json['model'],
+      status: json['status'] ?? 'unknown',
+    );
+  }
 }

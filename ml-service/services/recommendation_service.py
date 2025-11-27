@@ -475,6 +475,119 @@ class RecommendationService:
             limit=limit * 2  # 필터링 후 줄어들 수 있으므로
         )[:limit]
     
+    def get_model_deals(self, brand: str, model: str, limit: int = 10) -> List[Dict]:
+        """
+        특정 모델의 가성비 좋은 매물 추천
+        
+        가치 점수 계산:
+        1. 가격 괴리율: (예측가 - 실제가) / 예측가 * 100 (최대 40점)
+        2. 주행거리 점수: 낮을수록 좋음 (최대 30점)
+        3. 연식 점수: 최신일수록 좋음 (최대 30점)
+        """
+        # 데이터 필터링
+        dfs = []
+        if self._domestic_df is not None:
+            dfs.append(self._domestic_df)
+        if self._imported_df is not None:
+            dfs.append(self._imported_df)
+        
+        if not dfs:
+            return []
+        
+        df = pd.concat(dfs, ignore_index=True)
+        
+        # 모델 필터링 (브랜드 + 모델명 키워드 검색)
+        brand_mask = df['Manufacturer'].str.contains(brand, case=False, na=False)
+        model_mask = df['Model'].str.contains(model.split()[0], case=False, na=False)  # 첫 단어로 매칭
+        df = df[brand_mask & model_mask]
+        
+        # 이상치 제거
+        df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
+        df = df[~df['Price'].isin(self.SPECIAL_PRICES)]
+        df = df[df['YearOnly'] >= 2018]
+        
+        if len(df) == 0:
+            return []
+        
+        # 예측 서비스 초기화
+        if self._prediction_service is None:
+            try:
+                from services.prediction_v12 import PredictionServiceV12
+                self._prediction_service = PredictionServiceV12()
+            except:
+                pass
+        
+        deals = []
+        sample_size = min(50, len(df))
+        sample = df.sample(sample_size, random_state=42) if len(df) > sample_size else df
+        
+        for _, row in sample.iterrows():
+            try:
+                car_id = row.get('Id', '')
+                year = int(row.get('YearOnly', 2020))
+                mileage = int(row.get('Mileage', 50000))
+                actual_price = int(row.get('Price', 0))
+                fuel = str(row.get('FuelType', '가솔린'))
+                
+                # 연료 정규화
+                fuel_norm = '가솔린'
+                if '하이브리드' in fuel.lower(): fuel_norm = '하이브리드'
+                elif '디젤' in fuel.lower(): fuel_norm = '디젤'
+                elif 'lpg' in fuel.lower(): fuel_norm = 'LPG'
+                
+                # 예측 가격 계산
+                predicted_price = actual_price
+                if self._prediction_service:
+                    try:
+                        result = self._prediction_service.predict(
+                            brand, model, year, mileage, fuel=fuel_norm
+                        )
+                        predicted_price = result.predicted_price
+                    except:
+                        pass
+                
+                # 가치 점수 계산
+                # 1. 가격 괴리율 (40점 만점)
+                price_gap_pct = (predicted_price - actual_price) / max(predicted_price, 1) * 100
+                price_score = min(max(price_gap_pct * 4, 0), 40)  # -10% ~ +10% → 0~40점
+                
+                # 2. 주행거리 점수 (30점 만점)
+                # 30,000km 이하: 30점, 60,000km: 20점, 100,000km 이상: 0점
+                mileage_score = max(30 - (mileage / 3500), 0)
+                
+                # 3. 연식 점수 (30점 만점)
+                # 2024년: 30점, 2020년: 10점, 2018년 이하: 0점
+                year_score = max((year - 2018) * 5, 0)
+                year_score = min(year_score, 30)
+                
+                total_score = price_score + mileage_score + year_score
+                
+                # 엔카 URL 생성
+                detail_url = None
+                if car_id:
+                    detail_url = self.ENCAR_DETAIL_URL.format(car_id=car_id)
+                
+                deals.append({
+                    'brand': str(brand),
+                    'model': str(row.get('Model', model)),
+                    'year': year,
+                    'mileage': mileage,
+                    'fuel': fuel_norm,
+                    'actual_price': actual_price,
+                    'predicted_price': int(predicted_price),
+                    'price_diff': int(predicted_price - actual_price),
+                    'value_score': round(total_score, 1),
+                    'is_good_deal': price_gap_pct > 5,  # 5% 이상 저렴하면 가성비 좋음
+                    'car_id': str(car_id) if car_id else None,
+                    'detail_url': detail_url
+                })
+            except:
+                continue
+        
+        # 가치 점수 순 정렬
+        deals.sort(key=lambda x: x['value_score'], reverse=True)
+        return deals[:limit]
+    
     # ========== 즐겨찾기 ==========
     
     def add_favorite(self, user_id: str, data: Dict) -> Dict:

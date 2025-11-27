@@ -1,9 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme/theme_provider.dart';
+import 'services/api_service.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  final ApiService _api = ApiService();
+  AiStatus? _aiStatus;
+  bool _isLoadingAiStatus = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAiStatus();
+  }
+
+  Future<void> _loadAiStatus() async {
+    setState(() => _isLoadingAiStatus = true);
+    final status = await _api.getAiStatus();
+    if (mounted) {
+      setState(() {
+        _aiStatus = status;
+        _isLoadingAiStatus = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +107,9 @@ class SettingsPage extends StatelessWidget {
               ),
               child: Column(
                 children: [
+                  // Groq API 연결 상태 표시
+                  _buildAiStatusTile(textColor, subTextColor),
+                  _buildDivider(isDark),
                   _buildListTile(
                     title: "API 키 설정 (선택)",
                     subtitle: "기본 엔진 사용 중",
@@ -245,6 +275,87 @@ class SettingsPage extends StatelessWidget {
       height: 1,
       thickness: 1,
       color: isDark ? Colors.grey[800] : Colors.grey[100],
+    );
+  }
+
+  /// Groq API 연결 상태 표시 위젯
+  Widget _buildAiStatusTile(Color textColor, Color? subTextColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Groq AI 연결 상태",
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (_isLoadingAiStatus)
+                  Text(
+                    "확인 중...",
+                    style: TextStyle(color: subTextColor, fontSize: 13),
+                  )
+                else
+                  Text(
+                    _aiStatus?.isConnected == true
+                        ? "Llama 3.3 70B 연결됨"
+                        : "연결 안됨 (템플릿 모드)",
+                    style: TextStyle(color: subTextColor, fontSize: 13),
+                  ),
+              ],
+            ),
+          ),
+          // 연결 상태 인디케이터
+          if (_isLoadingAiStatus)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _aiStatus?.isConnected == true
+                    ? Colors.green.withOpacity(0.15)
+                    : Colors.orange.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _aiStatus?.isConnected == true
+                        ? Icons.check_circle
+                        : Icons.warning_rounded,
+                    color: _aiStatus?.isConnected == true
+                        ? Colors.green
+                        : Colors.orange,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _aiStatus?.isConnected == true ? "연결됨" : "기본",
+                    style: TextStyle(
+                      color: _aiStatus?.isConnected == true
+                          ? Colors.green
+                          : Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

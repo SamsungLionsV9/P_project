@@ -231,6 +231,12 @@ async def good_deals(category: str = "all", limit: int = 10):
     """가성비 좋은 차량 (예측가 > 실제가)"""
     return {"deals": recommendation_service.get_good_deals(category, limit)}
 
+@app.get("/api/model-deals")
+async def model_deals(brand: str, model: str, limit: int = 10):
+    """특정 모델의 가성비 좋은 매물"""
+    deals = recommendation_service.get_model_deals(brand, model, limit)
+    return {"brand": brand, "model": model, "deals": deals}
+
 @app.get("/api/brands")
 async def brands():
     return {"brands": ["현대", "기아", "제네시스", "쉐보레", "르노코리아", "KG모빌리티", "벤츠", "BMW", "아우디", "폭스바겐", "볼보", "렉서스", "포르쉐", "테슬라"]}
@@ -387,6 +393,17 @@ async def generate_negotiation(request: NegotiationRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"네고 대본 생성 실패: {str(e)}")
+
+# ========== AI 상태 확인 ==========
+
+@app.get("/api/ai/status")
+async def get_ai_status():
+    """AI 엔진 상태 확인 (Groq API 연결 여부)"""
+    return {
+        'groq_available': groq_service.is_available(),
+        'model': 'Llama 3.3 70B' if groq_service.is_available() else None,
+        'status': 'connected' if groq_service.is_available() else 'disconnected'
+    }
 
 if __name__ == "__main__":
     import uvicorn
