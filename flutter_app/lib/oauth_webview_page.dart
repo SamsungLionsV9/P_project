@@ -39,11 +39,12 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
             debugPrint('✅ 페이지 완료: $url');
             setState(() => _isLoading = false);
           },
-          onNavigationRequest: (NavigationRequest request) {
+          onNavigationRequest: (NavigationRequest request) async {
             debugPrint('🔄 네비게이션: ${request.url}');
             
             // OAuth 콜백 처리 (성공 시 JWT 토큰이 URL에 포함됨)
-            if (_handleOAuthCallback(request.url)) {
+            final handled = await _handleOAuthCallback(request.url);
+            if (handled) {
               return NavigationDecision.prevent;
             }
             
@@ -63,13 +64,15 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
   }
 
   /// OAuth 콜백 URL 처리
-  bool _handleOAuthCallback(String url) {
-    // 성공 콜백: /oauth2/redirect?token=...
-    if (url.contains('/oauth2/redirect') || url.contains('token=')) {
-      final uri = Uri.parse(url);
+  Future<bool> _handleOAuthCallback(String url) async {
+    final uri = Uri.parse(url);
+    
+    // 1. 기존 사용자 로그인 성공: /oauth2/redirect?token=...
+    if (url.contains('/oauth2/redirect')) {
       final token = uri.queryParameters['token'];
       final email = uri.queryParameters['email'];
       final error = uri.queryParameters['error'];
+      final provider = uri.queryParameters['provider'];
 
       if (error != null) {
         _showError('로그인 실패: $error');
@@ -78,21 +81,42 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
       }
 
       if (token != null) {
-        _authService.handleOAuthCallback(token, email ?? '', widget.provider);
+        await _authService.handleOAuthCallback(token, email ?? '', provider ?? widget.provider);
         Navigator.pop(context, {
           'success': true,
           'token': token,
           'email': email,
-          'provider': widget.provider,
+          'provider': provider ?? widget.provider,
+          'isExistingUser': true,  // 기존 사용자 표시
         });
         return true;
       }
     }
+    
+    // 2. 신규 사용자 회원가입 필요: /signup?oauth=true&...
+    if (url.contains('/signup') && url.contains('oauth=true')) {
+      final email = uri.queryParameters['email'];
+      final provider = uri.queryParameters['provider'];
+      final providerId = uri.queryParameters['providerId'];
+      final imageUrl = uri.queryParameters['imageUrl'];
+      
+      debugPrint('📝 신규 OAuth 사용자 - 회원가입 필요: $email ($provider)');
+      
+      Navigator.pop(context, {
+        'success': false,  // 로그인은 아직 완료되지 않음
+        'needsSignup': true,  // 회원가입 필요 플래그
+        'email': email,
+        'provider': provider ?? widget.provider,
+        'providerId': providerId,
+        'imageUrl': imageUrl,
+      });
+      return true;
+    }
 
-    // 에러 콜백
+    // 3. 에러 콜백
     if (url.contains('error=')) {
-      final uri = Uri.parse(url);
-      final error = uri.queryParameters['error_description'] ?? '로그인 실패';
+      final error = uri.queryParameters['error_description'] ?? 
+                    uri.queryParameters['error'] ?? '로그인 실패';
       _showError(error);
       Navigator.pop(context, {'success': false, 'error': error});
       return true;

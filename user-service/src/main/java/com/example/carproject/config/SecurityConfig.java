@@ -3,6 +3,7 @@ package com.example.carproject.config;
 import com.example.carproject.oauth2.CustomOAuth2UserService;
 import com.example.carproject.oauth2.OAuth2AuthenticationFailureHandler;
 import com.example.carproject.oauth2.OAuth2AuthenticationSuccessHandler;
+import com.example.carproject.oauth2.OAuth2RedirectUriFilter;
 import com.example.carproject.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,17 +35,20 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
+    private final OAuth2RedirectUriFilter oAuth2RedirectUriFilter;
     
     public SecurityConfig(@Lazy JwtAuthenticationFilter jwtAuthFilter, 
                          @Lazy UserDetailsService userDetailsService,
                          @Lazy CustomOAuth2UserService customOAuth2UserService,
                          @Lazy OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler,
-                         @Lazy OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler) {
+                         @Lazy OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler,
+                         OAuth2RedirectUriFilter oAuth2RedirectUriFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
         this.customOAuth2UserService = customOAuth2UserService;
         this.oAuth2AuthenticationSuccessHandler = oAuth2AuthenticationSuccessHandler;
         this.oAuth2AuthenticationFailureHandler = oAuth2AuthenticationFailureHandler;
+        this.oAuth2RedirectUriFilter = oAuth2RedirectUriFilter;
     }
     
     @Bean
@@ -56,19 +60,23 @@ public class SecurityConfig {
                         // 공개 엔드포인트
                         .requestMatchers(
                                 "/api/auth/signup", 
+                                "/api/auth/oauth/signup",  // OAuth 회원가입
                                 "/api/auth/login", 
                                 "/api/auth/health", 
                                 "/api/auth/logout",
                                 "/api/auth/email/**",  // 이메일 인증 엔드포인트
                                 // OAuth2 관련 엔드포인트
                                 "/oauth2/**",
-                                "/login/oauth2/**"
+                                "/login/oauth2/**",
+                                "/login"  // 기본 로그인 페이지도 허용 (OAuth2 선택 페이지)
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)  // OAuth2를 위해 세션 허용
                 )
+                // 기본 폼 로그인 비활성화 (OAuth2만 사용)
+                .formLogin(form -> form.disable())
                 // OAuth2 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
@@ -78,6 +86,7 @@ public class SecurityConfig {
                         .failureHandler(oAuth2AuthenticationFailureHandler)
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(oAuth2RedirectUriFilter, org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();

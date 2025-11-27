@@ -1,5 +1,6 @@
 package com.example.carproject.controller;
 
+import com.example.carproject.dto.OAuthSignupDto;
 import com.example.carproject.dto.UserLoginDto;
 import com.example.carproject.dto.UserResponseDto;
 import com.example.carproject.dto.UserSignupDto;
@@ -24,7 +25,7 @@ public class UserController {
     private final UserService userService;
     private final EmailVerificationService emailVerificationService;
     
-    /**
+    /**k 
      * 헬스체크
      * GET /api/health
      */
@@ -51,6 +52,34 @@ public class UserController {
             response.put("success", true);
             response.put("message", "회원가입이 완료되었습니다");
             response.put("user", user);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * OAuth 회원가입 (이메일 인증 불필요)
+     * POST /api/auth/oauth/signup
+     */
+    @PostMapping("/oauth/signup")
+    public ResponseEntity<?> oauthSignup(@Valid @RequestBody OAuthSignupDto dto) {
+        try {
+            UserResponseDto user = userService.oauthSignup(dto);
+            
+            // JWT 토큰 생성
+            String token = userService.generateTokenForUser(user.getEmail());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "회원가입이 완료되었습니다");
+            response.put("user", user);
+            response.put("token", token);
             
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {

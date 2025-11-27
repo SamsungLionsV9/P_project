@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import 'car_info_input_page.dart';
 import 'mypage.dart';
@@ -14,7 +15,30 @@ void main() async {
   // 저장된 토큰 로드
   await AuthService().loadSavedToken();
   
+  // 웹 환경에서 OAuth 콜백 처리
+  if (kIsWeb) {
+    _handleWebOAuthCallback();
+  }
+  
   runApp(const CarPriceApp());
+}
+
+/// 웹 환경에서 OAuth 콜백 처리
+void _handleWebOAuthCallback() {
+  try {
+    final uri = Uri.base;
+    final token = uri.queryParameters['token'];
+    final email = uri.queryParameters['email'];
+    final provider = uri.queryParameters['provider'];
+    
+    if (token != null && email != null) {
+      // 토큰 저장
+      AuthService().handleOAuthCallback(token, email, provider ?? 'unknown');
+      debugPrint('웹 OAuth 콜백 처리 완료: $email');
+    }
+  } catch (e) {
+    debugPrint('OAuth 콜백 처리 오류: $e');
+  }
 }
 
 class CarPriceApp extends StatefulWidget {
@@ -203,11 +227,105 @@ class _HomePageContentState extends State<HomePageContent> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isLoggedIn = false;
+  bool _oauthCallbackProcessed = false; // OAuth 콜백 처리 플래그
 
   @override
   void initState() {
     super.initState();
-    _isLoggedIn = _authService.isLoggedIn;
+    _checkLoginStatus();
+    
+    // 웹 환경에서 OAuth 콜백 확인
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkWebOAuthCallback();
+      });
+    }
+  }
+  
+  /// 로그인 상태 확인
+  void _checkLoginStatus() {
+    setState(() {
+      _isLoggedIn = _authService.isLoggedIn;
+    });
+  }
+  
+  /// 웹 환경에서 OAuth 콜백 확인 및 처리
+  Future<void> _checkWebOAuthCallback() async {
+    // 이미 처리된 경우 스킵
+    if (_oauthCallbackProcessed) {
+      return;
+    }
+    
+    try {
+      final uri = Uri.base;
+      final token = uri.queryParameters['token'];
+      final email = uri.queryParameters['email'];
+      final provider = uri.queryParameters['provider'];
+      final oauth = uri.queryParameters['oauth'];
+      
+      // OAuth 회원가입 리다이렉트 확인 (토큰 없이 oauth=true인 경우)
+      if (oauth == 'true' && email != null && provider != null && token == null) {
+        // 중복 처리 방지
+        _oauthCallbackProcessed = true;
+        
+        debugPrint('🔑 OAuth 회원가입 리다이렉트 감지: $email ($provider)');
+        
+        // 기존 사용자인 경우 회원가입 페이지를 건너뛰고 바로 메인 페이지로
+        final existing = uri.queryParameters['existing'];
+        if (existing == 'true') {
+          debugPrint('기존 사용자 감지, 메인 페이지로 이동');
+          // 상태만 업데이트 (이미 메인 페이지에 있음)
+          _checkLoginStatus();
+          return;
+        }
+        
+        // 회원가입 페이지로 이동
+        if (mounted) {
+          final result = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SignupPage(),
+            ),
+          );
+          
+          // 회원가입 완료 후 처리
+          if (result == true) {
+            _checkLoginStatus(); // 로그인 상태 다시 확인
+            // URL 정리 (웹 환경에서)
+            if (kIsWeb) {
+              // 쿼리 파라미터 제거를 위해 URL 변경
+              // 실제로는 이미 메인 페이지에 있으므로 상태만 업데이트
+            }
+          }
+        }
+        return;
+      }
+      
+      // 기존 사용자 로그인 (토큰이 있는 경우)
+      if (token != null && email != null) {
+        // 중복 처리 방지
+        _oauthCallbackProcessed = true;
+        
+        debugPrint('🔑 OAuth 콜백 감지: $email ($provider)');
+        
+        // 토큰 저장 및 로그인 상태 업데이트
+        await _authService.handleOAuthCallback(token, email, provider ?? 'unknown');
+        
+        // 로그인 상태 업데이트
+        if (mounted) {
+          setState(() {
+            _isLoggedIn = true;
+          });
+          _showMessage('${_getProviderName(provider ?? 'unknown')} 로그인 성공!');
+        }
+      }
+    } catch (e) {
+      debugPrint('OAuth 콜백 처리 오류: $e');
+      _oauthCallbackProcessed = false; // 에러 발생 시 재시도 가능하도록
+      if (mounted) {
+        _showMessage('로그인 처리 중 오류가 발생했습니다: $e', isError: true);
+      }
+    }
   }
 
   @override
@@ -245,9 +363,29 @@ class _HomePageContentState extends State<HomePageContent> {
 
   /// 소셜 로그인
   Future<void> _socialLogin(String provider) async {
+    final url = _authService.getSocialLoginUrl(provider);
+    
+    // 웹 환경에서는 WebView가 작동하지 않으므로 외부 브라우저 사용
+    if (kIsWeb) {
+      _showMessage('${_getProviderName(provider)} 로그인은 새 창에서 진행됩니다.');
+      
+      try {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          // 웹에서는 새 창으로 열기
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          _showMessage('로그인 후 이 페이지로 돌아오세요.');
+        } else {
+          _showMessage('브라우저를 열 수 없습니다', isError: true);
+        }
+      } catch (e) {
+        _showMessage('${_getProviderName(provider)} 로그인 오류: $e', isError: true);
+      }
+      return;
+    }
+    
     // 네이버는 WebView를 차단하므로 외부 브라우저 사용
     if (provider == 'naver') {
-      final url = _authService.getSocialLoginUrl(provider);
       _showMessage('네이버 로그인은 외부 브라우저에서 진행됩니다.\n(에뮬레이터에서는 제한될 수 있습니다)');
       
       try {
@@ -263,7 +401,7 @@ class _HomePageContentState extends State<HomePageContent> {
       return;
     }
     
-    // 카카오, 구글은 WebView 사용
+    // 모바일 앱에서는 WebView 사용
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
@@ -271,9 +409,39 @@ class _HomePageContentState extends State<HomePageContent> {
       ),
     );
 
-    if (result != null && result['success'] == true) {
-      setState(() => _isLoggedIn = true);
-      _showMessage('${_getProviderName(provider)} 로그인 성공!');
+    if (result != null) {
+      // 1. 기존 사용자 로그인 성공
+      if (result['success'] == true) {
+        setState(() => _isLoggedIn = true);
+        _showMessage('${_getProviderName(provider)} 로그인 성공!');
+      } 
+      // 2. 신규 사용자 - 회원가입 필요
+      else if (result['needsSignup'] == true) {
+        _showMessage('회원가입이 필요합니다.');
+        
+        // 회원가입 페이지로 이동 (OAuth 정보 전달)
+        final signupResult = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SignupPage(
+              oauthEmail: result['email'],
+              oauthProvider: result['provider'],
+              oauthProviderId: result['providerId'],
+              oauthImageUrl: result['imageUrl'],
+            ),
+          ),
+        );
+        
+        // 회원가입 완료 후 로그인 상태 업데이트
+        if (signupResult == true) {
+          setState(() => _isLoggedIn = true);
+          _showMessage('${_getProviderName(provider)} 회원가입 및 로그인 성공!');
+        }
+      }
+      // 3. 에러
+      else if (result['error'] != null) {
+        _showMessage('로그인 실패: ${result['error']}', isError: true);
+      }
     }
   }
 
@@ -319,6 +487,25 @@ class _HomePageContentState extends State<HomePageContent> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
+    
+    // 웹 환경에서 OAuth 콜백 확인 (빌드 시마다 확인)
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkWebOAuthCallback();
+      });
+    }
+    
+    // 로그인 상태 동기화
+    final currentLoginStatus = _authService.isLoggedIn;
+    if (_isLoggedIn != currentLoginStatus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _isLoggedIn = currentLoginStatus;
+          });
+        }
+      });
+    }
 
     return SafeArea(
       child: SingleChildScrollView(

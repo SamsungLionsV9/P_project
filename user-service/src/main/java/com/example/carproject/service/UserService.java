@@ -1,5 +1,6 @@
 package com.example.carproject.service;
 
+import com.example.carproject.dto.OAuthSignupDto;
 import com.example.carproject.dto.UserLoginDto;
 import com.example.carproject.dto.UserResponseDto;
 import com.example.carproject.dto.UserSignupDto;
@@ -80,6 +81,70 @@ public class UserService implements UserDetailsService {
         User savedUser = userRepository.save(user);
         
         return UserResponseDto.from(savedUser);
+    }
+    
+    /**
+     * OAuth 회원가입 (이메일 인증 불필요)
+     */
+    @Transactional
+    public UserResponseDto oauthSignup(OAuthSignupDto dto) {
+        // Provider 검증
+        User.Provider provider;
+        try {
+            provider = User.Provider.valueOf(dto.getProvider().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("지원하지 않는 OAuth 제공자입니다: " + dto.getProvider());
+        }
+        
+        // 기존 사용자 확인 (비활성화된 사용자 포함)
+        Optional<User> existingUserByEmail = userRepository.findByEmail(dto.getEmail());
+        if (existingUserByEmail.isPresent()) {
+            User existingUser = existingUserByEmail.get();
+            if (existingUser.getIsActive()) {
+                throw new IllegalArgumentException("이미 사용 중인 이메일입니다");
+            } else {
+                // 비활성화된 사용자가 있으면 삭제
+                userRepository.delete(existingUser);
+            }
+        }
+        
+        // 사용자명 중복 체크 (활성 사용자만)
+        Optional<User> existingUserByUsername = userRepository.findByUsername(dto.getUsername());
+        if (existingUserByUsername.isPresent() && existingUserByUsername.get().getIsActive()) {
+            throw new IllegalArgumentException("이미 사용 중인 사용자명입니다");
+        }
+        
+        // Provider ID 중복 체크
+        Optional<User> existingUserByProviderId = userRepository.findByProviderAndProviderId(provider, dto.getProviderId());
+        if (existingUserByProviderId.isPresent() && existingUserByProviderId.get().getIsActive()) {
+            throw new IllegalArgumentException("이미 가입된 소셜 계정입니다");
+        }
+        
+        // 사용자 생성 (비밀번호 없음)
+        User user = User.builder()
+                .username(dto.getUsername())
+                .email(dto.getEmail())
+                .password(null)  // OAuth 사용자는 비밀번호 없음
+                .phoneNumber(dto.getPhoneNumber())
+                .provider(provider)
+                .providerId(dto.getProviderId())
+                .profileImageUrl(dto.getProfileImageUrl())
+                .role(User.Role.USER)
+                .isActive(true)
+                .build();
+        
+        User savedUser = userRepository.save(user);
+        
+        return UserResponseDto.from(savedUser);
+    }
+    
+    /**
+     * 사용자 이메일로 JWT 토큰 생성 (OAuth 회원가입 후 사용)
+     */
+    public String generateTokenForUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
+        return jwtService.generateToken(user);
     }
     
     /**

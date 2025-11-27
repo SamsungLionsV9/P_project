@@ -18,11 +18,17 @@ public class CustomOAuth2User implements OAuth2User {
     private final User user;
     private final Map<String, Object> attributes;
     private final String nameAttributeKey;
+    private final boolean isNewUser;  // 신규 사용자 여부
     
     public CustomOAuth2User(User user, Map<String, Object> attributes, String nameAttributeKey) {
+        this(user, attributes, nameAttributeKey, false);
+    }
+    
+    public CustomOAuth2User(User user, Map<String, Object> attributes, String nameAttributeKey, boolean isNewUser) {
         this.user = user;
         this.attributes = attributes;
         this.nameAttributeKey = nameAttributeKey;
+        this.isNewUser = isNewUser;
     }
     
     @Override

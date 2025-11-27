@@ -36,10 +36,19 @@ public class KakaoOAuth2UserInfo extends OAuth2UserInfo {
     @Override
     public String getEmail() {
         Map<String, Object> kakaoAccount = getMapAttribute("kakao_account");
-        if (kakaoAccount == null) {
-            return null;
+        if (kakaoAccount != null) {
+            String email = (String) kakaoAccount.get("email");
+            if (email != null && !email.isEmpty()) {
+                return email;
+            }
         }
-        return (String) kakaoAccount.get("email");
+        // 이메일이 없는 경우 카카오 ID 기반 임시 이메일 생성
+        // 카카오 비즈 앱이 아니면 이메일을 받지 못할 수 있음
+        String kakaoId = getId();
+        if (kakaoId != null) {
+            return "kakao_" + kakaoId + "@kakao.user";
+        }
+        return null;
     }
     
     @Override
