@@ -3,9 +3,9 @@ FastAPI 백엔드 메인
 중고차 가격 예측 및 타이밍 분석 API
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List
+from typing import List, Optional
 import os
 
 from .schemas.schemas import (
@@ -17,6 +17,7 @@ from .schemas.schemas import (
 from .services.prediction_v11 import PredictionServiceV11
 from .services.timing import TimingService
 from .services.groq_service import GroqService
+from .services.recommendation_service import get_recommendation_service
 from .utils.validators import (
     validate_vehicle_data,
     get_supported_brands,
@@ -44,6 +45,7 @@ app.add_middleware(
 prediction_service = PredictionServiceV11()
 timing_service = TimingService()
 groq_service = GroqService()
+recommendation_service = get_recommendation_service()
 
 
 # ========== 헬스체크 ==========
@@ -358,6 +360,280 @@ async def get_fuel_types():
     return {
         "fuel_types": get_supported_fuel_types()
     }
+
+
+# ========== 검색 이력 API ==========
+
+from pydantic import BaseModel
+
+class HistoryRequest(BaseModel):
+    brand: str
+    model: str
+    year: int
+    mileage: int
+    fuel: str = "가솔린"
+    predicted_price: Optional[float] = None
+
+class FavoriteRequest(BaseModel):
+    brand: str
+    model: str
+    year: int
+    mileage: int = 0
+    fuel: str = "가솔린"
+    predicted_price: Optional[float] = None
+    memo: str = ""
+
+class AlertRequest(BaseModel):
+    brand: str
+    model: str
+    year: int
+    target_price: float
+
+
+@app.get("/api/history", tags=["History"])
+async def get_history(
+    user_id: str = Query(default="default_user", description="사용자 ID"),
+    limit: int = Query(default=10, ge=1, le=50, description="조회 개수")
+):
+    """
+    사용자 검색 이력 조회
+    
+    Args:
+        user_id: 사용자 ID
+        limit: 최대 조회 개수
+        
+    Returns:
+        검색 이력 목록
+    """
+    try:
+        history = recommendation_service.get_search_history(user_id, limit)
+        return {
+            "success": True,
+            "history": history,
+            "total": len(history)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/history", tags=["History"])
+async def add_history(
+    request: HistoryRequest,
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    검색 이력 저장
+    """
+    try:
+        search_data = request.model_dump()
+        result = recommendation_service.add_search_history(user_id, search_data)
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== 즐겨찾기 API ==========
+
+@app.get("/api/favorites", tags=["Favorites"])
+async def get_favorites(
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    즐겨찾기 목록 조회
+    """
+    try:
+        favorites = recommendation_service.get_favorites(user_id)
+        return {
+            "success": True,
+            "favorites": favorites,
+            "total": len(favorites)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/favorites", tags=["Favorites"])
+async def add_favorite(
+    request: FavoriteRequest,
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    즐겨찾기 추가
+    """
+    try:
+        data = request.model_dump()
+        result = recommendation_service.add_favorite(user_id, data)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/favorites/{favorite_id}", tags=["Favorites"])
+async def remove_favorite(
+    favorite_id: int,
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    즐겨찾기 삭제
+    """
+    try:
+        success = recommendation_service.remove_favorite(user_id, favorite_id)
+        return {"success": success}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== 가격 알림 API ==========
+
+@app.get("/api/alerts", tags=["Alerts"])
+async def get_alerts(
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    가격 알림 목록 조회
+    """
+    try:
+        alerts = recommendation_service.get_alerts(user_id)
+        return {
+            "success": True,
+            "alerts": alerts,
+            "total": len(alerts)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/alerts", tags=["Alerts"])
+async def add_alert(
+    request: AlertRequest,
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    가격 알림 추가
+    """
+    try:
+        data = request.model_dump()
+        result = recommendation_service.add_price_alert(user_id, data)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/alerts/{alert_id}/toggle", tags=["Alerts"])
+async def toggle_alert(
+    alert_id: int,
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    가격 알림 활성화/비활성화 토글
+    """
+    try:
+        result = recommendation_service.toggle_alert(user_id, alert_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/alerts/{alert_id}", tags=["Alerts"])
+async def remove_alert(
+    alert_id: int,
+    user_id: str = Query(default="default_user", description="사용자 ID")
+):
+    """
+    가격 알림 삭제
+    """
+    try:
+        success = recommendation_service.remove_alert(user_id, alert_id)
+        return {"success": success}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== 인기/추천 API ==========
+
+@app.get("/api/popular", tags=["Recommendation"])
+async def get_popular(
+    category: str = Query(default="all", description="카테고리 (all, domestic, imported)"),
+    limit: int = Query(default=5, ge=1, le=20, description="조회 개수")
+):
+    """
+    인기 모델 조회
+    """
+    try:
+        popular = recommendation_service.get_popular_models(category, limit)
+        return {
+            "success": True,
+            "models": popular,  # Flutter 앱과 키 일치
+            "category": category
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/recommendations", tags=["Recommendation"])
+async def get_recommendations(
+    user_id: str = Query(default="default_user", description="사용자 ID"),
+    category: str = Query(default="all", description="카테고리"),
+    budget_min: Optional[int] = Query(default=None, description="최소 예산 (만원)"),
+    budget_max: Optional[int] = Query(default=None, description="최대 예산 (만원)"),
+    limit: int = Query(default=10, ge=1, le=30, description="조회 개수")
+):
+    """
+    추천 차량 조회 (사용자 이력 기반)
+    """
+    try:
+        recommendations = recommendation_service.get_recommended_vehicles(
+            user_id=user_id,
+            category=category,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            limit=limit
+        )
+        return {
+            "success": True,
+            "recommendations": recommendations,
+            "total": len(recommendations)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/good-deals", tags=["Recommendation"])
+async def get_good_deals(
+    category: str = Query(default="all", description="카테고리"),
+    limit: int = Query(default=10, ge=1, le=30, description="조회 개수")
+):
+    """
+    가성비 좋은 차량 조회 (예측가 > 실제가)
+    """
+    try:
+        deals = recommendation_service.get_good_deals(category, limit)
+        return {
+            "success": True,
+            "deals": deals,
+            "total": len(deals)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/trending", tags=["Recommendation"])
+async def get_trending(
+    days: int = Query(default=7, ge=1, le=30, description="기간 (일)"),
+    limit: int = Query(default=10, ge=1, le=30, description="조회 개수")
+):
+    """
+    최근 N일간 트렌딩 모델
+    """
+    try:
+        trending = recommendation_service.get_trending_models(days, limit)
+        return {
+            "success": True,
+            "trending": trending,
+            "period_days": days
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ========== 루트 ==========
