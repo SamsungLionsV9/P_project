@@ -779,54 +779,6 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 20),
 
-          // 버튼들
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const NegotiationPage(initialTabIndex: 0),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.copy, size: 18),
-                  label: const Text("문자 복사"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0066FF),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const NegotiationPage(initialTabIndex: 1),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.phone, size: 18),
-                  label: const Text("전화 대본 보기"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0066FF),
-                    side: const BorderSide(color: Color(0xFF0066FF)),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
           // 구매 전 확인사항
           Container(
             width: double.infinity,
@@ -1580,6 +1532,12 @@ class _DealAnalysisModalState extends State<DealAnalysisModal> {
                       builder: (context) => NegotiationPage(
                         initialTabIndex: 0,
                         carName: "${widget.deal.brand} ${widget.deal.model} ${widget.deal.year}년",
+                        price: "${widget.deal.actualPrice}만원",
+                        // 정확한 가격 정보 전달
+                        actualPrice: widget.deal.actualPrice,
+                        predictedPrice: widget.predictedPrice,
+                        year: widget.deal.year,
+                        mileage: widget.deal.mileage,
                       ),
                     ),
                   );

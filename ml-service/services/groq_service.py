@@ -210,28 +210,67 @@ class GroqService:
     
     def _fallback_negotiation_script(self, vehicle_data: Dict, prediction_data: Dict,
                                     issues: List[str] = None) -> Dict:
-        """Fallback 네고 대본"""
+        """Fallback 네고 대본 (고도화)"""
         sale_price = vehicle_data.get('sale_price', 0)
         predicted_price = prediction_data.get('predicted_price', 0)
-        target_price = int(predicted_price * 0.98)
-        discount = sale_price - target_price
-        
+        brand = vehicle_data.get('brand', '')
         model = vehicle_data.get('model', '차량')
+        year = vehicle_data.get('year', '')
+        
+        # 가격 차이 분석
+        price_diff = predicted_price - sale_price
+        price_diff_pct = (price_diff / predicted_price * 100) if predicted_price > 0 else 0
+        
+        # 상황별 목표 가격 결정
+        if price_diff_pct >= 10:
+            situation = "very_cheap"
+            target_price = sale_price
+        elif price_diff_pct >= 3:
+            situation = "cheap"
+            target_price = int(sale_price * 0.97)
+        elif price_diff_pct >= -3:
+            situation = "fair"
+            target_price = int(predicted_price * 0.98)
+        elif price_diff_pct >= -10:
+            situation = "expensive"
+            target_price = int(predicted_price)
+        else:
+            situation = "very_expensive"
+            target_price = int(predicted_price * 0.95)
+        
+        discount = sale_price - target_price
+        car_info = f"{brand} {model}" if brand else model
+        if year:
+            car_info += f" {year}년식"
+        
+        # 상황별 메시지
+        if situation == "very_cheap":
+            msg = f"안녕하세요, {car_info} 매물 보고 연락드립니다. 가격 좋게 올려주셨네요. 바로 구매하고 싶은데, {target_price:,}만원에 정리 가능하실까요?"
+            phone = ["안녕하세요, 매물 보고 연락드렸습니다.", f"가격이 좋아서 바로 결정하려고 하는데요.", f"{target_price:,}만원에 가능하시면 오늘 바로 보러가겠습니다."]
+        elif situation == "cheap":
+            msg = f"안녕하세요, {car_info} 매물 관심있어서 연락드립니다. 가격 괜찮은 것 같은데, {target_price:,}만원까지 가능하시면 바로 계약하겠습니다."
+            phone = ["안녕하세요, 매물 문의드립니다.", f"가격이 괜찮아 보여서요.", f"{target_price:,}만원 정도에 맞춰주시면 빠르게 결정하겠습니다."]
+        elif situation == "fair":
+            msg = f"안녕하세요, {car_info} 매물 보고 연락드립니다. 비슷한 매물들 비교해보니 {predicted_price:,.0f}만원대가 시세더라구요. {target_price:,}만원에 가능하실까요?"
+            phone = ["안녕하세요, 매물 문의드립니다.", f"여러 매물 비교해봤는데 시세가 {predicted_price:,.0f}만원 정도더라구요.", f"{target_price:,}만원에 맞춰주시면 바로 보러가겠습니다."]
+        else:
+            msg = f"안녕하세요, {car_info} 매물 관심있는데요. 시세 확인해보니 {predicted_price:,.0f}만원대더라구요. {target_price:,}만원 정도로 조정 가능하시면 연락주세요."
+            phone = ["안녕하세요, 매물 문의드립니다.", f"마음에 드는데 다른 매물들이 {predicted_price:,.0f}만원대라서요.", f"{target_price:,}만원 정도로 맞춰주시면 바로 결정하겠습니다."]
         
         return {
             'target_price': target_price,
             'discount_amount': discount,
-            'message_script': f"안녕하세요. {model} 매물 관심있어서 연락드립니다. 빅데이터 분석 결과 적정가가 {target_price:,}만원으로 나왔는데, {target_price:,}만원에 거래 가능할까요?",
-            'phone_script': f"제가 여러 매물을 비교 분석해봤는데요, 이 차량의 적정 시세가 {target_price:,}만원 정도더라구요. {target_price:,}만원에 거래 가능하시면 바로 계약하고 싶습니다.",
+            'price_situation': situation,
+            'message_script': msg,
+            'phone_script': phone,
             'key_arguments': [
-                f"AI 분석 시세: {predicted_price:,.0f}만원",
-                f"요청 할인액: {discount:,}만원" if discount > 0 else "적정가 수준",
+                f"시세: {predicted_price:,.0f}만원",
+                f"목표가: {target_price:,}만원",
                 "즉시 계약 가능"
             ],
             'tips': [
-                "성실한 구매 의사 어필",
-                "경쟁 매물 언급",
-                "빠른 결정 제시"
+                "성실한 구매 의사 표현",
+                "빠른 결정 어필"
             ]
         }
 

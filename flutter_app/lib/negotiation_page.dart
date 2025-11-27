@@ -7,6 +7,11 @@ class NegotiationPage extends StatefulWidget {
   final String? carName;
   final String? price;
   final String? info;
+  // 고도화: 정확한 가격 정보
+  final int? actualPrice;  // 실제 판매가
+  final int? predictedPrice;  // AI 예측가
+  final int? year;  // 연식
+  final int? mileage;  // 주행거리
 
   const NegotiationPage({
     super.key, 
@@ -14,6 +19,10 @@ class NegotiationPage extends StatefulWidget {
     this.carName,
     this.price,
     this.info,
+    this.actualPrice,
+    this.predictedPrice,
+    this.year,
+    this.mileage,
   });
 
   @override
@@ -60,6 +69,11 @@ class _NegotiationPageState extends State<NegotiationPage> {
         price: widget.price ?? '0만원',
         info: widget.info ?? '',
         checkpoints: _selectedCheckpoints,
+        // 정확한 가격 정보 전달
+        actualPrice: widget.actualPrice,
+        predictedPrice: widget.predictedPrice,
+        year: widget.year,
+        mileage: widget.mileage,
       );
       
       setState(() {

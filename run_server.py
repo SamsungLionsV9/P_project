@@ -383,32 +383,59 @@ async def remove_alert(alert_id: int, user_id: str = "guest"):
 
 class NegotiationRequest(BaseModel):
     car_name: str
-    price: str
+    price: str  # 실제 판매가 (문자열)
     info: str
     checkpoints: List[str] = []
+    # 고도화: 정확한 가격 정보
+    actual_price: Optional[int] = None  # 실제 판매가 (숫자)
+    predicted_price: Optional[int] = None  # AI 예측가 (숫자)
+    year: Optional[int] = None  # 연식
+    mileage: Optional[int] = None  # 주행거리
 
 @app.post("/api/negotiation/generate")
 async def generate_negotiation(request: NegotiationRequest):
-    """Groq AI로 네고 대본 생성"""
+    """Groq AI로 네고 대본 생성 (고도화)"""
     try:
-        # 가격에서 숫자만 추출
-        price_num = int(''.join(filter(str.isdigit, request.price)) or 0)
+        # 가격 결정: 새 필드 우선, 없으면 기존 방식
+        if request.actual_price is not None:
+            sale_price = request.actual_price
+        else:
+            sale_price = int(''.join(filter(str.isdigit, request.price)) or 0)
+        
+        # 예측가 결정: 새 필드 우선, 없으면 판매가 기준 추정
+        if request.predicted_price is not None:
+            predicted_price = request.predicted_price
+        else:
+            # 예측가가 없으면 판매가의 105%로 추정 (협상 여지)
+            predicted_price = int(sale_price * 1.05)
         
         # car_name 파싱 (브랜드와 모델 분리)
         car_name = request.car_name or '차량'
         parts = car_name.split(' ', 1)
         brand = parts[0] if parts else '알 수 없음'
-        model = parts[1] if len(parts) > 1 else car_name
+        model_part = parts[1] if len(parts) > 1 else car_name
+        
+        # 연식 추출 (car_name에서 또는 별도 필드)
+        year = request.year
+        if not year and '년' in model_part:
+            # "쏘나타 2023년식" → year=2023
+            import re
+            year_match = re.search(r'(\d{4})년', model_part)
+            if year_match:
+                year = int(year_match.group(1))
+                model_part = model_part.replace(year_match.group(0), '').strip()
         
         vehicle_data = {
             'brand': brand,
-            'model': model,
-            'sale_price': price_num,
+            'model': model_part,
+            'year': year,
+            'mileage': request.mileage or 0,
+            'sale_price': sale_price,
             'info': request.info
         }
         
         prediction_data = {
-            'predicted_price': price_num * 0.95  # 5% 할인 목표
+            'predicted_price': predicted_price
         }
         
         # Groq 서비스 호출
@@ -420,12 +447,25 @@ async def generate_negotiation(request: NegotiationRequest):
         )
         
         # 프론트엔드 형식에 맞게 변환
-        phone_scripts = []
-        if result.get('phone_script'):
+        phone_script = result.get('phone_script', [])
+        if isinstance(phone_script, str):
+            phone_script = [phone_script]
+        
+        # 전화 대본 형식화 (리스트면 그대로, 아니면 단계별로)
+        if phone_script and len(phone_script) >= 3:
             phone_scripts = [
-                f"1단계: 인사 - \"안녕하세요, {request.car_name} 아직 있나요?\"",
-                f"2단계: 네고 - \"{result.get('phone_script', '')}\"",
-                "3단계: 마무리 - \"감사합니다. 주소 문자로 보내주세요.\""
+                f"1️⃣ 인사: {phone_script[0]}",
+                f"2️⃣ 시세 언급: {phone_script[1]}",
+                f"3️⃣ 가격 제안: {phone_script[2]}",
+            ]
+            if len(phone_script) > 3:
+                phone_scripts.append(f"4️⃣ 마무리: {phone_script[3]}")
+        else:
+            phone_scripts = [
+                f"1️⃣ 인사: 안녕하세요, {request.car_name} 매물 보고 연락드렸습니다.",
+                f"2️⃣ 시세 언급: 비슷한 매물들 비교해봤는데요.",
+                f"3️⃣ 가격 제안: {result.get('target_price', sale_price):,}만원 정도에 가능하시면 바로 보러가겠습니다.",
+                "4️⃣ 마무리: 연락 기다리겠습니다. 감사합니다."
             ]
         
         return {
@@ -433,8 +473,11 @@ async def generate_negotiation(request: NegotiationRequest):
             'phone_script': phone_scripts,
             'tip': result.get('tips', ['자신감 있게, 하지만 정중하게 협상하세요'])[0] if result.get('tips') else '자신감 있게 협상하세요',
             'checkpoints': request.checkpoints,
-            'target_price': result.get('target_price', price_num * 0.95),
-            'key_arguments': result.get('key_arguments', [])
+            'target_price': result.get('target_price', sale_price),
+            'key_arguments': result.get('key_arguments', []),
+            'price_situation': result.get('price_situation', 'fair'),
+            'actual_price': sale_price,
+            'predicted_price': predicted_price
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"네고 대본 생성 실패: {str(e)}")

@@ -632,23 +632,36 @@ class ApiService {
 
   // ========== Groq AI API (네고 대본 생성) ==========
   
-  /// Groq AI로 네고 대본 생성
+  /// Groq AI로 네고 대본 생성 (고도화)
   Future<NegotiationScript> generateNegotiationScript({
     required String carName,
     required String price,
     required String info,
     List<String> checkpoints = const [],
+    // 고도화: 정확한 가격 정보 (선택적)
+    int? actualPrice,
+    int? predictedPrice,
+    int? year,
+    int? mileage,
   }) async {
     try {
+      final body = {
+        'car_name': carName,
+        'price': price,
+        'info': info,
+        'checkpoints': checkpoints,
+      };
+      
+      // 정확한 가격 정보가 있으면 추가
+      if (actualPrice != null) body['actual_price'] = actualPrice;
+      if (predictedPrice != null) body['predicted_price'] = predictedPrice;
+      if (year != null) body['year'] = year;
+      if (mileage != null) body['mileage'] = mileage;
+      
       final response = await http.post(
         Uri.parse('$_baseUrl/negotiation/generate'),
         headers: _headers,
-        body: jsonEncode({
-          'car_name': carName,
-          'price': price,
-          'info': info,
-          'checkpoints': checkpoints,
-        }),
+        body: jsonEncode(body),
       ).timeout(const Duration(seconds: 30)); // AI 응답은 시간이 걸릴 수 있음
 
       if (response.statusCode == 200) {
