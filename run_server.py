@@ -7,7 +7,7 @@ import os
 # ml-service 경로 추가
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'ml-service'))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict

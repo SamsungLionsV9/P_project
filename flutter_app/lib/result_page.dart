@@ -955,8 +955,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
   
   /// 시장 타이밍 조언 생성
   String _getMarketTimingAdvice() {
-    final score = timing.score;
-    final seasonalTrend = timing.seasonalScore;
+    final score = timing.timingScore;
     
     if (score >= 70) {
       return "현재는 이 모델을 구매하기 좋은 시기입니다. "
@@ -964,11 +963,11 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
              "마음에 드는 차량이 있다면 적극 검토해보세요.";
     } else if (score >= 50) {
       return "현재 시장 상황은 보통입니다. "
-             "급하지 않다면 ${timing.recommendedMonths.isNotEmpty ? timing.recommendedMonths.first : '다음 달'}까지 기다려보는 것도 방법입니다. "
+             "급하지 않다면 다음 달까지 기다려보는 것도 방법입니다. "
              "가격 변동을 지켜보며 결정하세요.";
     } else {
       return "현재는 구매를 서두르지 않는 것이 좋습니다. "
-             "${timing.recommendedMonths.isNotEmpty ? timing.recommendedMonths.join(', ') + '월' : '이후'}에 가격이 하락할 가능성이 있습니다. "
+             "시장 상황이 안정될 때까지 기다려보세요. "
              "조금 더 기다려보세요.";
     }
   }
