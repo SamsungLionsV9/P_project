@@ -23,20 +23,26 @@ spring:
           writetimeout: 5000
     default-encoding: UTF-8
   
+  # 개발용 H2 인메모리 DB (MySQL 없이 실행 가능)
   datasource:
-    url: jdbc:mysql://localhost:3306/car_database?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
-    username: root
-    password: Project1!
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:h2:file:./data/car_database;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
     
   jpa:
     hibernate:
-      ddl-auto: update  # 개발: update, 운영: validate
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.H2Dialect
         use_sql_comments: true
     
   security:

@@ -185,8 +185,59 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// 인기 모델 클릭 시 가성비 매물 모달 표시
+  /// 조회 기록 저장
+  Future<void> _addToHistory({
+    required String brand,
+    required String model,
+    required int year,
+    required int mileage,
+    double? predictedPrice,
+  }) async {
+    try {
+      await _api.addHistory(
+        brand: brand,
+        model: model,
+        year: year,
+        mileage: mileage,
+        predictedPrice: predictedPrice ?? 0,
+      );
+      // 로컬 리스트에도 추가 (중복 방지)
+      final exists = _recentSearches.any((h) => 
+        h.brand == brand && h.model == model && h.year == year
+      );
+      if (!exists) {
+        setState(() {
+          _recentSearches.insert(0, SearchHistory(
+            brand: brand,
+            model: model,
+            year: year,
+            mileage: mileage,
+            predictedPrice: predictedPrice,
+          ));
+          // 최대 20개 유지
+          if (_recentSearches.length > 20) {
+            _recentSearches.removeLast();
+          }
+        });
+      }
+    } catch (e) {
+      // 무시
+    }
+  }
+
+  /// 인기 모델 클릭 시 가성비 매물 모달 표시 + 조회 기록
   Future<void> _showModelDeals(PopularCar car) async {
+    // 조회 기록 저장
+    await _addToHistory(
+      brand: car.brand,
+      model: car.model,
+      year: 2023,  // 인기 모델은 대표 연식
+      mileage: 30000,  // 대표 주행거리
+      predictedPrice: car.avgPrice.toDouble(),
+    );
+    
+    if (!mounted) return;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -197,6 +248,7 @@ class _RecommendationPageState extends State<RecommendationPage>
         avgPrice: car.avgPrice,
         medianPrice: car.medianPrice,
         listings: car.listings,
+        onCarViewed: _addToHistory,  // 콜백 전달
       ),
     );
   }
@@ -355,8 +407,17 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// URL로 상세페이지 열기 (데스크톱 버전 - 모바일은 502 에러)
+  /// URL로 상세페이지 열기 + 조회 기록 저장
   Future<void> _openDetailUrl(RecommendedCar car) async {
+    // 조회 기록 저장
+    await _addToHistory(
+      brand: car.brand,
+      model: car.model,
+      year: car.year,
+      mileage: car.mileage,
+      predictedPrice: car.predictedPrice.toDouble(),
+    );
+    
     // 엔카 데스크톱 URL (모바일 URL은 외부 접근 차단됨)
     final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
     String url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
@@ -774,6 +835,13 @@ class _ModelDealsModal extends StatefulWidget {
   final int avgPrice;
   final int medianPrice;
   final int listings;
+  final Future<void> Function({
+    required String brand,
+    required String model,
+    required int year,
+    required int mileage,
+    double? predictedPrice,
+  })? onCarViewed;
 
   const _ModelDealsModal({
     required this.brand,
@@ -781,6 +849,7 @@ class _ModelDealsModal extends StatefulWidget {
     required this.avgPrice,
     required this.medianPrice,
     required this.listings,
+    this.onCarViewed,
   });
 
   @override
@@ -823,9 +892,19 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
   }
 
   Future<void> _openDetailUrl(RecommendedCar car) async {
+    // 조회 기록 저장 (콜백 호출)
+    if (widget.onCarViewed != null) {
+      await widget.onCarViewed!(
+        brand: car.brand,
+        model: car.model,
+        year: car.year,
+        mileage: car.mileage,
+        predictedPrice: car.predictedPrice.toDouble(),
+      );
+    }
+    
     final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
     String url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
-    // 모바일 URL은 502 에러 발생하므로 데스크톱 URL 유지
     
     try {
       final uri = Uri.parse(url);
