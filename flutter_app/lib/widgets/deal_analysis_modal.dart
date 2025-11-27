@@ -337,7 +337,7 @@ class _DealAnalysisModalState extends State<DealAnalysisModal> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(factor.message, style: TextStyle(color: textColor)),
+                      child: Text(factor.msg, style: TextStyle(color: textColor)),
                     ),
                   ],
                 ),
