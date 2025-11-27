@@ -1,7 +1,7 @@
 """
 비슷한 차량 가격 분포 서비스
 - 전처리된 데이터 사용
-- 이상치 필터링 (가격 100~15000만원)
+- 이상치 필터링 (학습 데이터와 동일: 가격 100~50000만원)
 """
 import pandas as pd
 import numpy as np
@@ -11,9 +11,9 @@ from typing import Dict, List, Optional
 class SimilarVehicleService:
     """비슷한 차량 가격 분포 분석"""
     
-    # 가격 필터 (이상치 제거)
-    PRICE_MIN = 100   # 100만원 이상
-    PRICE_MAX = 15000 # 1.5억 이하
+    # 가격 필터 (학습 데이터와 동일한 기준)
+    PRICE_MIN = 100    # 100만원 이상
+    PRICE_MAX = 50000  # 5억 이하 (학습 시 동일)
     
     def __init__(self):
         self.data_path = Path(__file__).parent.parent.parent / "data"
@@ -98,13 +98,13 @@ class SimilarVehicleService:
         prices_raw = similar['price'].values
         q1, q3 = np.percentile(prices_raw, [25, 75])
         iqr = q3 - q1
-        lower_bound = max(q1 - 1.5 * iqr, 100)  # 최소 100만원
-        upper_bound = min(q3 + 1.5 * iqr, 10000)  # 최대 1억
+        lower_bound = max(q1 - 1.5 * iqr, self.PRICE_MIN)
+        upper_bound = min(q3 + 1.5 * iqr, self.PRICE_MAX)
         
         prices = prices_raw[(prices_raw >= lower_bound) & (prices_raw <= upper_bound)]
         
         if len(prices) < 3:
-            prices = prices_raw[(prices_raw >= 100) & (prices_raw <= 10000)]
+            prices = prices_raw[(prices_raw >= self.PRICE_MIN) & (prices_raw <= self.PRICE_MAX)]
         
         if len(prices) == 0:
             return self._empty_result()
