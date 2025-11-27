@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
+import 'widgets/deal_analysis_modal.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -407,10 +408,10 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// URL로 상세페이지 열기 + 조회 기록 저장
-  Future<void> _openDetailUrl(RecommendedCar car) async {
+  /// 추천 차량 클릭 시 상세 분석 모달 표시 + 조회 기록 저장
+  void _showRecommendationAnalysis(RecommendedCar car) {
     // 조회 기록 저장
-    await _addToHistory(
+    _addToHistory(
       brand: car.brand,
       model: car.model,
       year: car.year,
@@ -418,44 +419,22 @@ class _RecommendationPageState extends State<RecommendationPage>
       predictedPrice: car.predictedPrice.toDouble(),
     );
     
-    // 엔카 데스크톱 URL (모바일 URL은 외부 접근 차단됨)
-    final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
-    String url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
-    
-    // HTTPS 강제
-    url = url.replaceAll('http://', 'https://');
-    
-    try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        // 인앱 브라우저로 열기 (모바일 환경에 최적화)
-        await launchUrl(
-          uri, 
-          mode: LaunchMode.inAppBrowserView,
-          webViewConfiguration: const WebViewConfiguration(
-            enableJavaScript: true,
-          ),
-        );
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('링크를 열 수 없습니다')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류: $e')),
-        );
-      }
-    }
+    // 상세 분석 모달 표시
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DealAnalysisModal(
+        deal: car,
+        predictedPrice: car.predictedPrice,  // 차량의 예측가 사용
+      ),
+    );
   }
 
   Widget _buildRecommendationCard(RecommendedCar car) {
     final isGood = car.isGoodDeal;
     return GestureDetector(
-      onTap: () => _openDetailUrl(car),
+      onTap: () => _showRecommendationAnalysis(car),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -891,10 +870,11 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
     }
   }
 
-  Future<void> _openDetailUrl(RecommendedCar car) async {
+  /// 매물 클릭 시 상세 분석 모달 표시
+  void _showDealAnalysis(RecommendedCar car) {
     // 조회 기록 저장 (콜백 호출)
     if (widget.onCarViewed != null) {
-      await widget.onCarViewed!(
+      widget.onCarViewed!(
         brand: car.brand,
         model: car.model,
         year: car.year,
@@ -903,17 +883,16 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
       );
     }
     
-    final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
-    String url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
-    
-    try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      }
-    } catch (e) {
-      // ignore
-    }
+    // 상세 분석 모달 표시
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DealAnalysisModal(
+        deal: car,
+        predictedPrice: widget.avgPrice,  // 모델 평균가를 예측가로 사용
+      ),
+    );
   }
 
   @override
@@ -1022,7 +1001,7 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
     final isGood = priceDiff > 0;
     
     return GestureDetector(
-      onTap: () => _openDetailUrl(deal),
+      onTap: () => _showDealAnalysis(deal),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
