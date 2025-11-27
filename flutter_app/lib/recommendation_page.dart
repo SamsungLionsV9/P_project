@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
 import 'widgets/deal_analysis_modal.dart';
+import 'providers/recent_views_provider.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -20,9 +22,6 @@ class _RecommendationPageState extends State<RecommendationPage>
   List<PopularCar> _popularDomestic = [];
   List<PopularCar> _popularImported = [];
   List<RecommendedCar> _recommendations = [];
-  
-  // 최근 조회한 매물 (세션 내 로컬 저장) - 추천 탭용
-  List<RecommendedCar> _recentViewedCars = [];
 
   bool _isLoading = true;
   String? _error;
@@ -37,6 +36,10 @@ class _RecommendationPageState extends State<RecommendationPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
+    // Provider 초기화
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RecentViewsProvider>().loadRecentViews();
+    });
   }
 
   @override
@@ -77,22 +80,9 @@ class _RecommendationPageState extends State<RecommendationPage>
     }
   }
   
-  /// 최근 조회 기록에 매물 추가 (로컬)
+  /// 최근 조회 기록에 매물 추가 (Provider를 통해 전역 저장)
   void _addToRecentViewed(RecommendedCar car) {
-    setState(() {
-      // 중복 제거 (동일 차량이 있으면 제거 후 맨 앞에 추가)
-      _recentViewedCars.removeWhere((c) => 
-        c.brand == car.brand && 
-        c.model == car.model && 
-        c.year == car.year &&
-        c.actualPrice == car.actualPrice
-      );
-      _recentViewedCars.insert(0, car);
-      // 최대 20개 유지
-      if (_recentViewedCars.length > 20) {
-        _recentViewedCars = _recentViewedCars.sublist(0, 20);
-      }
-    });
+    context.read<RecentViewsProvider>().addRecentCar(car);
   }
 
   @override
@@ -538,10 +528,14 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// 최근 조회 탭 (세션 내 로컬 저장 - 추천 차량 클릭 기록)
+  /// 최근 조회 탭 (Provider 기반 - 전역 저장)
   Widget _buildHistoryTab() {
-    return _recentViewedCars.isEmpty
-        ? Center(
+    return Consumer<RecentViewsProvider>(
+      builder: (context, provider, child) {
+        final recentCars = provider.recentViewedCars;
+        
+        if (recentCars.isEmpty) {
+          return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -553,146 +547,144 @@ class _RecommendationPageState extends State<RecommendationPage>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '추천 차량을 클릭하면 여기에 기록됩니다',
+                  '추천 차량 또는 분석 결과의 매물을\n클릭하면 여기에 기록됩니다',
+                  textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
             ),
-          )
-        : Column(
-            children: [
-              // 헤더
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '총 ${_recentViewedCars.length}건',
-                      style: TextStyle(color: Colors.grey[400], fontSize: 14),
-                    ),
-                    TextButton.icon(
-                      onPressed: _clearRecentViewed,
-                      icon: const Icon(Icons.delete_sweep, size: 18, color: Colors.red),
-                      label: const Text('전체 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
-                    ),
-                  ],
-                ),
+          );
+        }
+        
+        return Column(
+          children: [
+            // 헤더
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '총 ${recentCars.length}건',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  ),
+                  TextButton.icon(
+                    onPressed: _clearRecentViewed,
+                    icon: const Icon(Icons.delete_sweep, size: 18, color: Colors.red),
+                    label: const Text('전체 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
+                  ),
+                ],
               ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _recentViewedCars.length,
-                  itemBuilder: (context, index) {
-                    final car = _recentViewedCars[index];
-                    return GestureDetector(
-                      onTap: () => _showRecommendationAnalysis(car),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF252542),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: car.isGoodDeal ? Colors.green.withOpacity(0.4) : Colors.white10,
-                          ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: recentCars.length,
+                itemBuilder: (context, index) {
+                  final car = recentCars[index];
+                  return GestureDetector(
+                    onTap: () => _showRecommendationAnalysis(car),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF252542),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: car.isGoodDeal ? Colors.green.withOpacity(0.4) : Colors.white10,
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: car.isGoodDeal ? Colors.green.withOpacity(0.1) : Colors.white10,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                car.isGoodDeal ? Icons.thumb_up : Icons.directions_car,
-                                color: car.isGoodDeal ? Colors.green : Colors.white54,
-                              ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: car.isGoodDeal ? Colors.green.withOpacity(0.1) : Colors.white10,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${car.brand} ${car.model}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${car.year}년 • ${(car.mileage / 10000).toStringAsFixed(1)}만km • ${car.fuel}',
-                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                                  ),
-                                ],
-                              ),
+                            child: Icon(
+                              car.isGoodDeal ? Icons.thumb_up : Icons.directions_car,
+                              color: car.isGoodDeal ? Colors.green : Colors.white54,
                             ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${car.actualPrice}만원',
+                                  '${car.brand} ${car.model}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                if (car.priceDiff > 0)
-                                  Text(
-                                    '-${car.priceDiff}만원',
-                                    style: const TextStyle(
-                                      color: Colors.green,
-                                      fontSize: 12,
-                                    ),
-                                  ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${car.year}년 • ${(car.mileage / 10000).toStringAsFixed(1)}만km • ${car.fuel}',
+                                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                ),
                               ],
                             ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () => _removeFromRecentViewed(index),
-                              child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
-                            ),
-                          ],
-                        ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${car.actualPrice}만원',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (car.priceDiff > 0)
+                                Text(
+                                  '-${car.priceDiff}만원',
+                                  style: const TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => provider.removeAt(index),
+                            child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
-            ],
-          );
-  }
-
-  /// 최근 조회에서 제거
-  void _removeFromRecentViewed(int index) {
-    setState(() {
-      _recentViewedCars.removeAt(index);
-    });
+            ),
+          ],
+        );
+      },
+    );
   }
 
   /// 최근 조회 전체 삭제
   void _clearRecentViewed() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF252542),
         title: const Text('전체 삭제', style: TextStyle(color: Colors.white)),
         content: const Text('모든 조회 기록을 삭제하시겠습니까?', style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('취소'),
           ),
           TextButton(
             onPressed: () {
-              setState(() => _recentViewedCars.clear());
-              Navigator.pop(context);
+              context.read<RecentViewsProvider>().clearAll();
+              Navigator.pop(dialogContext);
             },
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
           ),

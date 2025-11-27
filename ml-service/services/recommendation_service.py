@@ -15,9 +15,65 @@ from typing import Dict, List, Optional, Tuple
 from collections import Counter
 import sys
 import os
+import re
 
 # 상위 경로 추가 (prediction_v12 사용 위함)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+
+def extract_model_core(model_name: str) -> str:
+    """
+    모델명에서 핵심 식별자 추출
+    - 벤츠 E-클래스 W213 → E-클래스
+    - 벤츠 GLE-클래스 W167 → GLE-클래스
+    - 테슬라 모델 3 → 모델 3
+    - 테슬라 모델 Y → 모델 Y
+    - 그랜저 IG → 그랜저
+    """
+    model = model_name.strip()
+    
+    # 벤츠 클래스 패턴 (E-클래스, GLE-클래스, S-클래스 등)
+    benz_match = re.match(r'((?:GL)?[A-Z])-?클래스', model, re.IGNORECASE)
+    if benz_match:
+        return benz_match.group(0).replace('-', '-')
+    
+    # BMW 시리즈 패턴 (3시리즈, 5시리즈, X3 등)
+    bmw_series = re.match(r'(\d시리즈|[XZiM]\d)', model, re.IGNORECASE)
+    if bmw_series:
+        return bmw_series.group(1)
+    
+    # 테슬라 모델 패턴 (모델 3, 모델 Y, 모델 S 등)
+    tesla_match = re.match(r'(모델\s*[3YSX]|Model\s*[3YSX])', model, re.IGNORECASE)
+    if tesla_match:
+        return tesla_match.group(1).replace(' ', ' ')
+    
+    # 아우디 패턴 (A6, Q5 등)
+    audi_match = re.match(r'([AQeSR][0-9]+)', model, re.IGNORECASE)
+    if audi_match:
+        return audi_match.group(1).upper()
+    
+    # 일반 모델명: 첫 번째 핵심 단어 (공백/괄호 이전)
+    # 그랜저 IG, 쏘나타 DN8 → 그랜저, 쏘나타
+    core_match = re.match(r'^([가-힣A-Za-z0-9]+)', model)
+    if core_match:
+        return core_match.group(1)
+    
+    return model
+
+
+def is_model_match(target_model: str, candidate_model: str) -> bool:
+    """
+    두 모델이 같은 계열인지 정확히 판단
+    - target: 사용자가 선택한 모델 (E-클래스, 모델 3 등)
+    - candidate: 데이터셋의 모델명
+    """
+    target_core = extract_model_core(target_model)
+    candidate_core = extract_model_core(candidate_model)
+    
+    # 정확한 핵심 식별자 매칭
+    # E-클래스 ↔ E-클래스 OK, E-클래스 ↔ GLE-클래스 NO
+    return target_core.lower() == candidate_core.lower()
+
 
 class RecommendationService:
     """엔카 데이터 기반 추천 시스템"""
@@ -499,9 +555,10 @@ class RecommendationService:
         
         df = pd.concat(dfs, ignore_index=True)
         
-        # 모델 필터링 (브랜드 + 모델명 키워드 검색)
+        # 모델 필터링 (브랜드 + 정확한 모델 계열 매칭)
         brand_mask = df['Manufacturer'].str.contains(brand, case=False, na=False)
-        model_mask = df['Model'].str.contains(model.split()[0], case=False, na=False)  # 첫 단어로 매칭
+        # 정확한 모델 매칭 (E-클래스 ↔ E-클래스만, GLE-클래스 제외)
+        model_mask = df['Model'].apply(lambda x: is_model_match(model, str(x)))
         df = df[brand_mask & model_mask]
         
         # 이상치 제거 + car_id 필수 (상세페이지 연결 가능한 차량만)

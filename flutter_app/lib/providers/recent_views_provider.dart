@@ -5,25 +5,28 @@ import '../services/api_service.dart';
 import '../models/car_data.dart';
 
 /// 최근 조회 차량 Provider
-/// - 로그인 상태: 백엔드 API를 통해 DB에 저장/조회
-/// - 비로그인 상태: SharedPreferences를 통해 로컬 캐시 사용
+/// - 개별 매물 클릭 시 저장 (추천 탭 + 결과 페이지 모두)
+/// - SharedPreferences를 통해 로컬 캐시 사용
 class RecentViewsProvider extends ChangeNotifier {
-  static const String _localCacheKey = 'recent_views_cache';
-  static const int _maxLocalItems = 20;
+  static const String _localCacheKey = 'recent_viewed_cars';
+  static const int _maxItems = 30;
   
-  final ApiService _apiService = ApiService();
+  // RecommendedCar 형태의 데이터 저장
+  List<RecommendedCar> _recentViewedCars = [];
+  bool _isLoading = false;
   
+  // Legacy support
   List<CarData> _recentViews = [];
   bool _isLoggedIn = false;
-  bool _isLoading = false;
   String? _error;
   
   // Getters
+  List<RecommendedCar> get recentViewedCars => List.unmodifiable(_recentViewedCars);
   List<CarData> get recentViews => List.unmodifiable(_recentViews);
   bool get isLoggedIn => _isLoggedIn;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  int get count => _recentViews.length;
+  int get count => _recentViewedCars.length;
   
   /// 로그인 상태 설정
   void setLoginState(bool loggedIn) {
@@ -38,13 +41,7 @@ class RecentViewsProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      if (_isLoggedIn) {
-        // 로그인 상태: API에서 가져오기
-        await _loadFromApi();
-      } else {
-        // 비로그인 상태: 로컬 캐시에서 가져오기
-        await _loadFromLocalCache();
-      }
+      await _loadFromLocalCache();
     } catch (e) {
       _error = e.toString();
       debugPrint('RecentViewsProvider Error: $e');
@@ -54,51 +51,67 @@ class RecentViewsProvider extends ChangeNotifier {
     }
   }
   
-  /// 차량 조회 기록 추가
-  Future<void> addView(CarData car) async {
+  /// 매물 조회 기록 추가 (RecommendedCar)
+  Future<void> addRecentCar(RecommendedCar car) async {
     try {
-      // 중복 제거 후 맨 앞에 추가
-      _recentViews.removeWhere((c) => c.id == car.id);
-      _recentViews.insert(0, car);
+      // 중복 제거 (동일 차량 제거 후 맨 앞에 추가)
+      _recentViewedCars.removeWhere((c) => 
+        c.brand == car.brand && 
+        c.model == car.model && 
+        c.year == car.year &&
+        c.actualPrice == car.actualPrice
+      );
+      _recentViewedCars.insert(0, car);
       
       // 최대 개수 제한
-      if (_recentViews.length > _maxLocalItems) {
-        _recentViews = _recentViews.sublist(0, _maxLocalItems);
+      if (_recentViewedCars.length > _maxItems) {
+        _recentViewedCars = _recentViewedCars.sublist(0, _maxItems);
       }
       
       notifyListeners();
-      
-      if (_isLoggedIn) {
-        // 로그인 상태: API로 저장
-        await _saveToApi(car);
-      } else {
-        // 비로그인 상태: 로컬 캐시에 저장
-        await _saveToLocalCache();
+      await _saveToLocalCache();
+    } catch (e) {
+      debugPrint('Failed to add recent car: $e');
+    }
+  }
+  
+  /// 레거시: CarData 형태로 추가 (하위 호환)
+  Future<void> addView(CarData car) async {
+    try {
+      _recentViews.removeWhere((c) => c.id == car.id);
+      _recentViews.insert(0, car);
+      if (_recentViews.length > _maxItems) {
+        _recentViews = _recentViews.sublist(0, _maxItems);
       }
+      notifyListeners();
     } catch (e) {
       debugPrint('Failed to add view: $e');
     }
   }
   
-  /// 조회 기록 삭제
-  Future<void> removeView(String carId) async {
-    _recentViews.removeWhere((c) => c.id == carId);
-    notifyListeners();
-    
-    if (!_isLoggedIn) {
+  /// 조회 기록 삭제 (인덱스 기반)
+  Future<void> removeAt(int index) async {
+    if (index >= 0 && index < _recentViewedCars.length) {
+      _recentViewedCars.removeAt(index);
+      notifyListeners();
       await _saveToLocalCache();
     }
   }
   
+  /// 조회 기록 삭제 (레거시)
+  Future<void> removeView(String carId) async {
+    _recentViews.removeWhere((c) => c.id == carId);
+    notifyListeners();
+  }
+  
   /// 전체 기록 삭제
   Future<void> clearAll() async {
+    _recentViewedCars.clear();
     _recentViews.clear();
     notifyListeners();
     
-    if (!_isLoggedIn) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_localCacheKey);
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_localCacheKey);
   }
   
   /// 로그인 시 로컬 캐시를 서버로 동기화
@@ -179,7 +192,7 @@ class RecentViewsProvider extends ChangeNotifier {
     }
   }
   
-  /// 로컬 캐시에서 로드
+  /// 로컬 캐시에서 로드 (RecommendedCar)
   Future<void> _loadFromLocalCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -187,19 +200,45 @@ class RecentViewsProvider extends ChangeNotifier {
       
       if (cached != null) {
         final List<dynamic> items = jsonDecode(cached);
-        _recentViews = items.map((item) => CarData.fromJson(item)).toList();
+        _recentViewedCars = items.map((item) => RecommendedCar(
+          brand: item['brand'] ?? '',
+          model: item['model'] ?? '',
+          year: item['year'] ?? 2020,
+          mileage: item['mileage'] ?? 0,
+          fuel: item['fuel'] ?? '가솔린',
+          actualPrice: item['actualPrice'] ?? 0,
+          predictedPrice: item['predictedPrice'] ?? 0,
+          priceDiff: item['priceDiff'] ?? 0,
+          valueScore: (item['valueScore'] ?? 0).toDouble(),
+          isGoodDeal: item['isGoodDeal'] ?? false,
+          carId: item['carId'],
+          detailUrl: item['detailUrl'],
+        )).toList();
       }
     } catch (e) {
       debugPrint('Failed to load from local cache: $e');
-      _recentViews = [];
+      _recentViewedCars = [];
     }
   }
   
-  /// 로컬 캐시에 저장
+  /// 로컬 캐시에 저장 (RecommendedCar)
   Future<void> _saveToLocalCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final items = _recentViews.map((c) => c.toJson()).toList();
+      final items = _recentViewedCars.map((c) => {
+        'brand': c.brand,
+        'model': c.model,
+        'year': c.year,
+        'mileage': c.mileage,
+        'fuel': c.fuel,
+        'actualPrice': c.actualPrice,
+        'predictedPrice': c.predictedPrice,
+        'priceDiff': c.priceDiff,
+        'valueScore': c.valueScore,
+        'isGoodDeal': c.isGoodDeal,
+        'carId': c.carId,
+        'detailUrl': c.detailUrl,
+      }).toList();
       await prefs.setString(_localCacheKey, jsonEncode(items));
     } catch (e) {
       debugPrint('Failed to save to local cache: $e');

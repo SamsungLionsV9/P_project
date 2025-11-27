@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
 import 'negotiation_page.dart';
 import 'widgets/deal_analysis_modal.dart';
+import 'providers/recent_views_provider.dart';
 
 class ResultPage extends StatefulWidget {
   final SmartAnalysisResult analysisResult;
@@ -463,6 +465,9 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
   
   /// 개별 매물 분석 모달 표시
   Future<void> _showDealAnalysisModal(RecommendedCar deal) async {
+    // 최근 조회에 추가 (Provider를 통해 전역 저장)
+    context.read<RecentViewsProvider>().addRecentCar(deal);
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
