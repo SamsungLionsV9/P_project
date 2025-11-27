@@ -11,18 +11,32 @@ import 'signup_page.dart';
 import 'services/auth_service.dart';
 import 'theme/theme_provider.dart';
 import 'providers/comparison_provider.dart';
+import 'providers/recent_views_provider.dart';
+import 'providers/popular_cars_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // 저장된 토큰 로드
-  await AuthService().loadSavedToken();
+  final authService = AuthService();
+  await authService.loadSavedToken();
   
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => ComparisonProvider()),
+        ChangeNotifierProvider(create: (_) {
+          final provider = RecentViewsProvider();
+          provider.setLoginState(authService.isLoggedIn);
+          provider.loadRecentViews();
+          return provider;
+        }),
+        ChangeNotifierProvider(create: (_) {
+          final provider = PopularCarsProvider();
+          provider.loadData();
+          return provider;
+        }),
       ],
       child: const CarPriceApp(),
     ),
@@ -363,17 +377,17 @@ class _HomePageContentState extends State<HomePageContent> {
 
             const SizedBox(height: 32),
 
-            // 3. 최근 조회 차량 섹션
+            // 3. 최근 조회 차량 섹션 (Provider 연동)
             _buildSectionTitle("최근 조회 차량", textColor),
             const SizedBox(height: 12),
-            _buildHorizontalCarList(isReversed: false, isDark: isDark),
+            _buildRecentViewsList(isDark: isDark),
 
             const SizedBox(height: 32),
 
-            // 3. 인기 모델 추천 섹션
+            // 4. 인기 모델 추천 섹션 (Provider 연동)
             _buildSectionTitle("인기 모델 추천", textColor),
             const SizedBox(height: 12),
-            _buildHorizontalCarList(isReversed: true, isDark: isDark),
+            _buildPopularCarsList(isDark: isDark),
 
             const SizedBox(height: 40),
           ],
@@ -604,36 +618,122 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Helper Widget: 가로 스크롤 차량 리스트
-  Widget _buildHorizontalCarList({required bool isReversed, required bool isDark}) {
-    // 더미 데이터
-    final List<Map<String, dynamic>> cars = [
-      {"name": "노란색 벤츠", "info": "2023년 / 0.8만KM", "price": "1억", "color": Colors.yellow},
-      {"name": "파란색 차", "info": "2024년 / 1만KM", "price": "8000만원", "color": Colors.blue},
-      {"name": "흰색 SUV", "info": "2025년 / 0.9만KM", "price": "9000만원", "color": Colors.grey[300]},
-      {"name": "검정 세단", "info": "2022년 / 3만KM", "price": "5500만원", "color": Colors.black87},
-    ];
-
-    final displayList = isReversed ? cars.reversed.toList() : cars;
-
-    return SizedBox(
-      height: 190, // 카드 높이 + 그림자 여유분
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        scrollDirection: Axis.horizontal,
-        itemCount: displayList.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final car = displayList[index];
-          return CarCard(
-            name: car['name'],
-            info: car['info'],
-            price: car['price'],
-            color: car['color'],
-            isDark: isDark,
+  // 최근 조회 차량 리스트 (Provider 연동)
+  Widget _buildRecentViewsList({required bool isDark}) {
+    return Consumer<RecentViewsProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading && provider.recentViews.isEmpty) {
+          return const SizedBox(
+            height: 190,
+            child: Center(child: CircularProgressIndicator()),
           );
-        },
-      ),
+        }
+        
+        if (provider.recentViews.isEmpty) {
+          return SizedBox(
+            height: 190,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    '최근 조회한 차량이 없습니다',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        return SizedBox(
+          height: 190,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: provider.recentViews.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final car = provider.recentViews[index];
+              return CarCard(
+                name: car.name,
+                info: car.info,
+                price: car.price,
+                color: car.color,
+                isDark: isDark,
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+  
+  // 인기 모델 추천 리스트 (Provider 연동)
+  Widget _buildPopularCarsList({required bool isDark}) {
+    return Consumer<PopularCarsProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading && provider.topDomestic.isEmpty) {
+          return const SizedBox(
+            height: 190,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        
+        // 국산차와 수입차 합쳐서 표시
+        final allCars = [...provider.topDomestic, ...provider.topImported];
+        
+        if (allCars.isEmpty) {
+          return SizedBox(
+            height: 190,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.trending_up, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    '추천 데이터를 불러오는 중...',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        // 색상 팔레트
+        final colors = [
+          Colors.black87,
+          Colors.grey[300]!,
+          Colors.blue,
+          Colors.yellow[700]!,
+          Colors.green,
+          Colors.purple,
+        ];
+        
+        return SizedBox(
+          height: 190,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: allCars.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final car = allCars[index];
+              return CarCard(
+                name: '${car.brand} ${car.model}',
+                info: '${car.avgPrice}만원 ~',
+                price: '${car.listings}대 매물',
+                color: colors[index % colors.length],
+                isDark: isDark,
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

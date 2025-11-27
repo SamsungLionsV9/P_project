@@ -261,6 +261,31 @@ class ApiService {
     }
   }
 
+  /// 검색 이력 추가
+  Future<void> addHistory({
+    required String brand,
+    required String model,
+    required int year,
+    required int mileage,
+    double? predictedPrice,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/history?user_id=$_userId'),
+      headers: _headers,
+      body: jsonEncode({
+        'brand': brand,
+        'model': model,
+        'year': year,
+        'mileage': mileage,
+        'predicted_price': predictedPrice,
+      }),
+    ).timeout(_timeout);
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw ApiException('검색 이력 저장 실패');
+    }
+  }
+
   /// 추천 차량 목록
   Future<List<RecommendedCar>> getRecommendations({
     String category = 'all',
@@ -699,6 +724,17 @@ class PopularCar {
       type: json['type'],
     );
   }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'brand': brand,
+      'model': model,
+      'listings': listings,
+      'avg_price': avgPrice,
+      'median_price': medianPrice,
+      'type': type,
+    };
+  }
 }
 
 /// 추천 차량
@@ -753,6 +789,24 @@ class RecommendedCar {
   
   String get formattedMileage => '${(mileage / 10000).toStringAsFixed(1)}만 km';
   String get priceTag => isGoodDeal ? '🔥 가성비' : '';
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'brand': brand,
+      'model': model,
+      'year': year,
+      'mileage': mileage,
+      'fuel': fuel,
+      'actual_price': actualPrice,
+      'predicted_price': predictedPrice,
+      'price_diff': priceDiff,
+      'is_good_deal': isGoodDeal,
+      'score': score,
+      'type': type,
+      'detail_url': detailUrl,
+      'image_url': imageUrl,
+    };
+  }
 }
 
 class SearchHistory {

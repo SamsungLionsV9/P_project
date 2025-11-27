@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car-Sentix - 중고차 AI 어드바이저</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <style>
+        body { font-family: 'Pretendard', sans-serif; }
+        .gradient-bg {
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563EB',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white text-gray-800">
+
+    <!-- App Bar -->
+    <nav class="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100 sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+                <circle cx="7" cy="17" r="2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+                <circle cx="17" cy="17" r="2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+            </svg>
+            <span class="text-xl font-bold tracking-tight">Car-Sentix</span>
+        </div>
+        <button class="text-sm font-medium text-primary hover:text-blue-700">로그인</button>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="gradient-bg px-6 pt-12 pb-10 text-center">
+        <div class="mb-6 inline-block p-4 rounded-full bg-blue-50">
+            <svg class="w-12 h-12 text-primary mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+        </div>
+        <h1 class="text-3xl font-bold mb-4 text-gray-900 leading-tight">
+            중고차,<br>데이터로 현명하게 사세요
+        </h1>
+        <p class="text-gray-600 mb-8 leading-relaxed">
+            AI 가격 예측 + 시장 타이밍 분석 + Groq AI 자문<br>
+            단 한 번의 분석으로 모든 것을 확인하세요.
+        </p>
+        
+        <button class="w-full bg-primary text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:bg-blue-700 transition active:scale-95 mb-6">
+            지금 무료로 분석하기
+        </button>
+
+        <div class="flex justify-center gap-3">
+            <span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full border border-gray-200">119K 데이터</span>
+            <span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full border border-gray-200">R² 0.87 정확도</span>
+        </div>
+    </header>
+
+    <!-- Interactive Demo -->
+    <section class="px-6 py-8">
+        <div class="bg-white rounded-2xl p-6 border border-blue-100 shadow-[0_10px_40px_-15px_rgba(37,99,235,0.1)]">
+            <div class="flex items-center gap-2 mb-6">
+                <span class="text-lg font-bold text-primary">⚡️ 3초 만에 분석해보기</span>
+            </div>
+
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">브랜드</label>
+                    <select class="w-full p-3 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary">
+                        <option>현대</option>
+                        <option>기아</option>
+                        <option>제네시스</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">모델</label>
+                    <select class="w-full p-3 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary">
+                        <option>그랜저</option>
+                        <option>아반떼</option>
+                        <option>쏘나타</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-xl p-4 space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-500">💰 예상 시세</span>
+                    <div class="flex items-center gap-1">
+                        <span class="font-bold text-gray-900">3,200만원</span>
+                        <svg class="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-500">🚦 구매 신호</span>
+                    <span class="bg-green-100 text-success text-xs font-bold px-2 py-1 rounded">강력 추천</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="px-6 py-8 bg-gray-50">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900">🎯 3가지 핵심 기능</h2>
+        
+        <div class="space-y-4">
+            <!-- Card 1 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-4 text-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">AI 가격 예측</h3>
+                <p class="text-sm text-gray-600 leading-relaxed">119,343대 데이터를 학습한 AI가 R² 0.87 정확도로 적정 시세를 알려드립니다.</p>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-4 text-success">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">시장 타이밍 분석</h3>
+                <p class="text-sm text-gray-600 leading-relaxed">금리, 유가, 신차 출시일 등 거시 데이터를 분석해 '살 때'를 알려드립니다.</p>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mb-4 text-purple-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold mb-2">Groq AI 자문</h3>
+                <p class="text-sm text-gray-600 leading-relaxed">허위 매물 탐지부터 가격 네고 대본까지, AI 딜러가 직접 조언해드립니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer CTA -->
+    <footer class="px-6 py-12 bg-gray-900 text-white text-center">
+        <h2 class="text-2xl font-bold mb-4">지금 바로 시작하세요</h2>
+        <p class="text-gray-400 mb-8 text-sm">회원가입 없이 3초 만에 결과를 확인할 수 있습니다.</p>
+        
+        <button class="w-full bg-primary text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:bg-blue-600 transition mb-8">
+            무료로 분석하기
+        </button>
+        
+        <p class="text-xs text-gray-500">© 2025 Car-Sentix. Built with AI</p>
+    </footer>
+
+</body>
+</html>

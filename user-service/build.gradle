@@ -37,8 +37,11 @@ dependencies {
     implementation 'jakarta.mail:jakarta.mail-api:2.1.2'
     implementation 'com.sun.mail:jakarta.mail:2.0.1' // IDE 새로고침용
     
-    // MySQL
+    // MySQL (운영 환경)
     runtimeOnly 'com.mysql:mysql-connector-j'
+    
+    // H2 (개발 환경)
+    runtimeOnly 'com.h2database:h2'
     
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
