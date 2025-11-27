@@ -29,8 +29,8 @@ class RecommendationService:
     # 특수 가격 이상치 (가격 미정 표시 등)
     SPECIAL_PRICES = {9999, 8888, 7777, 6666, 5555, 1111, 10000}
     
-    # 엔카 모바일 상세페이지 URL 템플릿
-    ENCAR_DETAIL_URL = "https://m.encar.com/dc/dc_cardetailview.do?carid={car_id}"
+    # 엔카 데스크톱 상세페이지 URL 템플릿 (모바일은 502 에러 발생)
+    ENCAR_DETAIL_URL = "https://www.encar.com/dc/dc_cardetailview.do?carid={car_id}"
     
     def __init__(self):
         self.data_path = Path(__file__).parent.parent.parent / "data"

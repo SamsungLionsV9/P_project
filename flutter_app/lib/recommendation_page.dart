@@ -355,15 +355,14 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// URL로 상세페이지 열기 (모바일 버전 우선)
+  /// URL로 상세페이지 열기 (데스크톱 버전 - 모바일은 502 에러)
   Future<void> _openDetailUrl(RecommendedCar car) async {
-    // 엔카 모바일 URL 생성 (실제 URL이 있으면 모바일로 변환)
+    // 엔카 데스크톱 URL (모바일 URL은 외부 접근 차단됨)
     final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
-    String url = car.detailUrl ?? 'https://m.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
+    String url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
     
-    // www.encar.com을 m.encar.com으로 변환 (모바일 최적화)
-    url = url.replaceAll('www.encar.com', 'm.encar.com');
-    url = url.replaceAll('http://', 'https://');  // HTTPS 강제
+    // HTTPS 강제
+    url = url.replaceAll('http://', 'https://');
     
     try {
       final uri = Uri.parse(url);
@@ -825,8 +824,8 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
 
   Future<void> _openDetailUrl(RecommendedCar car) async {
     final searchQuery = Uri.encodeComponent('${car.brand} ${car.model}');
-    String url = car.detailUrl ?? 'https://m.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
-    url = url.replaceAll('www.encar.com', 'm.encar.com');
+    String url = car.detailUrl ?? 'https://www.encar.com/dc/dc_carsearchlist.do?q=$searchQuery';
+    // 모바일 URL은 502 에러 발생하므로 데스크톱 URL 유지
     
     try {
       final uri = Uri.parse(url);
