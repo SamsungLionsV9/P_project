@@ -99,11 +99,13 @@ public class UserController {
     public ResponseEntity<?> login(@Valid @RequestBody UserLoginDto dto) {
         try {
             String token = userService.login(dto);
+            UserResponseDto user = userService.getUserInfo(dto.getEmail());  // 사용자 정보 조회
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "로그인 성공");
             response.put("token", token);
+            response.put("user", user);  // 사용자 정보 추가
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {

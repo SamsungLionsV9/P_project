@@ -66,11 +66,7 @@ public class UserService implements UserDetailsService {
             }
         }
         
-        // 사용자명 중복 체크 (활성 사용자만)
-        Optional<User> existingUserByUsername = userRepository.findByUsername(dto.getUsername());
-        if (existingUserByUsername.isPresent() && existingUserByUsername.get().getIsActive()) {
-            throw new IllegalArgumentException("이미 사용 중인 사용자명입니다");
-        }
+        // 참고: 사용자명(이름)은 중복 허용, 이메일만 고유해야 함
         
         // 사용자 생성
         User user = User.builder()
@@ -112,11 +108,7 @@ public class UserService implements UserDetailsService {
             }
         }
         
-        // 사용자명 중복 체크 (활성 사용자만)
-        Optional<User> existingUserByUsername = userRepository.findByUsername(dto.getUsername());
-        if (existingUserByUsername.isPresent() && existingUserByUsername.get().getIsActive()) {
-            throw new IllegalArgumentException("이미 사용 중인 사용자명입니다");
-        }
+        // 참고: 사용자명(이름)은 중복 허용, 이메일만 고유해야 함
         
         // Provider ID 중복 체크
         Optional<User> existingUserByProviderId = userRepository.findByProviderAndProviderId(provider, dto.getProviderId());
@@ -274,12 +266,8 @@ public class UserService implements UserDetailsService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
         
-        // 사용자명 변경 (중복 체크)
+        // 사용자명 변경 (이름은 중복 허용)
         if (username != null && !username.trim().isEmpty() && !username.equals(user.getUsername())) {
-            Optional<User> existingUser = userRepository.findByUsername(username);
-            if (existingUser.isPresent() && !existingUser.get().getId().equals(userId)) {
-                throw new IllegalArgumentException("이미 사용 중인 사용자명입니다");
-            }
             user.setUsername(username);
         }
         

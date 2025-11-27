@@ -51,8 +51,8 @@ class ApiService {
     return headers;
   }
   
-  /// 사용자 ID (로그인 시) 또는 guest
-  String get _userId => _authService.userId ?? 'guest';
+  /// 사용자 식별자 (이메일 또는 guest) - 관리자가 식별하기 쉬움
+  String get _userId => _authService.userEmail ?? 'guest';
 
   /// 가격 예측
   Future<PredictionResult> predict({
