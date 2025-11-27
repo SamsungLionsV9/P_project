@@ -243,7 +243,7 @@ class PredictionServiceV11:
     
     def predict(self, brand: str, model_name: str, year: int, mileage: int,
                 options: Optional[Dict] = None, accident_free: bool = True,
-                grade: str = 'normal', fuel: str = '가솔린') -> PredictionResult:
+                grade: str = 'normal') -> PredictionResult:
         """
         통합 예측 (국산차/외제차 자동 분류)
         
@@ -255,23 +255,12 @@ class PredictionServiceV11:
             options: 옵션 딕셔너리 (has_sunroof, has_leather_seat 등)
             accident_free: 무사고 여부
             grade: 검사 등급 (normal, good, excellent)
-            fuel: 연료 타입 (가솔린, 디젤, 하이브리드, 전기, LPG)
             
         Returns:
             PredictionResult: 예측 결과
         """
         options = options or {}
         warnings = []
-        
-        # 연료 타입별 가격 조정 비율
-        fuel_multipliers = {
-            '가솔린': 1.0,      # 기준
-            '디젤': 1.03,       # +3% (디젤 프리미엄)
-            '하이브리드': 1.08, # +8% (친환경 프리미엄)
-            '전기': 1.10,       # +10% (전기차 프리미엄)
-            'LPG': 0.92,        # -8% (LPG 할인)
-        }
-        fuel_multiplier = fuel_multipliers.get(fuel, 1.0)
         
         # 모델 타입 결정
         model_type = self._get_model_type(brand)
@@ -283,21 +272,7 @@ class PredictionServiceV11:
             features = self._create_domestic_features(model_name, year, mileage, 
                                                        options, accident_free, grade)
             pred_log = self.domestic_model.predict(features)[0]
-            base_price = np.expm1(pred_log)
-            
-            # 국산차도 옵션 프리미엄 추가 (모델 가중치가 낮아서 수동 보정)
-            domestic_opt_premiums = {
-                'has_sunroof': 80,        # 선루프 +80만원
-                'has_leather_seat': 60,   # 가죽시트 +60만원
-                'has_navigation': 50,     # 내비게이션 +50만원
-                'has_ventilated_seat': 70, # 통풍시트 +70만원
-                'has_heated_seat': 40,    # 열선시트 +40만원
-                'has_smart_key': 30,      # 스마트키 +30만원
-                'has_rear_camera': 30,    # 후방카메라 +30만원
-                'has_led_lamp': 40,       # LED램프 +40만원
-            }
-            option_total = sum(int(bool(options.get(k, False))) * v for k, v in domestic_opt_premiums.items())
-            predicted_price = (base_price * fuel_multiplier) + option_total  # 연료 배율 적용
+            predicted_price = np.expm1(pred_log)
             mape = 9.9  # 국산차 V11 MAPE
             
         else:
@@ -315,8 +290,8 @@ class PredictionServiceV11:
                 'has_leather_seat': 80, 'has_navigation': 80, 'has_heated_seat': 60,
                 'has_smart_key': 50, 'has_rear_camera': 50,
             })
-            option_total = sum(int(bool(options.get(k, False))) * v for k, v in opt_premiums.items())
-            predicted_price = (base_price * fuel_multiplier) + option_total  # 연료 배율 적용
+            option_total = sum(options.get(k, 0) * v for k, v in opt_premiums.items())
+            predicted_price = base_price + option_total
             mape = 12.1  # 외제차 V13 MAPE
         
         # 신뢰도 계산 (MAPE 기반)

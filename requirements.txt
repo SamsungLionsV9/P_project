@@ -14,3 +14,13 @@ python-dotenv
 selenium
 webdriver-manager
 groq
+
+# FastAPI 및 웹 서버
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart
+
+# MySQL 및 데이터 처리
+pymysql>=1.1.0
+tqdm>=4.66.0

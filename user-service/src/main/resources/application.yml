@@ -5,7 +5,7 @@ spring:
   main:
     allow-circular-references: true
   
-  # 이메일 발송 설정 (Gmail SMTP)
+  # 이메일 설정 (Gmail SMTP)
   mail:
     host: smtp.gmail.com
     port: 587
@@ -24,25 +24,19 @@ spring:
     default-encoding: UTF-8
   
   datasource:
-    # H2 인메모리 DB (개발용)
-    url: jdbc:h2:mem:cardb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password: 
-    driver-class-name: org.h2.Driver
-    
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:mysql://localhost:3306/car_database?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: root
+    password: Project1!
+    driver-class-name: com.mysql.cj.jdbc.Driver
     
   jpa:
     hibernate:
-      ddl-auto: create-drop  # H2용: 시작 시 생성, 종료 시 삭제
+      ddl-auto: update  # 개발: update, 운영: validate
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.MySQL8Dialect
         use_sql_comments: true
     
   security:
@@ -102,8 +96,6 @@ server:
 app:
   oauth2:
     redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
-  mail:
-    verification-code-expiry: 300  # 인증 코드 유효 시간 (초) - 5분
     
 logging:
   level:

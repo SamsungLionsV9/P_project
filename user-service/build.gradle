@@ -33,12 +33,12 @@ dependencies {
     
     // 이메일 발송
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    // Jakarta Mail API (Spring Boot 3.x에서 필요) - 명시적 버전 지정
+    implementation 'jakarta.mail:jakarta.mail-api:2.1.2'
+    implementation 'com.sun.mail:jakarta.mail:2.0.1' // IDE 새로고침용
     
-    // MySQL (운영용)
+    // MySQL
     runtimeOnly 'com.mysql:mysql-connector-j'
-    
-    // H2 (개발/테스트용)
-    runtimeOnly 'com.h2database:h2'
     
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.12.3'

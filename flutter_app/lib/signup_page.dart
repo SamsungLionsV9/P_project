@@ -46,7 +46,7 @@ class _SignupPageState extends State<SignupPage> {
     return RegExp(r'^[A-Za-z0-9+_.-]+@(.+)$').hasMatch(email);
   }
 
-  /// 비밀번호 강도 검증
+  /// 비밀번호 강도 검증 (백엔드 규칙과 일치)
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return '비밀번호를 입력하세요';
@@ -59,6 +59,10 @@ class _SignupPageState extends State<SignupPage> {
     }
     if (!RegExp(r'[0-9]').hasMatch(value)) {
       return '숫자를 포함해야 합니다';
+    }
+    // 백엔드 규칙: 특수문자도 포함해야 함
+    if (!RegExp(r'[@$!%*#?&]').hasMatch(value)) {
+      return '특수문자(@\$!%*#?&)를 포함해야 합니다';
     }
     return null;
   }
@@ -132,10 +136,13 @@ class _SignupPageState extends State<SignupPage> {
     setState(() => _isLoading = false);
     
     if (result['success'] == true) {
-      setState(() => _isEmailVerified = true);
+      setState(() {
+        _isEmailVerified = true;
+      });
       _showMessage('이메일 인증 완료!');
       
-      // 자동으로 회원가입 진행
+      // 인증 성공 후 약간의 딜레이를 주고 회원가입 진행
+      await Future.delayed(const Duration(milliseconds: 500));
       await _completeSignup();
     } else {
       _showMessage(result['message'] ?? '인증 실패', isError: true);
@@ -146,18 +153,28 @@ class _SignupPageState extends State<SignupPage> {
   Future<void> _completeSignup() async {
     setState(() => _isLoading = true);
     
-    final result = await _authService.signup(
-      _emailController.text.trim(),
-      _passwordController.text,
-      _nameController.text.trim(),
-    );
-    
-    setState(() => _isLoading = false);
-    
-    if (result['success'] == true) {
-      setState(() => _currentStep = 2);
-    } else {
-      _showMessage(result['message'] ?? '회원가입 실패', isError: true);
+    try {
+      final result = await _authService.signup(
+        _emailController.text.trim(),
+        _passwordController.text,
+        _nameController.text.trim(),
+      );
+      
+      setState(() => _isLoading = false);
+      
+      if (result['success'] == true) {
+        setState(() => _currentStep = 2);
+        _showMessage('회원가입이 완료되었습니다!');
+      } else {
+        // 회원가입 실패 시 에러 메시지 표시
+        final errorMessage = result['message'] ?? '회원가입 실패';
+        _showMessage(errorMessage, isError: true);
+        debugPrint('회원가입 실패: $errorMessage');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showMessage('회원가입 중 오류가 발생했습니다: $e', isError: true);
+      debugPrint('회원가입 예외: $e');
     }
   }
 
@@ -319,7 +336,7 @@ class _SignupPageState extends State<SignupPage> {
           _buildTextField(
             controller: _passwordController,
             label: '비밀번호',
-            hint: '8자 이상, 영문+숫자',
+            hint: '8자 이상, 영문+숫자+특수문자',
             icon: Icons.lock_outline,
             isDark: isDark,
             obscureText: _obscurePassword,
