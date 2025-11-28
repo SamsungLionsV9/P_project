@@ -28,10 +28,13 @@ class RecommendationService:
         
         self._domestic_df = None
         self._imported_df = None
+        self._domestic_details_df = None  # 상세 옵션 데이터
+        self._imported_details_df = None
         self._prediction_service = None
         
         self._init_db()
         self._load_data()
+        self._load_details()  # 상세 옵션 데이터 로드
         self._analyze_popular()
     
     def _init_db(self):
@@ -108,6 +111,24 @@ class RecommendationService:
                 print(f"✓ 외제차 데이터: {len(self._imported_df):,}건")
         except Exception as e:
             print(f"⚠️ 외제차 로드 실패: {e}")
+    
+    def _load_details(self):
+        """상세 옵션 데이터 로드 (complete_domestic_details.csv 등)"""
+        try:
+            domestic_detail_path = self.data_path / "complete_domestic_details.csv"
+            if domestic_detail_path.exists():
+                self._domestic_details_df = pd.read_csv(domestic_detail_path)
+                print(f"✓ 국산차 상세 데이터: {len(self._domestic_details_df):,}건")
+        except Exception as e:
+            print(f"⚠️ 국산차 상세 로드 실패: {e}")
+        
+        try:
+            imported_detail_path = self.data_path / "complete_imported_details.csv"
+            if imported_detail_path.exists():
+                self._imported_details_df = pd.read_csv(imported_detail_path)
+                print(f"✓ 외제차 상세 데이터: {len(self._imported_details_df):,}건")
+        except Exception as e:
+            print(f"⚠️ 외제차 상세 로드 실패: {e}")
     
     def _analyze_popular(self):
         """엔카 데이터 기반 인기 모델 분석"""
@@ -490,6 +511,11 @@ class RecommendationService:
                 elif year >= 2019:
                     score += 1
                 
+                # 옵션 정보 가져오기
+                car_id = row.get('Id', None)
+                is_imported = row.get('Type', 'domestic') == 'imported'
+                options = self._get_vehicle_options(car_id, is_imported) if car_id else {}
+                
                 recommendations.append({
                     'brand': str(brand),
                     'model': str(model),
@@ -501,7 +527,9 @@ class RecommendationService:
                     'price_diff': int(price_diff),
                     'is_good_deal': bool(price_diff > 100),  # 명시적 bool 변환
                     'score': float(round(score, 1)),
-                    'type': str(row.get('Type', 'domestic'))
+                    'type': str(row.get('Type', 'domestic')),
+                    'options': options,
+                    'accident_free': options.get('accident_free', False),
                 })
                 
             except Exception as e:
@@ -720,11 +748,36 @@ class RecommendationService:
 
     # ========== 차량 데이터 관리 (관리자용) ==========
     
+    def _get_vehicle_options(self, car_id, is_imported: bool = False) -> Dict:
+        """차량 ID로 옵션 정보 조회"""
+        details_df = self._imported_details_df if is_imported else self._domestic_details_df
+        if details_df is None:
+            return {}
+        
+        try:
+            row = details_df[details_df['car_id'] == car_id]
+            if row.empty:
+                return {}
+            row = row.iloc[0]
+            return {
+                'sunroof': bool(row.get('has_sunroof', False)),
+                'navigation': bool(row.get('has_navigation', False)),
+                'leather_seat': bool(row.get('has_leather_seat', False)),
+                'smart_key': bool(row.get('has_smart_key', False)),
+                'rear_camera': bool(row.get('has_rear_camera', False)),
+                'led_lamp': bool(row.get('has_led_lamp', False)),
+                'heated_seat': bool(row.get('has_heated_seat', False)),
+                'ventilated_seat': bool(row.get('has_ventilated_seat', False)),
+                'accident_free': bool(row.get('is_accident_free', False)),
+            }
+        except Exception:
+            return {}
+    
     def get_vehicles_for_admin(self, brand: str = None, model: str = None,
                                 year_min: int = None, year_max: int = None,
                                 price_min: int = None, price_max: int = None,
                                 category: str = "all", page: int = 1, limit: int = 20) -> Dict:
-        """관리자용 차량 데이터 조회"""
+        """관리자용 차량 데이터 조회 (옵션 정보 포함)"""
         vehicles = []
         
         # 국산차 데이터 (컬럼: Manufacturer, Model, Year, Mileage, FuelType, Price, OfficeCityState)
@@ -752,8 +805,11 @@ class RecommendationService:
             
             for idx, row in df.head(limit if category == 'domestic' else limit // 2).iterrows():
                 price = int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0
+                car_id = row.get('Id', idx)
+                options = self._get_vehicle_options(car_id, is_imported=False)
                 vehicles.append({
                     'id': int(idx) if isinstance(idx, (int, float)) else hash(str(idx)) % 1000000,
+                    'car_id': car_id,
                     'category': 'domestic',
                     'brand': str(row.get('Manufacturer', '')),
                     'model': str(row.get('Model', '')),
@@ -761,7 +817,9 @@ class RecommendationService:
                     'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
                     'price': price,  # 만원 단위
                     'fuel': str(row.get('FuelType', '가솔린')),
-                    'region': str(row.get('OfficeCityState', ''))
+                    'region': str(row.get('OfficeCityState', '')),
+                    'options': options,
+                    'accident_free': options.get('accident_free', False),
                 })
         
         # 외제차 데이터
@@ -787,8 +845,11 @@ class RecommendationService:
             
             for idx, row in df.head(limit if category == 'imported' else limit // 2).iterrows():
                 price = int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0
+                car_id = row.get('Id', idx)
+                options = self._get_vehicle_options(car_id, is_imported=True)
                 vehicles.append({
                     'id': (int(idx) if isinstance(idx, (int, float)) else hash(str(idx)) % 1000000) + 1000000,
+                    'car_id': car_id,
                     'category': 'imported',
                     'brand': str(row.get('Manufacturer', '')),
                     'model': str(row.get('Model', '')),
@@ -796,7 +857,9 @@ class RecommendationService:
                     'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
                     'price': price,  # 만원 단위
                     'fuel': str(row.get('FuelType', '가솔린')),
-                    'region': str(row.get('OfficeCityState', ''))
+                    'region': str(row.get('OfficeCityState', '')),
+                    'options': options,
+                    'accident_free': options.get('accident_free', False),
                 })
         
         # 페이지네이션

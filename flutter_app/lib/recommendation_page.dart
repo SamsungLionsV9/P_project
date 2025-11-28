@@ -403,6 +403,23 @@ class _RecommendationPageState extends State<RecommendationPage>
               _buildInfoChip(Icons.local_gas_station, car.fuel),
             ],
           ),
+          // 옵션 표시
+          if (car.options.count > 0 || car.accidentFree) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (car.accidentFree)
+                  _buildOptionChip('무사고', Colors.green),
+                ...car.options.enabledOptions.take(3).map(
+                  (opt) => _buildOptionChip(opt, const Color(0xFF6C63FF)),
+                ),
+                if (car.options.count > 3)
+                  _buildOptionChip('+${car.options.count - 3}', Colors.grey),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
@@ -463,6 +480,25 @@ class _RecommendationPageState extends State<RecommendationPage>
         const SizedBox(width: 4),
         Text(text, style: TextStyle(color: Colors.grey[400], fontSize: 13)),
       ],
+    );
+  }
+
+  Widget _buildOptionChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 

@@ -671,6 +671,63 @@ class PopularCar {
   }
 }
 
+/// 차량 옵션 정보
+class CarOptions {
+  final bool sunroof;
+  final bool navigation;
+  final bool leatherSeat;
+  final bool smartKey;
+  final bool rearCamera;
+  final bool ledLamp;
+  final bool heatedSeat;
+  final bool ventilatedSeat;
+  final bool accidentFree;
+
+  CarOptions({
+    this.sunroof = false,
+    this.navigation = false,
+    this.leatherSeat = false,
+    this.smartKey = false,
+    this.rearCamera = false,
+    this.ledLamp = false,
+    this.heatedSeat = false,
+    this.ventilatedSeat = false,
+    this.accidentFree = false,
+  });
+
+  factory CarOptions.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return CarOptions();
+    return CarOptions(
+      sunroof: json['sunroof'] ?? false,
+      navigation: json['navigation'] ?? false,
+      leatherSeat: json['leather_seat'] ?? false,
+      smartKey: json['smart_key'] ?? false,
+      rearCamera: json['rear_camera'] ?? false,
+      ledLamp: json['led_lamp'] ?? false,
+      heatedSeat: json['heated_seat'] ?? false,
+      ventilatedSeat: json['ventilated_seat'] ?? false,
+      accidentFree: json['accident_free'] ?? false,
+    );
+  }
+
+  /// 주요 옵션 목록 (true인 것만)
+  List<String> get enabledOptions {
+    final options = <String>[];
+    if (sunroof) options.add('선루프');
+    if (navigation) options.add('네비');
+    if (leatherSeat) options.add('가죽시트');
+    if (smartKey) options.add('스마트키');
+    if (rearCamera) options.add('후방카메라');
+    if (ledLamp) options.add('LED');
+    if (heatedSeat) options.add('열선시트');
+    if (ventilatedSeat) options.add('통풍시트');
+    return options;
+  }
+
+  /// 옵션 개수
+  int get count => enabledOptions.length;
+}
+
 /// 추천 차량
 class RecommendedCar {
   final String brand;
@@ -684,6 +741,8 @@ class RecommendedCar {
   final bool isGoodDeal;
   final double score;
   final String type;
+  final CarOptions options;
+  final bool accidentFree;
 
   RecommendedCar({
     required this.brand,
@@ -697,6 +756,8 @@ class RecommendedCar {
     required this.isGoodDeal,
     required this.score,
     required this.type,
+    required this.options,
+    this.accidentFree = false,
   });
 
   factory RecommendedCar.fromJson(Map<String, dynamic> json) {
@@ -712,6 +773,8 @@ class RecommendedCar {
       isGoodDeal: json['is_good_deal'] ?? false,
       score: (json['score'] ?? 0).toDouble(),
       type: json['type'] ?? 'domestic',
+      options: CarOptions.fromJson(json['options']),
+      accidentFree: json['accident_free'] ?? false,
     );
   }
   
