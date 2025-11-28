@@ -1,111 +1,94 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'car_info_input_page.dart';
 import 'mypage.dart';
 import 'settings_page.dart';
 import 'recommendation_page.dart';
+import 'comparison_page.dart';
 import 'oauth_webview_page.dart';
 import 'signup_page.dart';
 import 'services/auth_service.dart';
+import 'services/api_service.dart';
+import 'theme/theme_provider.dart';
+import 'providers/comparison_provider.dart';
+import 'providers/recent_views_provider.dart';
+import 'providers/popular_cars_provider.dart';
+import 'widgets/deal_analysis_modal.dart';
+import 'widgets/model_deals_modal.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // 저장된 토큰 로드
-  await AuthService().loadSavedToken();
+  final authService = AuthService();
+  await authService.loadSavedToken();
   
-  // 웹 환경에서 OAuth 콜백 처리
-  if (kIsWeb) {
-    _handleWebOAuthCallback();
-  }
-  
-  runApp(const CarPriceApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => ComparisonProvider()),
+        ChangeNotifierProvider(create: (_) {
+          final provider = RecentViewsProvider();
+          provider.loadRecentViews();
+          return provider;
+        }),
+        ChangeNotifierProvider(create: (_) {
+          final provider = PopularCarsProvider();
+          provider.loadData();
+          return provider;
+        }),
+      ],
+      child: const CarPriceApp(),
+    ),
+  );
 }
 
-/// 웹 환경에서 OAuth 콜백 처리
-void _handleWebOAuthCallback() {
-  try {
-    final uri = Uri.base;
-    final token = uri.queryParameters['token'];
-    final email = uri.queryParameters['email'];
-    final provider = uri.queryParameters['provider'];
-    
-    if (token != null && email != null) {
-      // 토큰 저장
-      AuthService().handleOAuthCallback(token, email, provider ?? 'unknown');
-      debugPrint('웹 OAuth 콜백 처리 완료: $email');
-    }
-  } catch (e) {
-    debugPrint('OAuth 콜백 처리 오류: $e');
-  }
-}
-
-class CarPriceApp extends StatefulWidget {
+class CarPriceApp extends StatelessWidget {
   const CarPriceApp({super.key});
 
   @override
-  State<CarPriceApp> createState() => _CarPriceAppState();
-}
-
-class _CarPriceAppState extends State<CarPriceApp> {
-  // 테마 모드 상태 관리 (기본값: 라이트 모드)
-  ThemeMode _themeMode = ThemeMode.light;
-
-  void _toggleTheme(bool isDark) {
-    setState(() {
-      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
-    });
-  }
-
-
-  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '중고차 시세 예측',
-      debugShowCheckedModeBanner: false,
-      themeMode: _themeMode,
-      // 라이트 테마 정의
-      theme: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: const Color(0xFF0066FF),
-        scaffoldBackgroundColor: const Color(0xFFF5F7FA),
-        fontFamily: 'Pretendard',
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF5F7FA),
-          foregroundColor: Colors.black,
-        ),
-      ),
-      // 다크 테마 정의
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF0066FF),
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        fontFamily: 'Pretendard',
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF121212),
-          foregroundColor: Colors.white,
-        ),
-      ),
-      home: MainScreen(
-        isDarkMode: _themeMode == ThemeMode.dark,
-        onThemeChanged: _toggleTheme,
-      ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: '중고차 시세 예측',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeProvider.themeMode,
+          // 라이트 테마 정의
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primaryColor: const Color(0xFF0066FF),
+            scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+            fontFamily: 'Pretendard',
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFFF5F7FA),
+              foregroundColor: Colors.black,
+            ),
+          ),
+          // 다크 테마 정의
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primaryColor: const Color(0xFF0066FF),
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            fontFamily: 'Pretendard',
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF121212),
+              foregroundColor: Colors.white,
+            ),
+          ),
+          home: const MainScreen(),
+        );
+      },
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  final bool isDarkMode;
-  final ValueChanged<bool> onThemeChanged;
-
-  const MainScreen({
-    super.key,
-    required this.isDarkMode,
-    required this.onThemeChanged,
-  });
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -113,36 +96,6 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
-  late final List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    // 페이지 리스트 초기화 시 콜백 전달
-    _pages = [
-      const HomePageContent(),
-      const CarInfoInputPage(),
-      const RecommendationPage(),  // 추천 페이지 추가
-      const MyPage(),
-      SettingsPage(
-        isDarkMode: widget.isDarkMode,
-        onThemeChanged: widget.onThemeChanged,
-      ),
-    ];
-  }
-
-  @override
-  void didUpdateWidget(MainScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 테마 변경 시 SettingsPage 업데이트
-    if (oldWidget.isDarkMode != widget.isDarkMode) {
-      _pages[4] = SettingsPage(
-        isDarkMode: widget.isDarkMode,
-        onThemeChanged: widget.onThemeChanged,
-      );
-    }
-  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -152,14 +105,24 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDark = themeProvider.isDarkMode;
     final navBgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final unselectedItemColor = isDark ? Colors.grey[600] : Colors.grey[400];
+    
+    // 페이지 리스트 (빌드 시점에 생성)
+    final pages = [
+      const HomePageContent(),
+      const CarInfoInputPage(),
+      const RecommendationPage(),
+      const MyPage(),
+      const SettingsPage(),
+    ];
 
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -227,105 +190,11 @@ class _HomePageContentState extends State<HomePageContent> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isLoggedIn = false;
-  bool _oauthCallbackProcessed = false; // OAuth 콜백 처리 플래그
 
   @override
   void initState() {
     super.initState();
-    _checkLoginStatus();
-    
-    // 웹 환경에서 OAuth 콜백 확인
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkWebOAuthCallback();
-      });
-    }
-  }
-  
-  /// 로그인 상태 확인
-  void _checkLoginStatus() {
-    setState(() {
-      _isLoggedIn = _authService.isLoggedIn;
-    });
-  }
-  
-  /// 웹 환경에서 OAuth 콜백 확인 및 처리
-  Future<void> _checkWebOAuthCallback() async {
-    // 이미 처리된 경우 스킵
-    if (_oauthCallbackProcessed) {
-      return;
-    }
-    
-    try {
-      final uri = Uri.base;
-      final token = uri.queryParameters['token'];
-      final email = uri.queryParameters['email'];
-      final provider = uri.queryParameters['provider'];
-      final oauth = uri.queryParameters['oauth'];
-      
-      // OAuth 회원가입 리다이렉트 확인 (토큰 없이 oauth=true인 경우)
-      if (oauth == 'true' && email != null && provider != null && token == null) {
-        // 중복 처리 방지
-        _oauthCallbackProcessed = true;
-        
-        debugPrint('🔑 OAuth 회원가입 리다이렉트 감지: $email ($provider)');
-        
-        // 기존 사용자인 경우 회원가입 페이지를 건너뛰고 바로 메인 페이지로
-        final existing = uri.queryParameters['existing'];
-        if (existing == 'true') {
-          debugPrint('기존 사용자 감지, 메인 페이지로 이동');
-          // 상태만 업데이트 (이미 메인 페이지에 있음)
-          _checkLoginStatus();
-          return;
-        }
-        
-        // 회원가입 페이지로 이동
-        if (mounted) {
-          final result = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const SignupPage(),
-            ),
-          );
-          
-          // 회원가입 완료 후 처리
-          if (result == true) {
-            _checkLoginStatus(); // 로그인 상태 다시 확인
-            // URL 정리 (웹 환경에서)
-            if (kIsWeb) {
-              // 쿼리 파라미터 제거를 위해 URL 변경
-              // 실제로는 이미 메인 페이지에 있으므로 상태만 업데이트
-            }
-          }
-        }
-        return;
-      }
-      
-      // 기존 사용자 로그인 (토큰이 있는 경우)
-      if (token != null && email != null) {
-        // 중복 처리 방지
-        _oauthCallbackProcessed = true;
-        
-        debugPrint('🔑 OAuth 콜백 감지: $email ($provider)');
-        
-        // 토큰 저장 및 로그인 상태 업데이트
-        await _authService.handleOAuthCallback(token, email, provider ?? 'unknown');
-        
-        // 로그인 상태 업데이트
-        if (mounted) {
-          setState(() {
-            _isLoggedIn = true;
-          });
-          _showMessage('${_getProviderName(provider ?? 'unknown')} 로그인 성공!');
-        }
-      }
-    } catch (e) {
-      debugPrint('OAuth 콜백 처리 오류: $e');
-      _oauthCallbackProcessed = false; // 에러 발생 시 재시도 가능하도록
-      if (mounted) {
-        _showMessage('로그인 처리 중 오류가 발생했습니다: $e', isError: true);
-      }
-    }
+    _isLoggedIn = _authService.isLoggedIn;
   }
 
   @override
@@ -363,29 +232,9 @@ class _HomePageContentState extends State<HomePageContent> {
 
   /// 소셜 로그인
   Future<void> _socialLogin(String provider) async {
-    final url = _authService.getSocialLoginUrl(provider);
-    
-    // 웹 환경에서는 WebView가 작동하지 않으므로 외부 브라우저 사용
-    if (kIsWeb) {
-      _showMessage('${_getProviderName(provider)} 로그인은 새 창에서 진행됩니다.');
-      
-      try {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          // 웹에서는 새 창으로 열기
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-          _showMessage('로그인 후 이 페이지로 돌아오세요.');
-        } else {
-          _showMessage('브라우저를 열 수 없습니다', isError: true);
-        }
-      } catch (e) {
-        _showMessage('${_getProviderName(provider)} 로그인 오류: $e', isError: true);
-      }
-      return;
-    }
-    
     // 네이버는 WebView를 차단하므로 외부 브라우저 사용
     if (provider == 'naver') {
+      final url = _authService.getSocialLoginUrl(provider);
       _showMessage('네이버 로그인은 외부 브라우저에서 진행됩니다.\n(에뮬레이터에서는 제한될 수 있습니다)');
       
       try {
@@ -401,7 +250,7 @@ class _HomePageContentState extends State<HomePageContent> {
       return;
     }
     
-    // 모바일 앱에서는 WebView 사용
+    // 카카오, 구글은 WebView 사용
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
@@ -409,39 +258,9 @@ class _HomePageContentState extends State<HomePageContent> {
       ),
     );
 
-    if (result != null) {
-      // 1. 기존 사용자 로그인 성공
-      if (result['success'] == true) {
-        setState(() => _isLoggedIn = true);
-        _showMessage('${_getProviderName(provider)} 로그인 성공!');
-      } 
-      // 2. 신규 사용자 - 회원가입 필요
-      else if (result['needsSignup'] == true) {
-        _showMessage('회원가입이 필요합니다.');
-        
-        // 회원가입 페이지로 이동 (OAuth 정보 전달)
-        final signupResult = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SignupPage(
-              oauthEmail: result['email'],
-              oauthProvider: result['provider'],
-              oauthProviderId: result['providerId'],
-              oauthImageUrl: result['imageUrl'],
-            ),
-          ),
-        );
-        
-        // 회원가입 완료 후 로그인 상태 업데이트
-        if (signupResult == true) {
-          setState(() => _isLoggedIn = true);
-          _showMessage('${_getProviderName(provider)} 회원가입 및 로그인 성공!');
-        }
-      }
-      // 3. 에러
-      else if (result['error'] != null) {
-        _showMessage('로그인 실패: ${result['error']}', isError: true);
-      }
+    if (result != null && result['success'] == true) {
+      setState(() => _isLoggedIn = true);
+      _showMessage('${_getProviderName(provider)} 로그인 성공!');
     }
   }
 
@@ -487,25 +306,6 @@ class _HomePageContentState extends State<HomePageContent> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
-    
-    // 웹 환경에서 OAuth 콜백 확인 (빌드 시마다 확인)
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkWebOAuthCallback();
-      });
-    }
-    
-    // 로그인 상태 동기화
-    final currentLoginStatus = _authService.isLoggedIn;
-    if (_isLoggedIn != currentLoginStatus) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _isLoggedIn = currentLoginStatus;
-          });
-        }
-      });
-    }
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -579,17 +379,17 @@ class _HomePageContentState extends State<HomePageContent> {
 
             const SizedBox(height: 32),
 
-            // 3. 최근 조회 차량 섹션
+            // 3. 최근 조회 차량 섹션 (Provider 연동)
             _buildSectionTitle("최근 조회 차량", textColor),
             const SizedBox(height: 12),
-            _buildHorizontalCarList(isReversed: false, isDark: isDark),
+            _buildRecentViewsList(isDark: isDark),
 
             const SizedBox(height: 32),
 
-            // 3. 인기 모델 추천 섹션
+            // 4. 인기 모델 추천 섹션 (Provider 연동)
             _buildSectionTitle("인기 모델 추천", textColor),
             const SizedBox(height: 12),
-            _buildHorizontalCarList(isReversed: true, isDark: isDark),
+            _buildPopularCarsList(isDark: isDark),
 
             const SizedBox(height: 40),
           ],
@@ -820,36 +620,176 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Helper Widget: 가로 스크롤 차량 리스트
-  Widget _buildHorizontalCarList({required bool isReversed, required bool isDark}) {
-    // 더미 데이터
-    final List<Map<String, dynamic>> cars = [
-      {"name": "노란색 벤츠", "info": "2023년 / 0.8만KM", "price": "1억", "color": Colors.yellow},
-      {"name": "파란색 차", "info": "2024년 / 1만KM", "price": "8000만원", "color": Colors.blue},
-      {"name": "흰색 SUV", "info": "2025년 / 0.9만KM", "price": "9000만원", "color": Colors.grey[300]},
-      {"name": "검정 세단", "info": "2022년 / 3만KM", "price": "5500만원", "color": Colors.black87},
-    ];
-
-    final displayList = isReversed ? cars.reversed.toList() : cars;
-
-    return SizedBox(
-      height: 190, // 카드 높이 + 그림자 여유분
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        scrollDirection: Axis.horizontal,
-        itemCount: displayList.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final car = displayList[index];
-          return CarCard(
-            name: car['name'],
-            info: car['info'],
-            price: car['price'],
-            color: car['color'],
-            isDark: isDark,
+  // 최근 조회 차량 리스트 (Provider 연동)
+  Widget _buildRecentViewsList({required bool isDark}) {
+    return Consumer<RecentViewsProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading && provider.recentViewedCars.isEmpty) {
+          return const SizedBox(
+            height: 190,
+            child: Center(child: CircularProgressIndicator()),
           );
+        }
+        
+        if (provider.recentViewedCars.isEmpty) {
+          return SizedBox(
+            height: 190,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    '최근 조회한 차량이 없습니다',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        return SizedBox(
+          height: 190,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: provider.recentViewedCars.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final car = provider.recentViewedCars[index];
+              // RecommendedCar 모델에서 CarCard 형식으로 변환
+              final displayColor = car.isGoodDeal ? Colors.green : Colors.blue;
+              return CarCard(
+                name: '${car.brand} ${car.model}',
+                info: '${car.year}년 · ${car.formattedMileage}',
+                price: '${car.actualPrice}만원',
+                color: displayColor,
+                isDark: isDark,
+                onTap: () => _showRecentCarDetail(car),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+  
+  /// 최근 조회 차량 클릭 시 상세 분석 모달 표시
+  void _showRecentCarDetail(RecommendedCar car) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DealAnalysisModal(
+        deal: car,
+        predictedPrice: car.predictedPrice,
+      ),
+    );
+  }
+
+  /// 인기 모델 클릭 시 해당 모델의 실매물 모달 표시
+  void _showPopularModelDeals(PopularCar car) {
+    // 최근 조회 Provider (모달에서 매물 클릭 시 기록 추가용)
+    final recentViewsProvider = context.read<RecentViewsProvider>();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ModelDealsModal(
+        brand: car.brand,
+        model: car.model,
+        avgPrice: car.avgPrice,
+        medianPrice: car.medianPrice,
+        listings: car.listings,
+        onCarViewed: (viewedCar) {
+          recentViewsProvider.addRecentCar(viewedCar);
         },
       ),
+    );
+  }
+
+  // 매물 수 포맷팅 (직접적인 대수 대신 친근한 표현)
+  String _formatListingsCount(int count) {
+    if (count >= 3000) {
+      return '인기 🔥';
+    } else if (count >= 2000) {
+      return '많은 매물';
+    } else if (count >= 1000) {
+      return '적당한 매물';
+    } else if (count >= 500) {
+      return '희소 매물';
+    } else {
+      return '레어 ✨';
+    }
+  }
+  
+  // 인기 모델 추천 리스트 (Provider 연동)
+  Widget _buildPopularCarsList({required bool isDark}) {
+    return Consumer<PopularCarsProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading && provider.topDomestic.isEmpty) {
+          return const SizedBox(
+            height: 190,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        
+        // 국산차와 수입차 합쳐서 표시
+        final allCars = [...provider.topDomestic, ...provider.topImported];
+        
+        if (allCars.isEmpty) {
+          return SizedBox(
+            height: 190,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.trending_up, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    '추천 데이터를 불러오는 중...',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        // 색상 팔레트
+        final colors = [
+          Colors.black87,
+          Colors.grey[300]!,
+          Colors.blue,
+          Colors.yellow[700]!,
+          Colors.green,
+          Colors.purple,
+        ];
+        
+        return SizedBox(
+          height: 190,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            scrollDirection: Axis.horizontal,
+            itemCount: allCars.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final car = allCars[index];
+              return CarCard(
+                name: '${car.brand} ${car.model}',
+                info: '평균 ${car.avgPrice}만원',
+                price: _formatListingsCount(car.listings),
+                color: colors[index % colors.length],
+                isDark: isDark,
+                onTap: () => _showPopularModelDeals(car),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -861,6 +801,7 @@ class CarCard extends StatelessWidget {
   final String price;
   final Color color;
   final bool isDark;
+  final VoidCallback? onTap;
 
   const CarCard({
     super.key,
@@ -869,6 +810,7 @@ class CarCard extends StatelessWidget {
     required this.price,
     required this.color,
     required this.isDark,
+    this.onTap,
   });
 
   @override
@@ -876,7 +818,9 @@ class CarCard extends StatelessWidget {
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       width: 140,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -944,6 +888,7 @@ class CarCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

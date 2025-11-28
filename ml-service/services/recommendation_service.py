@@ -15,12 +15,78 @@ from typing import Dict, List, Optional, Tuple
 from collections import Counter
 import sys
 import os
+import re
 
 # 상위 경로 추가 (prediction_v12 사용 위함)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+
+def extract_model_core(model_name: str) -> str:
+    """
+    모델명에서 핵심 식별자 추출
+    - 벤츠 E-클래스 W213 → E-클래스
+    - 벤츠 GLE-클래스 W167 → GLE-클래스
+    - 테슬라 모델 3 → 모델 3
+    - 테슬라 모델 Y → 모델 Y
+    - 그랜저 IG → 그랜저
+    """
+    model = model_name.strip()
+    
+    # 벤츠 클래스 패턴 (E-클래스, GLE-클래스, S-클래스 등)
+    benz_match = re.match(r'((?:GL)?[A-Z])-?클래스', model, re.IGNORECASE)
+    if benz_match:
+        return benz_match.group(0).replace('-', '-')
+    
+    # BMW 시리즈 패턴 (3시리즈, 5시리즈, X3 등)
+    bmw_series = re.match(r'(\d시리즈|[XZiM]\d)', model, re.IGNORECASE)
+    if bmw_series:
+        return bmw_series.group(1)
+    
+    # 테슬라 모델 패턴 (모델 3, 모델 Y, 모델 S 등)
+    tesla_match = re.match(r'(모델\s*[3YSX]|Model\s*[3YSX])', model, re.IGNORECASE)
+    if tesla_match:
+        return tesla_match.group(1).replace(' ', ' ')
+    
+    # 아우디 패턴 (A6, Q5 등)
+    audi_match = re.match(r'([AQeSR][0-9]+)', model, re.IGNORECASE)
+    if audi_match:
+        return audi_match.group(1).upper()
+    
+    # 일반 모델명: 첫 번째 핵심 단어 (공백/괄호 이전)
+    # 그랜저 IG, 쏘나타 DN8 → 그랜저, 쏘나타
+    core_match = re.match(r'^([가-힣A-Za-z0-9]+)', model)
+    if core_match:
+        return core_match.group(1)
+    
+    return model
+
+
+def is_model_match(target_model: str, candidate_model: str) -> bool:
+    """
+    두 모델이 같은 계열인지 정확히 판단
+    - target: 사용자가 선택한 모델 (E-클래스, 모델 3 등)
+    - candidate: 데이터셋의 모델명
+    """
+    target_core = extract_model_core(target_model)
+    candidate_core = extract_model_core(candidate_model)
+    
+    # 정확한 핵심 식별자 매칭
+    # E-클래스 ↔ E-클래스 OK, E-클래스 ↔ GLE-클래스 NO
+    return target_core.lower() == candidate_core.lower()
+
+
 class RecommendationService:
     """엔카 데이터 기반 추천 시스템"""
+    
+    # 이상치 필터 (similar_service와 통일)
+    PRICE_MIN = 100    # 100만원 이상
+    PRICE_MAX = 50000  # 5억 이하 (학습 데이터와 동일)
+    
+    # 특수 가격 이상치 (가격 미정 표시 등)
+    SPECIAL_PRICES = {9999, 8888, 7777, 6666, 5555, 1111, 10000}
+    
+    # 엔카 데스크톱 상세페이지 URL 템플릿 (모바일은 502 에러 발생)
+    ENCAR_DETAIL_URL = "https://www.encar.com/dc/dc_cardetailview.do?carid={car_id}"
     
     def __init__(self):
         self.data_path = Path(__file__).parent.parent.parent / "data"
@@ -28,13 +94,12 @@ class RecommendationService:
         
         self._domestic_df = None
         self._imported_df = None
-        self._domestic_details_df = None  # 상세 옵션 데이터
-        self._imported_details_df = None
         self._prediction_service = None
+        self._car_details = {}  # car_id별 상세 옵션 정보
         
         self._init_db()
         self._load_data()
-        self._load_details()  # 상세 옵션 데이터 로드
+        self._load_car_details()  # 옵션 상세 정보 로드
         self._analyze_popular()
     
     def _init_db(self):
@@ -68,11 +133,27 @@ class RecommendationService:
                 mileage INTEGER,
                 fuel TEXT,
                 predicted_price REAL,
-                source_url TEXT,
+                actual_price INTEGER,
+                car_id TEXT,
+                detail_url TEXT,
                 memo TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # 기존 테이블에 컬럼 추가 (마이그레이션)
+        try:
+            cursor.execute('ALTER TABLE favorites ADD COLUMN actual_price INTEGER')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE favorites ADD COLUMN car_id TEXT')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE favorites ADD COLUMN detail_url TEXT')
+        except:
+            pass
         
         # 전역 검색 통계 테이블
         cursor.execute('''
@@ -112,23 +193,54 @@ class RecommendationService:
         except Exception as e:
             print(f"⚠️ 외제차 로드 실패: {e}")
     
-    def _load_details(self):
-        """상세 옵션 데이터 로드 (complete_domestic_details.csv 등)"""
+    def _load_car_details(self):
+        """차량 상세 옵션 정보 로드 (car_id별 조회용)"""
         try:
-            domestic_detail_path = self.data_path / "complete_domestic_details.csv"
-            if domestic_detail_path.exists():
-                self._domestic_details_df = pd.read_csv(domestic_detail_path)
-                print(f"✓ 국산차 상세 데이터: {len(self._domestic_details_df):,}건")
+            # 국산차 상세 정보
+            domestic_details_path = self.data_path / "complete_domestic_details.csv"
+            if domestic_details_path.exists():
+                df = pd.read_csv(domestic_details_path)
+                for _, row in df.iterrows():
+                    car_id = str(row.get('car_id', ''))
+                    if car_id:
+                        self._car_details[car_id] = {
+                            'is_accident_free': bool(row.get('is_accident_free', 0)),
+                            'inspection_grade': str(row.get('inspection_grade', '')),
+                            'has_sunroof': bool(row.get('has_sunroof', 0)),
+                            'has_navigation': bool(row.get('has_navigation', 0)),
+                            'has_leather_seat': bool(row.get('has_leather_seat', 0)),
+                            'has_smart_key': bool(row.get('has_smart_key', 0)),
+                            'has_rear_camera': bool(row.get('has_rear_camera', 0)),
+                            'has_heated_seat': bool(row.get('has_heated_seat', 0)),
+                            'has_ventilated_seat': bool(row.get('has_ventilated_seat', 0)),
+                        }
+                print(f"✓ 국산차 상세정보: {len(self._car_details):,}건")
+            
+            # 외제차 상세 정보
+            imported_details_path = self.data_path / "complete_imported_details.csv"
+            if imported_details_path.exists():
+                df = pd.read_csv(imported_details_path)
+                for _, row in df.iterrows():
+                    car_id = str(row.get('car_id', ''))
+                    if car_id and car_id not in self._car_details:
+                        self._car_details[car_id] = {
+                            'is_accident_free': bool(row.get('is_accident_free', 0)),
+                            'inspection_grade': str(row.get('inspection_grade', '')),
+                            'has_sunroof': bool(row.get('has_sunroof', 0)),
+                            'has_navigation': bool(row.get('has_navigation', 0)),
+                            'has_leather_seat': bool(row.get('has_leather_seat', 0)),
+                            'has_smart_key': bool(row.get('has_smart_key', 0)),
+                            'has_rear_camera': bool(row.get('has_rear_camera', 0)),
+                            'has_heated_seat': bool(row.get('has_heated_seat', 0)),
+                            'has_ventilated_seat': bool(row.get('has_ventilated_seat', 0)),
+                        }
+                print(f"✓ 전체 차량 상세정보: {len(self._car_details):,}건")
         except Exception as e:
-            print(f"⚠️ 국산차 상세 로드 실패: {e}")
-        
-        try:
-            imported_detail_path = self.data_path / "complete_imported_details.csv"
-            if imported_detail_path.exists():
-                self._imported_details_df = pd.read_csv(imported_detail_path)
-                print(f"✓ 외제차 상세 데이터: {len(self._imported_details_df):,}건")
-        except Exception as e:
-            print(f"⚠️ 외제차 상세 로드 실패: {e}")
+            print(f"⚠️ 상세정보 로드 실패: {e}")
+    
+    def get_car_options(self, car_id: str) -> Optional[Dict]:
+        """car_id로 차량 옵션 정보 조회"""
+        return self._car_details.get(str(car_id))
     
     def _analyze_popular(self):
         """엔카 데이터 기반 인기 모델 분석"""
@@ -220,64 +332,69 @@ class RecommendationService:
         return {'id': history_id, **search_data}
     
     def get_search_history(self, user_id: str, limit: int = 10) -> List[Dict]:
-        """사용자 검색 이력 조회"""
+        """사용자 검색 이력 조회 (id 포함 - 개별 삭제용)"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
+        # 가장 최근 검색 기록만 가져오면서 id도 반환 (개별 삭제 지원)
         cursor.execute('''
-            SELECT DISTINCT brand, model, year, mileage, fuel, predicted_price, 
-                   MAX(searched_at) as last_searched
+            SELECT id, brand, model, year, mileage, fuel, predicted_price, searched_at
             FROM search_history 
-            WHERE user_id = ?
-            GROUP BY brand, model, year
-            ORDER BY last_searched DESC
-            LIMIT ?
-        ''', (user_id, limit))
-        
-        results = []
-        for row in cursor.fetchall():
-            results.append({
-                'brand': row[0],
-                'model': row[1],
-                'year': row[2],
-                'mileage': row[3],
-                'fuel': row[4],
-                'predicted_price': row[5],
-                'last_searched': row[6]
-            })
-        
-        conn.close()
-        return results
-    
-    def get_all_history(self, limit: int = 100) -> List[Dict]:
-        """관리자용 - 모든 사용자의 검색 이력 조회"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT id, user_id, brand, model, year, mileage, fuel, 
-                   predicted_price, searched_at
-            FROM search_history 
+            WHERE user_id = ? AND id IN (
+                SELECT MAX(id) 
+                FROM search_history 
+                WHERE user_id = ?
+                GROUP BY brand, model, year
+            )
             ORDER BY searched_at DESC
             LIMIT ?
-        ''', (limit,))
+        ''', (user_id, user_id, limit))
         
         results = []
         for row in cursor.fetchall():
             results.append({
                 'id': row[0],
-                'user_id': row[1],
-                'brand': row[2],
-                'model': row[3],
-                'year': row[4],
-                'mileage': row[5],
-                'fuel': row[6],
-                'predicted_price': row[7],
-                'searched_at': row[8]
+                'brand': row[1],
+                'model': row[2],
+                'year': row[3],
+                'mileage': row[4],
+                'fuel': row[5],
+                'predicted_price': row[6],
+                'last_searched': row[7]
             })
         
         conn.close()
         return results
+    
+    def remove_search_history(self, user_id: str, history_id: int) -> bool:
+        """검색 이력 삭제"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM search_history WHERE id = ? AND user_id = ?
+        ''', (history_id, user_id))
+        
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        
+        return deleted
+    
+    def clear_search_history(self, user_id: str) -> int:
+        """검색 이력 전체 삭제"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            DELETE FROM search_history WHERE user_id = ?
+        ''', (user_id,))
+        
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        return deleted_count
     
     def get_trending_models(self, days: int = 7, limit: int = 10) -> List[Dict]:
         """최근 N일간 인기 검색 모델 (전체 사용자 기준)"""
@@ -301,76 +418,6 @@ class RecommendationService:
                 'brand': row[0],
                 'model': row[1],
                 'search_count': row[2]
-            })
-        
-        conn.close()
-        return results
-    
-    def get_dashboard_stats(self) -> Dict:
-        """대시보드 통계 조회"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # 오늘 날짜
-        today = datetime.now().strftime('%Y-%m-%d')
-        
-        # 오늘 조회 수
-        cursor.execute('''
-            SELECT COUNT(*) FROM search_history 
-            WHERE DATE(searched_at) = ?
-        ''', (today,))
-        today_count = cursor.fetchone()[0]
-        
-        # 전체 누적 조회 수
-        cursor.execute('SELECT COUNT(*) FROM search_history')
-        total_count = cursor.fetchone()[0]
-        
-        # 평균 예측가 (오늘)
-        cursor.execute('''
-            SELECT AVG(predicted_price) FROM search_history 
-            WHERE DATE(searched_at) = ? AND predicted_price IS NOT NULL
-        ''', (today,))
-        avg_price = cursor.fetchone()[0] or 0
-        
-        # 모델별 조회 수 (인기 모델)
-        cursor.execute('''
-            SELECT model, COUNT(*) as cnt FROM search_history
-            GROUP BY model
-            ORDER BY cnt DESC
-            LIMIT 7
-        ''')
-        popular_models = [{'name': row[0] or '기타', 'value': row[1]} for row in cursor.fetchall()]
-        
-        conn.close()
-        
-        return {
-            'todayCount': today_count,
-            'totalCount': total_count,
-            'avgPrice': round(avg_price, 0),
-            'avgConfidence': 85,  # 고정값 (실제 신뢰도 평균)
-            'popularModels': popular_models
-        }
-    
-    def get_daily_request_stats(self, days: int = 7) -> List[Dict]:
-        """일별 요청 통계"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        results = []
-        for i in range(days - 1, -1, -1):
-            date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-            day_name = ['월', '화', '수', '목', '금', '토', '일'][(datetime.now() - timedelta(days=i)).weekday()]
-            
-            cursor.execute('''
-                SELECT COUNT(*) FROM search_history 
-                WHERE DATE(searched_at) = ?
-            ''', (date,))
-            count = cursor.fetchone()[0]
-            
-            results.append({
-                'date': date,
-                'day': day_name,
-                'count': count
             })
         
         conn.close()
@@ -433,9 +480,13 @@ class RecommendationService:
         if df is None or len(df) == 0:
             return []
         
-        # 필터링
-        df = df[(df['Price'] >= 100) & (df['Price'] <= 50000)]
+        # 필터링 (이상치 제거 - 학습 데이터와 통일)
+        df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
+        df = df[~df['Price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거 (9999 등)
         df = df[df['YearOnly'] >= 2018]  # 최근 7년 이내
+        
+        # car_id가 있는 차량만 선택 (상세페이지 연결 가능)
+        df = df[df['Id'].notna() & (df['Id'] != '')]
         
         if budget_min:
             df = df[df['Price'] >= budget_min]
@@ -459,6 +510,7 @@ class RecommendationService:
         
         for _, row in sample.iterrows():
             try:
+                car_id = row.get('Id', '')  # 엔카 차량 ID
                 brand = row.get('Manufacturer', '')
                 model = row.get('Model', '')
                 year = int(row.get('YearOnly', 2020))
@@ -511,10 +563,10 @@ class RecommendationService:
                 elif year >= 2019:
                     score += 1
                 
-                # 옵션 정보 가져오기
-                car_id = row.get('Id', None)
-                is_imported = row.get('Type', 'domestic') == 'imported'
-                options = self._get_vehicle_options(car_id, is_imported) if car_id else {}
+                # 엔카 상세페이지 URL 생성
+                detail_url = None
+                if car_id:
+                    detail_url = self.ENCAR_DETAIL_URL.format(car_id=car_id)
                 
                 recommendations.append({
                     'brand': str(brand),
@@ -528,8 +580,8 @@ class RecommendationService:
                     'is_good_deal': bool(price_diff > 100),  # 명시적 bool 변환
                     'score': float(round(score, 1)),
                     'type': str(row.get('Type', 'domestic')),
-                    'options': options,
-                    'accident_free': options.get('accident_free', False),
+                    'car_id': str(car_id) if car_id else None,
+                    'detail_url': detail_url
                 })
                 
             except Exception as e:
@@ -549,6 +601,359 @@ class RecommendationService:
             limit=limit * 2  # 필터링 후 줄어들 수 있으므로
         )[:limit]
     
+    def get_model_deals(self, brand: str, model: str, limit: int = 10) -> List[Dict]:
+        """
+        특정 모델의 가성비 좋은 매물 추천
+        
+        가치 점수 계산:
+        1. 가격 괴리율: (예측가 - 실제가) / 예측가 * 100 (최대 40점)
+        2. 주행거리 점수: 낮을수록 좋음 (최대 30점)
+        3. 연식 점수: 최신일수록 좋음 (최대 30점)
+        """
+        # 데이터 필터링
+        dfs = []
+        if self._domestic_df is not None:
+            dfs.append(self._domestic_df)
+        if self._imported_df is not None:
+            dfs.append(self._imported_df)
+        
+        if not dfs:
+            return []
+        
+        df = pd.concat(dfs, ignore_index=True)
+        
+        # 모델 필터링 (브랜드 + 정확한 모델 계열 매칭)
+        brand_mask = df['Manufacturer'].str.contains(brand, case=False, na=False)
+        # 정확한 모델 매칭 (E-클래스 ↔ E-클래스만, GLE-클래스 제외)
+        model_mask = df['Model'].apply(lambda x: is_model_match(model, str(x)))
+        df = df[brand_mask & model_mask]
+        
+        # 이상치 제거 + car_id 필수 (상세페이지 연결 가능한 차량만)
+        df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
+        df = df[~df['Price'].isin(self.SPECIAL_PRICES)]
+        df = df[df['YearOnly'] >= 2018]
+        df = df[df['Id'].notna() & (df['Id'] != '')]
+        
+        if len(df) == 0:
+            return []
+        
+        # 예측 서비스 초기화
+        if self._prediction_service is None:
+            try:
+                from services.prediction_v12 import PredictionServiceV12
+                self._prediction_service = PredictionServiceV12()
+            except:
+                pass
+        
+        deals = []
+        sample_size = min(50, len(df))
+        sample = df.sample(sample_size, random_state=42) if len(df) > sample_size else df
+        
+        for _, row in sample.iterrows():
+            try:
+                # car_id 처리: NaN, 빈 문자열, None 모두 None으로 통일
+                raw_car_id = row.get('Id', '')
+                car_id = str(raw_car_id).strip() if raw_car_id and str(raw_car_id).strip() and str(raw_car_id) != 'nan' else None
+                year = int(row.get('YearOnly', 2020))
+                mileage = int(row.get('Mileage', 50000))
+                actual_price = int(row.get('Price', 0))
+                fuel = str(row.get('FuelType', '가솔린'))
+                
+                # 연료 정규화
+                fuel_norm = '가솔린'
+                if '하이브리드' in fuel.lower(): fuel_norm = '하이브리드'
+                elif '디젤' in fuel.lower(): fuel_norm = '디젤'
+                elif 'lpg' in fuel.lower(): fuel_norm = 'LPG'
+                
+                # 예측 가격 계산 (실제 데이터의 모델명 사용)
+                actual_model_name = str(row.get('Model', model))
+                predicted_price = actual_price
+                if self._prediction_service:
+                    try:
+                        result = self._prediction_service.predict(
+                            brand, actual_model_name, year, mileage, fuel=fuel_norm
+                        )
+                        predicted_price = result.predicted_price
+                    except:
+                        pass
+                
+                # 가치 점수 계산 (모든 값을 Python 기본 타입으로 변환)
+                # 1. 가격 괴리율 (40점 만점)
+                price_gap_pct = float((predicted_price - actual_price) / max(predicted_price, 1) * 100)
+                price_score = float(min(max(price_gap_pct * 4, 0), 40))
+                
+                # 2. 주행거리 점수 (30점 만점)
+                mileage_score = float(max(30 - (mileage / 3500), 0))
+                
+                # 3. 연식 점수 (30점 만점)
+                year_score = float(min(max((year - 2018) * 5, 0), 30))
+                
+                total_score = float(price_score + mileage_score + year_score)
+                
+                # 엔카 URL 생성 (차량 ID 기반 상세 페이지)
+                detail_url = None
+                if car_id:
+                    detail_url = self.ENCAR_DETAIL_URL.format(car_id=car_id)
+                
+                # 옵션 정보 조회
+                options = self.get_car_options(car_id) if car_id else None
+                
+                deals.append({
+                    'brand': str(brand),
+                    'model': str(row.get('Model', model)),
+                    'year': int(year),
+                    'mileage': int(mileage),
+                    'fuel': str(fuel_norm),
+                    'actual_price': int(actual_price),
+                    'predicted_price': int(predicted_price),
+                    'price_diff': int(predicted_price - actual_price),
+                    'value_score': round(total_score, 1),
+                    'is_good_deal': price_gap_pct > 5,
+                    'car_id': str(car_id) if car_id else None,
+                    'detail_url': str(detail_url) if detail_url else None,
+                    # 옵션 정보 (수집된 데이터 기반)
+                    'options': options
+                })
+            except:
+                continue
+        
+        # 정렬: 연식(최신순) → 가격(저렴순) → 주행거리(적은순)
+        deals.sort(key=lambda x: (-x['year'], x['actual_price'], x['mileage']))
+        return deals[:limit]
+    
+    # ========== 개별 매물 분석 ==========
+    
+    def analyze_deal(self, brand: str, model: str, year: int, mileage: int,
+                     actual_price: int, predicted_price: int, fuel: str = '가솔린') -> Dict:
+        """
+        개별 매물 상세 분석
+        - 가격 적정성
+        - 허위매물 위험도
+        - 네고 포인트
+        """
+        result = {
+            'price_fairness': self._calculate_price_fairness(actual_price, predicted_price),
+            'fraud_risk': self._calculate_fraud_risk(actual_price, predicted_price, year, mileage),
+            'nego_points': self._generate_nego_points(actual_price, predicted_price, year, mileage),
+            'summary': {}
+        }
+        
+        # 요약 정보
+        price_diff = predicted_price - actual_price
+        price_diff_pct = (price_diff / predicted_price * 100) if predicted_price > 0 else 0
+        
+        result['summary'] = {
+            'actual_price': int(actual_price),
+            'predicted_price': int(predicted_price),
+            'price_diff': int(price_diff),
+            'price_diff_pct': round(price_diff_pct, 1),
+            'is_good_deal': price_diff > 0,
+            'verdict': self._get_verdict(price_diff_pct, result['fraud_risk']['score'])
+        }
+        
+        return result
+    
+    def _calculate_price_fairness(self, actual_price: int, predicted_price: int) -> Dict:
+        """가격 적정성 계산"""
+        if predicted_price <= 0:
+            return {'score': 50, 'label': '판단불가', 'percentile': 50, 'description': '예측가 정보 부족'}
+        
+        price_ratio = actual_price / predicted_price
+        
+        # 점수 계산 (저렴할수록 높은 점수)
+        if price_ratio <= 0.85:
+            score = 95
+            label = '매우 저렴'
+            percentile = 5
+        elif price_ratio <= 0.95:
+            score = 80
+            label = '저렴'
+            percentile = 15
+        elif price_ratio <= 1.05:
+            score = 60
+            label = '적정'
+            percentile = 50
+        elif price_ratio <= 1.15:
+            score = 40
+            label = '다소 비쌈'
+            percentile = 75
+        else:
+            score = 20
+            label = '비쌈'
+            percentile = 90
+        
+        descriptions = {
+            '매우 저렴': '동일 조건 차량 중 매우 저렴합니다. 차량 상태를 꼼꼼히 확인하세요.',
+            '저렴': '동일 조건 차량 중 저렴한 편입니다.',
+            '적정': '시세에 맞는 적정 가격입니다.',
+            '다소 비쌈': '시세보다 다소 높은 가격입니다. 네고 여지가 있습니다.',
+            '비쌈': '시세보다 높은 가격입니다. 충분한 네고가 필요합니다.'
+        }
+        
+        return {
+            'score': score,
+            'label': label,
+            'percentile': percentile,
+            'description': descriptions.get(label, '')
+        }
+    
+    def _calculate_fraud_risk(self, actual_price: int, predicted_price: int, 
+                               year: int, mileage: int) -> Dict:
+        """허위매물 위험도 산출"""
+        risk_score = 0
+        factors = []
+        
+        # 1. 가격 범위 체크 (예측가의 70~130% 범위)
+        if predicted_price > 0:
+            price_ratio = actual_price / predicted_price
+            
+            if price_ratio < 0.7:
+                risk_score += 40
+                factors.append({
+                    'check': 'price_too_cheap',
+                    'status': 'fail',
+                    'msg': '시세 대비 30% 이상 저렴 - 주의 필요'
+                })
+            elif price_ratio < 0.85:
+                risk_score += 15
+                factors.append({
+                    'check': 'price_cheap',
+                    'status': 'warn',
+                    'msg': '시세 대비 다소 저렴 - 상태 확인 권장'
+                })
+            elif price_ratio > 1.3:
+                risk_score += 10
+                factors.append({
+                    'check': 'price_expensive',
+                    'status': 'warn',
+                    'msg': '시세 대비 높은 가격'
+                })
+            else:
+                factors.append({
+                    'check': 'price_range',
+                    'status': 'pass',
+                    'msg': '가격이 시세 범위 내'
+                })
+        
+        # 2. 주행거리 체크 (연간 1.5만km 기준)
+        current_year = 2025
+        age = max(current_year - year, 1)
+        expected_mileage = age * 15000
+        mileage_ratio = mileage / max(expected_mileage, 1)
+        
+        if mileage_ratio < 0.3:  # 너무 적음 (연식 대비)
+            risk_score += 20
+            factors.append({
+                'check': 'mileage_low',
+                'status': 'warn',
+                'msg': f'주행거리가 연식 대비 매우 적음 ({mileage:,}km)'
+            })
+        elif mileage_ratio > 2.0:  # 너무 많음
+            risk_score += 10
+            factors.append({
+                'check': 'mileage_high',
+                'status': 'warn',
+                'msg': f'주행거리가 평균보다 많음 ({mileage:,}km)'
+            })
+        else:
+            avg_per_year = mileage / age
+            factors.append({
+                'check': 'mileage_normal',
+                'status': 'pass',
+                'msg': f'주행거리 정상 (연평균 {avg_per_year/10000:.1f}만km)'
+            })
+        
+        # 3. 연식 체크
+        if year >= 2020:
+            factors.append({
+                'check': 'year_recent',
+                'status': 'pass',
+                'msg': f'최근 연식 ({year}년)'
+            })
+        elif year >= 2015:
+            risk_score += 5
+            factors.append({
+                'check': 'year_mid',
+                'status': 'info',
+                'msg': f'중간 연식 ({year}년) - 관리 상태 확인 권장'
+            })
+        else:
+            risk_score += 15
+            factors.append({
+                'check': 'year_old',
+                'status': 'warn',
+                'msg': f'오래된 연식 ({year}년) - 정비 이력 확인 필수'
+            })
+        
+        # 위험도 레벨 결정
+        if risk_score >= 60:
+            level = 'high'
+        elif risk_score >= 30:
+            level = 'medium'
+        else:
+            level = 'low'
+        
+        return {
+            'score': min(risk_score, 100),
+            'level': level,
+            'factors': factors
+        }
+    
+    def _generate_nego_points(self, actual_price: int, predicted_price: int,
+                               year: int, mileage: int) -> List[str]:
+        """네고 포인트 생성"""
+        points = []
+        
+        price_diff = predicted_price - actual_price
+        price_diff_pct = (price_diff / predicted_price * 100) if predicted_price > 0 else 0
+        
+        # 가격 기반 네고 포인트
+        if price_diff_pct > 10:
+            points.append('예측가 대비 이미 저렴하여 추가 네고 어려울 수 있음')
+        elif price_diff_pct > 0:
+            points.append(f'예측가 대비 {abs(price_diff):,}만원 저렴 - 소폭 네고 시도 가능')
+        elif price_diff_pct > -5:
+            points.append(f'예측가 수준 - {abs(price_diff):,}만원 정도 네고 시도')
+        elif price_diff_pct > -15:
+            points.append(f'예측가 대비 {abs(price_diff):,}만원 비쌈 - 적극 네고 필요')
+        else:
+            points.append(f'예측가 대비 많이 비쌈 - {abs(price_diff):,}만원 이상 네고 필수')
+        
+        # 일반적인 네고 포인트
+        points.append('등록비용/이전비용 포함 협상 시도')
+        points.append('소모품(타이어, 브레이크패드) 교체 여부 확인')
+        
+        # 주행거리 기반
+        if mileage > 80000:
+            points.append('주행거리 많음 - 타이밍벨트/체인 교체 여부 확인')
+        
+        # 연식 기반
+        current_year = 2025
+        age = current_year - year
+        if age >= 5:
+            points.append(f'{age}년 된 차량 - 주요 소모품 교체 이력 확인')
+        
+        return points
+    
+    def _get_verdict(self, price_diff_pct: float, fraud_risk_score: int) -> str:
+        """종합 판정"""
+        if fraud_risk_score >= 60:
+            return '주의 필요'
+        elif fraud_risk_score >= 30:
+            if price_diff_pct > 5:
+                return '확인 후 구매 권장'
+            else:
+                return '신중한 검토 필요'
+        else:
+            if price_diff_pct > 10:
+                return '추천 매물'
+            elif price_diff_pct > 0:
+                return '괜찮은 매물'
+            elif price_diff_pct > -10:
+                return '적정 매물'
+            else:
+                return '네고 필요'
+    
     # ========== 즐겨찾기 ==========
     
     def add_favorite(self, user_id: str, data: Dict) -> Dict:
@@ -556,11 +961,20 @@ class RecommendationService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # 중복 체크
-        cursor.execute('''
-            SELECT id FROM favorites 
-            WHERE user_id = ? AND brand = ? AND model = ? AND year = ?
-        ''', (user_id, data.get('brand'), data.get('model'), data.get('year')))
+        car_id = data.get('car_id')
+        detail_url = data.get('detail_url')
+        actual_price = data.get('actual_price')
+        
+        # 중복 체크 (car_id > detail_url > actual_price 순)
+        if car_id:
+            cursor.execute('SELECT id FROM favorites WHERE user_id = ? AND car_id = ?', (user_id, car_id))
+        elif detail_url:
+            cursor.execute('SELECT id FROM favorites WHERE user_id = ? AND detail_url = ?', (user_id, detail_url))
+        else:
+            cursor.execute('''
+                SELECT id FROM favorites 
+                WHERE user_id = ? AND brand = ? AND model = ? AND year = ? AND actual_price = ?
+            ''', (user_id, data.get('brand'), data.get('model'), data.get('year'), actual_price))
         
         existing = cursor.fetchone()
         if existing:
@@ -568,8 +982,8 @@ class RecommendationService:
             return {'success': False, 'message': '이미 즐겨찾기에 있습니다', 'id': existing[0]}
         
         cursor.execute('''
-            INSERT INTO favorites (user_id, brand, model, year, mileage, fuel, predicted_price, memo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO favorites (user_id, brand, model, year, mileage, fuel, predicted_price, actual_price, car_id, detail_url, memo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id,
             data.get('brand'),
@@ -578,6 +992,9 @@ class RecommendationService:
             data.get('mileage'),
             data.get('fuel', '가솔린'),
             data.get('predicted_price'),
+            actual_price,
+            car_id,
+            detail_url,
             data.get('memo', '')
         ))
         
@@ -593,7 +1010,7 @@ class RecommendationService:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT id, brand, model, year, mileage, fuel, predicted_price, memo, created_at
+            SELECT id, brand, model, year, mileage, fuel, predicted_price, actual_price, car_id, detail_url, memo, created_at
             FROM favorites
             WHERE user_id = ?
             ORDER BY created_at DESC
@@ -609,8 +1026,11 @@ class RecommendationService:
                 'mileage': row[4],
                 'fuel': row[5],
                 'predicted_price': row[6],
-                'memo': row[7],
-                'created_at': row[8]
+                'actual_price': row[7],
+                'car_id': row[8],
+                'detail_url': row[9],
+                'memo': row[10],
+                'created_at': row[11]
             })
         
         conn.close()
@@ -744,178 +1164,6 @@ class RecommendationService:
         conn.close()
         
         return deleted
-
-
-    # ========== 차량 데이터 관리 (관리자용) ==========
-    
-    def _get_vehicle_options(self, car_id, is_imported: bool = False) -> Dict:
-        """차량 ID로 옵션 정보 조회"""
-        details_df = self._imported_details_df if is_imported else self._domestic_details_df
-        if details_df is None:
-            return {}
-        
-        try:
-            row = details_df[details_df['car_id'] == car_id]
-            if row.empty:
-                return {}
-            row = row.iloc[0]
-            return {
-                'sunroof': bool(row.get('has_sunroof', False)),
-                'navigation': bool(row.get('has_navigation', False)),
-                'leather_seat': bool(row.get('has_leather_seat', False)),
-                'smart_key': bool(row.get('has_smart_key', False)),
-                'rear_camera': bool(row.get('has_rear_camera', False)),
-                'led_lamp': bool(row.get('has_led_lamp', False)),
-                'heated_seat': bool(row.get('has_heated_seat', False)),
-                'ventilated_seat': bool(row.get('has_ventilated_seat', False)),
-                'accident_free': bool(row.get('is_accident_free', False)),
-            }
-        except Exception:
-            return {}
-    
-    def get_vehicles_for_admin(self, brand: str = None, model: str = None,
-                                year_min: int = None, year_max: int = None,
-                                price_min: int = None, price_max: int = None,
-                                category: str = "all", page: int = 1, limit: int = 20) -> Dict:
-        """관리자용 차량 데이터 조회 (옵션 정보 포함)"""
-        vehicles = []
-        
-        # 국산차 데이터 (컬럼: Manufacturer, Model, Year, Mileage, FuelType, Price, OfficeCityState)
-        # Price 단위: 만원 (예: 2500 = 2500만원)
-        if category in ['all', 'domestic'] and self._domestic_df is not None:
-            df = self._domestic_df.copy()
-            # 기본 필터: 합리적인 가격 범위만 (500만원 ~ 1억5천만원)
-            # 99999 등 가격 미정 데이터 제외
-            df = df[(df['Price'] >= 500) & (df['Price'] <= 15000)]
-            # 연식 최신순 정렬
-            df = df.sort_values('YearOnly', ascending=False)
-            
-            if brand:
-                df = df[df['Manufacturer'].str.contains(brand, na=False, case=False)]
-            if model:
-                df = df[df['Model'].str.contains(model, na=False, case=False)]
-            if year_min:
-                df = df[df['YearOnly'] >= year_min]
-            if year_max:
-                df = df[df['YearOnly'] <= year_max]
-            if price_min:
-                df = df[df['Price'] >= price_min]
-            if price_max:
-                df = df[df['Price'] <= price_max]
-            
-            for idx, row in df.head(limit if category == 'domestic' else limit // 2).iterrows():
-                price = int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0
-                car_id = row.get('Id', idx)
-                options = self._get_vehicle_options(car_id, is_imported=False)
-                vehicles.append({
-                    'id': int(idx) if isinstance(idx, (int, float)) else hash(str(idx)) % 1000000,
-                    'car_id': car_id,
-                    'category': 'domestic',
-                    'brand': str(row.get('Manufacturer', '')),
-                    'model': str(row.get('Model', '')),
-                    'year': int(row.get('YearOnly', 0)),
-                    'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
-                    'price': price,  # 만원 단위
-                    'fuel': str(row.get('FuelType', '가솔린')),
-                    'region': str(row.get('OfficeCityState', '')),
-                    'options': options,
-                    'accident_free': options.get('accident_free', False),
-                })
-        
-        # 외제차 데이터
-        if category in ['all', 'imported'] and self._imported_df is not None:
-            df = self._imported_df.copy()
-            # 기본 필터: 합리적인 가격 범위만 (500만원 ~ 5억원, 외제차는 범위가 넓음)
-            df = df[(df['Price'] >= 500) & (df['Price'] <= 50000)]
-            # 연식 최신순 정렬
-            df = df.sort_values('YearOnly', ascending=False)
-            
-            if brand:
-                df = df[df['Manufacturer'].str.contains(brand, na=False, case=False)]
-            if model:
-                df = df[df['Model'].str.contains(model, na=False, case=False)]
-            if year_min:
-                df = df[df['YearOnly'] >= year_min]
-            if year_max:
-                df = df[df['YearOnly'] <= year_max]
-            if price_min:
-                df = df[df['Price'] >= price_min]
-            if price_max:
-                df = df[df['Price'] <= price_max]
-            
-            for idx, row in df.head(limit if category == 'imported' else limit // 2).iterrows():
-                price = int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0
-                car_id = row.get('Id', idx)
-                options = self._get_vehicle_options(car_id, is_imported=True)
-                vehicles.append({
-                    'id': (int(idx) if isinstance(idx, (int, float)) else hash(str(idx)) % 1000000) + 1000000,
-                    'car_id': car_id,
-                    'category': 'imported',
-                    'brand': str(row.get('Manufacturer', '')),
-                    'model': str(row.get('Model', '')),
-                    'year': int(row.get('YearOnly', 0)),
-                    'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
-                    'price': price,  # 만원 단위
-                    'fuel': str(row.get('FuelType', '가솔린')),
-                    'region': str(row.get('OfficeCityState', '')),
-                    'options': options,
-                    'accident_free': options.get('accident_free', False),
-                })
-        
-        # 페이지네이션
-        total = len(vehicles)
-        start = (page - 1) * limit
-        end = start + limit
-        
-        return {
-            'vehicles': vehicles[start:end] if start < total else vehicles[:limit],
-            'total': total,
-            'page': page,
-            'limit': limit
-        }
-    
-    def get_vehicle_detail(self, vehicle_id: int, category: str = "domestic") -> Dict:
-        """차량 상세 정보"""
-        df = self._imported_df if category == 'imported' or vehicle_id >= 1000000 else self._domestic_df
-        actual_id = vehicle_id - 1000000 if vehicle_id >= 1000000 else vehicle_id
-        
-        if df is None or actual_id not in df.index:
-            return None
-        
-        row = df.loc[actual_id]
-        return {
-            'id': vehicle_id,
-            'category': 'imported' if vehicle_id >= 1000000 else 'domestic',
-            'brand': str(row.get('Manufacturer', '')),
-            'model': str(row.get('Model', '')),
-            'year': int(row.get('YearOnly', 0)),
-            'mileage': int(row.get('Mileage', 0)) if pd.notna(row.get('Mileage')) else 0,
-            'price': int(row.get('Price', 0)) if pd.notna(row.get('Price')) else 0,
-            'fuel': str(row.get('FuelType', '')),
-            'region': str(row.get('OfficeCityState', ''))
-        }
-    
-    def get_vehicle_stats(self) -> Dict:
-        """차량 데이터 통계"""
-        domestic_count = len(self._domestic_df) if self._domestic_df is not None else 0
-        imported_count = len(self._imported_df) if self._imported_df is not None else 0
-        
-        domestic_brands = {}
-        imported_brands = {}
-        
-        if self._domestic_df is not None and 'Manufacturer' in self._domestic_df.columns:
-            domestic_brands = self._domestic_df['Manufacturer'].value_counts().head(10).to_dict()
-        
-        if self._imported_df is not None and 'Manufacturer' in self._imported_df.columns:
-            imported_brands = self._imported_df['Manufacturer'].value_counts().head(10).to_dict()
-        
-        return {
-            'domesticCount': domestic_count,
-            'importedCount': imported_count,
-            'totalCount': domestic_count + imported_count,
-            'domesticBrands': [{'brand': k, 'count': v} for k, v in domestic_brands.items()],
-            'importedBrands': [{'brand': k, 'count': v} for k, v in imported_brands.items()]
-        }
 
 
 # 싱글톤

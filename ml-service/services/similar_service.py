@@ -1,7 +1,7 @@
 """
 비슷한 차량 가격 분포 서비스
 - 전처리된 데이터 사용
-- 이상치 필터링 (가격 100~15000만원)
+- 이상치 필터링 (학습 데이터와 동일: 가격 100~50000만원)
 """
 import pandas as pd
 import numpy as np
@@ -11,9 +11,12 @@ from typing import Dict, List, Optional
 class SimilarVehicleService:
     """비슷한 차량 가격 분포 분석"""
     
-    # 가격 필터 (이상치 제거)
-    PRICE_MIN = 100   # 100만원 이상
-    PRICE_MAX = 15000 # 1.5억 이하
+    # 가격 필터 (학습 데이터와 동일한 기준)
+    PRICE_MIN = 100    # 100만원 이상
+    PRICE_MAX = 50000  # 5억 이하 (학습 시 동일)
+    
+    # 특수 가격 이상치 (가격 미정 표시 등)
+    SPECIAL_PRICES = {9999, 8888, 7777, 6666, 5555, 1111, 10000}
     
     def __init__(self):
         self.data_path = Path(__file__).parent.parent.parent / "data"
@@ -29,6 +32,7 @@ class SimilarVehicleService:
                 df = pd.read_csv(combined_path)
                 # 이상치 필터링
                 df = df[(df['price'] >= self.PRICE_MIN) & (df['price'] <= self.PRICE_MAX)]
+                df = df[~df['price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거 (9999 등)
                 self._combined_df = df
                 print(f"✓ 전처리 데이터 로드: {len(df):,}건 (이상치 제거됨)")
             else:
@@ -45,6 +49,7 @@ class SimilarVehicleService:
             if domestic_path.exists():
                 df = pd.read_csv(domestic_path)
                 df = df[(df['Price'] >= self.PRICE_MIN) & (df['Price'] <= self.PRICE_MAX)]
+                df = df[~df['Price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거
                 # 컬럼명 통일
                 df = df.rename(columns={'Manufacturer': 'brand', 'Model': 'model_name', 
                                         'Year': 'year', 'Mileage': 'mileage', 'Price': 'price'})
@@ -98,13 +103,13 @@ class SimilarVehicleService:
         prices_raw = similar['price'].values
         q1, q3 = np.percentile(prices_raw, [25, 75])
         iqr = q3 - q1
-        lower_bound = max(q1 - 1.5 * iqr, 100)  # 최소 100만원
-        upper_bound = min(q3 + 1.5 * iqr, 10000)  # 최대 1억
+        lower_bound = max(q1 - 1.5 * iqr, self.PRICE_MIN)
+        upper_bound = min(q3 + 1.5 * iqr, self.PRICE_MAX)
         
         prices = prices_raw[(prices_raw >= lower_bound) & (prices_raw <= upper_bound)]
         
         if len(prices) < 3:
-            prices = prices_raw[(prices_raw >= 100) & (prices_raw <= 10000)]
+            prices = prices_raw[(prices_raw >= self.PRICE_MIN) & (prices_raw <= self.PRICE_MAX)]
         
         if len(prices) == 0:
             return self._empty_result()

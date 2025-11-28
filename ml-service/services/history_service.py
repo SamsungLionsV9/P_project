@@ -57,39 +57,69 @@ class HistoryService:
     
     def add_favorite(self, user_id: str, vehicle_data: Dict) -> Dict:
         """즐겨찾기 추가"""
+        # 고유 ID 생성 (타임스탬프 기반)
+        import time
+        unique_id = int(time.time() * 1000) % 10000000
+        
+        # car_id 추출 (엔카 차량 고유 ID - 핵심 식별자)
+        car_id = vehicle_data.get("car_id")
+        
         entry = {
-            "id": f"f_{len(self._favorites[user_id]) + 1}",
+            "id": unique_id,
+            "car_id": car_id,  # 엔카 차량 고유 ID
             "timestamp": datetime.now().isoformat(),
             "brand": vehicle_data.get("brand"),
             "model": vehicle_data.get("model"),
             "year": vehicle_data.get("year"),
             "mileage": vehicle_data.get("mileage"),
             "predicted_price": vehicle_data.get("predicted_price"),
-            "sale_price": vehicle_data.get("sale_price"),
-            "source_url": vehicle_data.get("source_url"),
+            "actual_price": vehicle_data.get("actual_price") or vehicle_data.get("sale_price"),
+            "detail_url": vehicle_data.get("detail_url") or vehicle_data.get("source_url"),
             "memo": vehicle_data.get("memo", "")
         }
         
-        # 중복 체크
+        # 중복 체크 (car_id > detail_url > actual_price+mileage 순)
+        detail_url = entry.get("detail_url")
+        actual_price = entry.get("actual_price")
+        mileage = entry.get("mileage")
+        
         for fav in self._favorites[user_id]:
-            if (fav["brand"] == entry["brand"] and 
+            # 1순위: car_id로 중복 체크 (가장 정확)
+            if car_id and fav.get("car_id") == car_id:
+                return {"error": "이미 즐겨찾기에 있습니다", "existing": fav}
+            # 2순위: detail_url로 중복 체크
+            if detail_url and fav.get("detail_url") == detail_url:
+                return {"error": "이미 즐겨찾기에 있습니다", "existing": fav}
+            # 3순위: brand+model+year+actual_price 조합 (mileage 제외 - 단위 불일치 가능)
+            if (not car_id and not detail_url and 
+                fav["brand"] == entry["brand"] and 
                 fav["model"] == entry["model"] and
                 fav["year"] == entry["year"] and
-                fav["mileage"] == entry["mileage"]):
+                fav.get("actual_price") == actual_price):
                 return {"error": "이미 즐겨찾기에 있습니다", "existing": fav}
         
         self._favorites[user_id].insert(0, entry)
         return entry
     
     def get_favorites(self, user_id: str) -> List[Dict]:
-        """즐겨찾기 목록"""
-        return self._favorites[user_id]
+        """즐겨찾기 목록 (유효한 데이터만 반환)"""
+        # car_id 또는 detail_url 또는 actual_price가 있는 유효한 데이터만 반환
+        valid_favorites = [
+            fav for fav in self._favorites[user_id]
+            if fav.get("car_id") or fav.get("detail_url") or fav.get("actual_price")
+        ]
+        return valid_favorites
     
-    def remove_favorite(self, user_id: str, favorite_id: str) -> bool:
+    def remove_favorite(self, user_id: str, favorite_id) -> bool:
         """즐겨찾기 삭제"""
         before = len(self._favorites[user_id])
+        # favorite_id를 정수로 변환 (문자열로 올 수 있음)
+        try:
+            fav_id = int(favorite_id)
+        except (ValueError, TypeError):
+            fav_id = favorite_id
         self._favorites[user_id] = [
-            f for f in self._favorites[user_id] if f["id"] != favorite_id
+            f for f in self._favorites[user_id] if f["id"] != fav_id
         ]
         return len(self._favorites[user_id]) < before
     

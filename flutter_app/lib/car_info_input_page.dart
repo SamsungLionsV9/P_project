@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'result_page.dart';
 import 'services/api_service.dart';
+import 'utils/model_name_mapper.dart' as mapper;
 
 class CarInfoInputPage extends StatefulWidget {
-  const CarInfoInputPage({super.key});
+  /// 탭에서 열렸을 때는 false, push로 열렸을 때만 true
+  final bool showBackButton;
+  
+  const CarInfoInputPage({super.key, this.showBackButton = false});
 
   @override
   State<CarInfoInputPage> createState() => _CarInfoInputPageState();
@@ -34,83 +38,8 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
   bool _hasSmartKey = false;
   bool _hasRearCamera = false;
   
-  // 사용자에게 보여줄 간단한 모델 목록
-  final Map<String, List<String>> _brandModels = {
-    '현대': ['아반떼', '쏘나타', '그랜저', '투싼', '싼타페', '팰리세이드', '스타리아'],
-    '기아': ['모닝', '레이', 'K3', 'K5', 'K8', 'K9', '셀토스', '스포티지', '쏘렌토', '카니발', 'EV6', 'EV9'],
-    '제네시스': ['G70', 'G80', 'G90', 'GV60', 'GV70', 'GV80'],
-    'BMW': ['3시리즈', '5시리즈', '7시리즈', 'X3', 'X5', 'X7'],
-    '벤츠': ['C-클래스', 'E-클래스', 'S-클래스', 'GLC', 'GLE', 'GLS'],
-    '아우디': ['A4', 'A6', 'A8', 'Q3', 'Q5', 'Q7', 'Q8'],
-  };
-
-  // 연식에 따른 실제 백엔드 모델명 매핑
-  String _getBackendModelName(String brand, String model, int year) {
-    // 현대
-    if (brand == '현대') {
-      if (model == '아반떼') {
-        if (year >= 2021) return '아반떼 (CN7)';
-        if (year >= 2016) return '아반떼 AD';
-        return '아반떼 MD';
-      }
-      if (model == '쏘나타') {
-        if (year >= 2024) return '쏘나타 디 엣지(DN8)';
-        if (year >= 2020) return '쏘나타 (DN8)';
-        if (year >= 2015) return 'LF 쏘나타';
-        return 'YF 쏘나타';
-      }
-      if (model == '그랜저') {
-        if (year >= 2023) return '그랜저 (GN7)';
-        if (year >= 2020) return '더 뉴 그랜저 IG';
-        if (year >= 2017) return '그랜저 IG';
-        return '그랜저 HG';
-      }
-      if (model == '투싼') {
-        if (year >= 2024) return '더 뉴 투싼 (NX4)';
-        if (year >= 2021) return '투싼 (NX4)';
-        return '올 뉴 투싼';
-      }
-      if (model == '싼타페') {
-        if (year >= 2024) return '싼타페 (MX5)';
-        if (year >= 2019) return '싼타페 TM';
-        return '싼타페 DM';
-      }
-      if (model == '팰리세이드') {
-        if (year >= 2023) return '더 뉴 팰리세이드';
-        return '팰리세이드';
-      }
-    }
-    // 기아
-    if (brand == '기아') {
-      if (model == 'K5') {
-        if (year >= 2024) return '더 뉴 K5 (DL3)';
-        if (year >= 2020) return 'K5 (DL3)';
-        return 'K5';
-      }
-      if (model == '스포티지') {
-        if (year >= 2024) return '더 뉴 스포티지 (NQ5)';
-        if (year >= 2022) return '스포티지 (NQ5)';
-        return '스포티지';
-      }
-      if (model == '쏘렌토') {
-        if (year >= 2024) return '더 뉴 쏘렌토 (MQ4)';
-        if (year >= 2020) return '쏘렌토 (MQ4)';
-        return '쏘렌토';
-      }
-      if (model == '카니발') {
-        if (year >= 2024) return '더 뉴 카니발 (KA4)';
-        if (year >= 2021) return '카니발 (KA4)';
-        return '카니발';
-      }
-    }
-    // 제네시스
-    if (brand == '제네시스') {
-      if (model == 'G80' && year >= 2020) return 'G80 (RG3)';
-      if (model == 'G90' && year >= 2022) return 'G90 (RS4)';
-    }
-    // 기본: 모델명 그대로 반환
-    return model;
-  }
+  // 브랜드별 모델 목록 (utils/model_name_mapper.dart에서 가져옴)
+  Map<String, List<String>> get _brandModels => mapper.brandModels;
 
   @override
   Widget build(BuildContext context) {
@@ -125,10 +54,15 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
+        // 명시적 파라미터로 뒤로가기 버튼 제어
+        // 탭에서는 showBackButton = false (기본값)
+        leading: widget.showBackButton 
+          ? IconButton(
+              icon: Icon(Icons.arrow_back_ios, color: textColor),
+              onPressed: () => Navigator.pop(context),
+            )
+          : null,
+        automaticallyImplyLeading: false,
         title: Text(
           "차량 정보 입력",
           style: TextStyle(
@@ -535,15 +469,26 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
     });
     
     try {
-      // 연식에 따른 정확한 모델명 변환
-      final backendModel = _getBackendModelName(_selectedBrand!, _selectedModel!, year);
+      // 연식에 따른 정확한 모델명 변환 (utils/model_name_mapper.dart 사용)
+      final backendModel = mapper.getBackendModelName(_selectedBrand!, _selectedModel!, year);
+      
+      // 성능점검 별표 → 등급 변환 (1-2: normal, 3-4: good, 5: excellent)
+      String inspectionGrade;
+      if (_performanceRating >= 5) {
+        inspectionGrade = 'excellent';
+      } else if (_performanceRating >= 3) {
+        inspectionGrade = 'good';
+      } else {
+        inspectionGrade = 'normal';
+      }
       
       // 디버그: API 호출 전 파라미터 출력
       debugPrint('🚗 API 호출: brand=$_selectedBrand, model=$_selectedModel → $backendModel, year=$year, mileage=$mileage, fuel=$_selectedFuel');
       debugPrint('⚙️ 옵션: 선루프=$_hasSunroof, 내비=$_hasNavigation, 가죽시트=$_hasLeatherSeats, 스마트키=$_hasSmartKey, 후방카메라=$_hasRearCamera');
+      debugPrint('⭐ 성능점검: $_performanceRating → $inspectionGrade');
       debugPrint('🌐 API URL: ${_apiService.currentBaseUrl}');
       
-      // 통합 분석 API 호출 (변환된 모델명 + 옵션 포함)
+      // 통합 분석 API 호출 (변환된 모델명 + 옵션 + 성능점검 포함)
       final result = await _apiService.smartAnalysis(
         brand: _selectedBrand!,
         model: backendModel,  // 연식 기반 변환된 모델명
@@ -556,6 +501,8 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
         hasLeatherSeat: _hasLeatherSeats,
         hasSmartKey: _hasSmartKey,
         hasRearCamera: _hasRearCamera,
+        // 성능점검 등급 전달
+        inspectionGrade: inspectionGrade,
       );
       
       // 디버그: API 응답 출력
@@ -572,7 +519,7 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
       
       if (!mounted) return;
       
-      // 결과 페이지로 이동
+      // 결과 페이지로 이동 (선택한 옵션 정보 포함)
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -583,6 +530,14 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
             year: year,
             mileage: mileage,
             fuel: _selectedFuel,
+            selectedOptions: {
+              'sunroof': _hasSunroof,
+              'navigation': _hasNavigation,
+              'leatherSeat': _hasLeatherSeats,
+              'smartKey': _hasSmartKey,
+              'rearCamera': _hasRearCamera,
+            },
+            inspectionGrade: inspectionGrade,
           ),
         ),
       );

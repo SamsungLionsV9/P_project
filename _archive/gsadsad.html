@@ -1,0 +1,144 @@
+import React, { useState } from 'react';
+import { ChevronRight, Settings, Car, DollarSign, Wallet } from 'lucide-react';
+
+const CarMarketApp = () => {
+  // 모의 데이터 (이미지의 내용과 동일하게 구성)
+  const carData = [
+    {
+      id: 1,
+      name: "노란색 벤츠",
+      year: "2023년",
+      mileage: "0.8만KM",
+      price: "1억",
+      image: "https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=500&auto=format&fit=crop", // Yellow sports car
+    },
+    {
+      id: 2,
+      name: "파란색 차",
+      year: "2024년",
+      mileage: "1만KM",
+      price: "8000만원",
+      image: "https://images.unsplash.com/photo-1603584173870-7b299f589389?q=80&w=500&auto=format&fit=crop", // Blue car
+    },
+    {
+      id: 3,
+      name: "흰색 SUV",
+      year: "2025년",
+      mileage: "0.5만KM",
+      price: "9000만원",
+      image: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?q=80&w=500&auto=format&fit=crop", // White SUV
+    },
+    {
+      id: 4,
+      name: "검정 세단",
+      year: "2022년",
+      mileage: "3만KM",
+      price: "5500만원",
+      image: "https://images.unsplash.com/photo-1555215695-3004980adade?q=80&w=500&auto=format&fit=crop",
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex justify-center font-sans text-slate-900">
+      {/* Mobile Container */}
+      <div className="w-full max-w-md bg-slate-50 min-h-screen flex flex-col pb-24 relative shadow-2xl">
+        
+        {/* Main Content Area */}
+        <div className="p-5 space-y-8 mt-4">
+          
+          {/* 1. Hero Card Section */}
+          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+            <h1 className="text-xl font-bold mb-6 text-slate-900">
+              내 차 시세가 궁금하다면?
+            </h1>
+            <button className="w-full bg-[#0064DE] hover:bg-blue-700 active:bg-blue-800 transition-colors text-white text-lg font-bold py-4 rounded-xl shadow-blue-200 shadow-lg">
+              빠른 시세 조회
+            </button>
+          </div>
+
+          {/* 2. Recent Vehicles Section */}
+          <section>
+            <SectionHeader title="최근 조회 차량" />
+            <div className="flex overflow-x-auto pb-4 -mx-5 px-5 space-x-3 scrollbar-hide">
+              {carData.map((car) => (
+                <CarCard key={`recent-${car.id}`} car={car} />
+              ))}
+            </div>
+          </section>
+
+          {/* 3. Popular Models Section */}
+          <section>
+            <SectionHeader title="인기 모델 추천" />
+            <div className="flex overflow-x-auto pb-4 -mx-5 px-5 space-x-3 scrollbar-hide">
+              {carData.map((car) => (
+                <CarCard key={`popular-${car.id}`} car={car} />
+              ))}
+            </div>
+          </section>
+
+        </div>
+
+        {/* 4. Bottom Navigation */}
+        <div className="fixed bottom-0 max-w-md w-full bg-white border-t border-slate-100 flex justify-around items-center py-3 pb-6 z-10 text-[10px] text-slate-400 font-medium">
+          <NavItem icon={<DollarSign size={24} />} label="내 차 팔기" active />
+          <NavItem icon={<Car size={24} />} label="내 차 사기" />
+          <NavItem icon={<Settings size={24} />} label="설정" />
+        </div>
+
+      </div>
+
+      {/* Hide Scrollbar Style */}
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// --- Sub Components ---
+
+const SectionHeader = ({ title }) => (
+  <div className="flex items-center gap-1 mb-4 cursor-pointer hover:opacity-70 transition-opacity">
+    <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+    <ChevronRight size={20} className="text-slate-400" />
+  </div>
+);
+
+const CarCard = ({ car }) => (
+  <div className="min-w-[150px] bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex flex-col cursor-pointer hover:shadow-md transition-shadow">
+    {/* Image Area */}
+    <div className="w-full h-24 mb-3 rounded-xl overflow-hidden bg-slate-100 relative">
+      <img 
+        src={car.image} 
+        alt={car.name}
+        className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
+      />
+    </div>
+    
+    {/* Text Area */}
+    <div className="text-center space-y-1">
+      <h3 className="text-sm font-bold text-slate-800">{car.name}</h3>
+      <p className="text-[10px] text-slate-400">
+        {car.year} / {car.mileage}
+      </p>
+      <p className="text-sm font-bold text-blue-500 mt-1">{car.price}</p>
+    </div>
+  </div>
+);
+
+const NavItem = ({ icon, label, active = false }) => (
+  <button className={`flex flex-col items-center gap-1 w-full ${active ? 'text-slate-900' : 'text-slate-300 hover:text-slate-500'} transition-colors`}>
+    <div className={`${active ? 'text-slate-900' : 'text-slate-300'}`}>
+      {icon}
+    </div>
+    <span>{label}</span>
+  </button>
+);
+
+export default CarMarketApp;

@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
+import 'widgets/deal_analysis_modal.dart';
+import 'providers/recent_views_provider.dart';
+import 'widgets/common/option_badges.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -18,7 +23,7 @@ class _RecommendationPageState extends State<RecommendationPage>
   List<PopularCar> _popularDomestic = [];
   List<PopularCar> _popularImported = [];
   List<RecommendedCar> _recommendations = [];
-  List<SearchHistory> _recentSearches = [];
+  List<Favorite> _favorites = [];  // 찜 목록
 
   bool _isLoading = true;
   String? _error;
@@ -33,6 +38,86 @@ class _RecommendationPageState extends State<RecommendationPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
+    _loadFavorites();  // 찜 목록 로드
+    // Provider 초기화
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RecentViewsProvider>().loadRecentViews();
+    });
+  }
+  
+  /// 찜 목록 로드
+  Future<void> _loadFavorites() async {
+    try {
+      final favorites = await _api.getFavorites();
+      if (mounted) {
+        setState(() => _favorites = favorites);
+      }
+    } catch (e) {
+      // 무시
+    }
+  }
+  
+  /// 찜 토글 (고유 매물 단위로 구별 + 즉시 UI 반영)
+  Future<void> _toggleFavorite(RecommendedCar car) async {
+    // isSameDeal로 정확한 매물 구별
+    final existing = _favorites.where((f) => f.isSameDeal(car)).toList();
+    final isCurrentlyFavorite = existing.isNotEmpty;
+
+    // 1. 즉시 로컬 상태 업데이트 (optimistic update)
+    if (isCurrentlyFavorite) {
+      setState(() {
+        _favorites.removeWhere((f) => f.isSameDeal(car));
+      });
+    } else {
+      // 임시 Favorite 객체 생성
+      final tempFavorite = Favorite(
+        id: DateTime.now().millisecondsSinceEpoch,
+        carId: car.carId,
+        brand: car.brand,
+        model: car.model,
+        year: car.year,
+        mileage: car.mileage,
+        predictedPrice: car.predictedPrice.toDouble(),
+        actualPrice: car.actualPrice,
+        detailUrl: car.detailUrl,
+      );
+      setState(() {
+        _favorites.add(tempFavorite);
+      });
+    }
+
+    // 2. 서버에 요청
+    try {
+      if (isCurrentlyFavorite) {
+        await _api.removeFavorite(existing.first.id);
+        _showSnackBar("'${car.brand} ${car.model}' 찜 목록에서 삭제되었습니다.");
+      } else {
+        await _api.addFavorite(
+          brand: car.brand,
+          model: car.model,
+          year: car.year,
+          mileage: car.mileage,
+          predictedPrice: car.predictedPrice.toDouble(),
+          actualPrice: car.actualPrice,
+          detailUrl: car.detailUrl,
+          carId: car.carId,
+        );
+        _showSnackBar("'${car.brand} ${car.model}' 찜 목록에 추가되었습니다.");
+      }
+      
+      // 3. 서버에서 최신 상태로 동기화
+      await _loadFavorites();
+    } catch (e) {
+      // 실패 시 원래 상태로 복구
+      await _loadFavorites();
+      _showSnackBar("오류가 발생했습니다.");
+    }
+  }
+  
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
   }
 
   @override
@@ -57,14 +142,12 @@ class _RecommendationPageState extends State<RecommendationPage>
           budgetMax: _budgetMax,
           limit: 20,
         ),
-        _api.getHistory(limit: 5),
       ]);
 
       setState(() {
         _popularDomestic = results[0] as List<PopularCar>;
         _popularImported = results[1] as List<PopularCar>;
         _recommendations = results[2] as List<RecommendedCar>;
-        _recentSearches = results[3] as List<SearchHistory>;
         _isLoading = false;
       });
     } catch (e) {
@@ -73,6 +156,11 @@ class _RecommendationPageState extends State<RecommendationPage>
         _isLoading = false;
       });
     }
+  }
+  
+  /// 최근 조회 기록에 매물 추가 (Provider를 통해 전역 저장)
+  void _addToRecentViewed(RecommendedCar car) {
+    context.read<RecentViewsProvider>().addRecentCar(car);
   }
 
   @override
@@ -184,16 +272,35 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  Widget _buildPopularCard(PopularCar car) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF252542),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
+  /// 인기 모델 클릭 시 가성비 매물 모달 표시
+  void _showModelDeals(PopularCar car) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ModelDealsModal(
+        brand: car.brand,
+        model: car.model,
+        avgPrice: car.avgPrice,
+        medianPrice: car.medianPrice,
+        listings: car.listings,
+        onCarViewed: _addToRecentViewed,  // 최근 조회 콜백
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildPopularCard(PopularCar car) {
+    return GestureDetector(
+      onTap: () => _showModelDeals(car),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252542),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
         children: [
           Container(
             width: 48,
@@ -244,7 +351,10 @@ class _RecommendationPageState extends State<RecommendationPage>
               ),
             ],
           ),
+          const SizedBox(width: 8),
+          Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
         ],
+      ),
       ),
     );
   }
@@ -333,20 +443,39 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
+  /// 추천 차량 클릭 시 상세 분석 모달 표시 + 최근 조회 저장
+  void _showRecommendationAnalysis(RecommendedCar car) {
+    // 최근 조회 기록에 추가 (로컬)
+    _addToRecentViewed(car);
+    
+    // 상세 분석 모달 표시
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DealAnalysisModal(
+        deal: car,
+        predictedPrice: car.predictedPrice,
+      ),
+    );
+  }
+
   Widget _buildRecommendationCard(RecommendedCar car) {
     final isGood = car.isGoodDeal;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF252542),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isGood ? Colors.green.withOpacity(0.5) : Colors.white10,
-          width: isGood ? 2 : 1,
+    return GestureDetector(
+      onTap: () => _showRecommendationAnalysis(car),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252542),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isGood ? Colors.green.withOpacity(0.5) : Colors.white10,
+            width: isGood ? 2 : 1,
+          ),
         ),
-      ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -403,22 +532,10 @@ class _RecommendationPageState extends State<RecommendationPage>
               _buildInfoChip(Icons.local_gas_station, car.fuel),
             ],
           ),
-          // 옵션 표시
-          if (car.options.count > 0 || car.accidentFree) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                if (car.accidentFree)
-                  _buildOptionChip('무사고', Colors.green),
-                ...car.options.enabledOptions.take(3).map(
-                  (opt) => _buildOptionChip(opt, const Color(0xFF6C63FF)),
-                ),
-                if (car.options.count > 3)
-                  _buildOptionChip('+${car.options.count - 3}', Colors.grey),
-              ],
-            ),
+          // 옵션 배지 표시
+          if (car.options != null) ...[
+            const SizedBox(height: 10),
+            OptionBadges(options: car.options!, compact: true),
           ],
           const SizedBox(height: 12),
           Row(
@@ -467,7 +584,18 @@ class _RecommendationPageState extends State<RecommendationPage>
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          // 상세보기 안내
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Icon(Icons.open_in_new, size: 14, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text('탭하여 상세보기', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+            ],
+          ),
         ],
+      ),
       ),
     );
   }
@@ -483,29 +611,15 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  Widget _buildOptionChip(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  /// 최근 조회 탭
+  /// 최근 조회 탭 (Provider 기반 - 추천 탭에서 클릭한 매물만)
   Widget _buildHistoryTab() {
-    return _recentSearches.isEmpty
-        ? Center(
+    return Consumer<RecentViewsProvider>(
+      builder: (context, provider, child) {
+        // 추천 탭에서 조회한 차량만 표시 (분석 페이지 매물 제외)
+        final recentCars = provider.recommendationOnlyCars;
+        
+        if (recentCars.isEmpty) {
+          return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -517,70 +631,175 @@ class _RecommendationPageState extends State<RecommendationPage>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '차량을 검색하면 여기에 기록됩니다',
+                  '인기 모델이나 추천 차량의 매물을\n클릭하면 여기에 기록됩니다',
+                  textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
               ],
             ),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _recentSearches.length,
-            itemBuilder: (context, index) {
-              final history = _recentSearches[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF252542),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
+          );
+        }
+        
+        return Column(
+          children: [
+            // 헤더
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '총 ${recentCars.length}건',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  ),
+                  TextButton.icon(
+                    onPressed: _clearRecentViewed,
+                    icon: const Icon(Icons.delete_sweep, size: 18, color: Colors.red),
+                    label: const Text('전체 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: recentCars.length,
+                itemBuilder: (context, index) {
+                  final car = recentCars[index];
+                  // 고유 매물 단위로 찜 여부 확인
+                  final isFavorite = _favorites.any((f) => f.isSameDeal(car));
+                  return GestureDetector(
+                    onTap: () => _showRecommendationAnalysis(car),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white10,
+                        color: const Color(0xFF252542),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: car.isGoodDeal ? Colors.green.withOpacity(0.4) : Colors.white10,
+                        ),
                       ),
-                      child: const Icon(Icons.history, color: Colors.white54),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '${history.brand} ${history.model}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: car.isGoodDeal ? Colors.green.withOpacity(0.1) : Colors.white10,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  car.isGoodDeal ? Icons.thumb_up : Icons.directions_car,
+                                  color: car.isGoodDeal ? Colors.green : Colors.white54,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${car.brand} ${car.model}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${car.year}년 • ${(car.mileage / 10000).toStringAsFixed(1)}만km • ${car.fuel}',
+                                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // 찜하기 버튼
+                              GestureDetector(
+                                onTap: () => _toggleFavorite(car),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(
+                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: isFavorite ? Colors.red : Colors.grey[500],
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${car.actualPrice}만원',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (car.priceDiff > 0)
+                                    Text(
+                                      '-${car.priceDiff}만원',
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => provider.removeAt(index),
+                                child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${history.year}년 • ${(history.mileage / 10000).toStringAsFixed(1)}만km',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                          ),
+                          // 옵션 배지 표시
+                          if (car.options != null) ...[
+                            const SizedBox(height: 10),
+                            OptionBadges(options: car.options!, compact: true),
+                          ],
                         ],
                       ),
                     ),
-                    if (history.predictedPrice != null)
-                      Text(
-                        '${history.predictedPrice!.toStringAsFixed(0)}만원',
-                        style: const TextStyle(
-                          color: Color(0xFF6C63FF),
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                  ],
-                ),
-              );
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 최근 조회 전체 삭제
+  void _clearRecentViewed() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF252542),
+        title: const Text('전체 삭제', style: TextStyle(color: Colors.white)),
+        content: const Text('모든 조회 기록을 삭제하시겠습니까?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<RecentViewsProvider>().clearAll();
+              Navigator.pop(dialogContext);
             },
-          );
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showBudgetFilter() {
@@ -637,6 +856,309 @@ class _RecommendationPageState extends State<RecommendationPage>
         style: TextStyle(
           color: isSelected ? Colors.white : Colors.grey[400],
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+}
+
+/// 모델별 가성비 매물 모달
+class _ModelDealsModal extends StatefulWidget {
+  final String brand;
+  final String model;
+  final int avgPrice;
+  final int medianPrice;
+  final int listings;
+  final void Function(RecommendedCar car)? onCarViewed;
+
+  const _ModelDealsModal({
+    required this.brand,
+    required this.model,
+    required this.avgPrice,
+    required this.medianPrice,
+    required this.listings,
+    this.onCarViewed,
+  });
+
+  @override
+  State<_ModelDealsModal> createState() => _ModelDealsModalState();
+}
+
+class _ModelDealsModalState extends State<_ModelDealsModal> {
+  final ApiService _api = ApiService();
+  List<RecommendedCar> _deals = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeals();
+  }
+
+  Future<void> _loadDeals() async {
+    try {
+      final deals = await _api.getModelDeals(
+        brand: widget.brand,
+        model: widget.model,
+        limit: 10,
+      );
+      if (mounted) {
+        setState(() {
+          _deals = deals;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// 매물 클릭 시 상세 분석 모달 표시
+  void _showDealAnalysis(RecommendedCar car) {
+    // 최근 조회 기록에 추가 (콜백 호출)
+    widget.onCarViewed?.call(car);
+    
+    // 상세 분석 모달 표시
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DealAnalysisModal(
+        deal: car,
+        predictedPrice: car.predictedPrice,  // 각 매물의 예측가 사용
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A1A2E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // 핸들
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${widget.brand} ${widget.model}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '등록 ${widget.listings}건 • 평균 ${widget.avgPrice}만원 • 중앙값 ${widget.medianPrice}만원',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.recommend, color: Colors.green, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            '가성비 좋은 매물 추천',
+                            style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 24),
+              // 매물 리스트
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+                        : _deals.isEmpty
+                            ? Center(child: Text('추천 매물이 없습니다', style: TextStyle(color: Colors.grey[500])))
+                            : ListView.builder(
+                                controller: scrollController,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: _deals.length,
+                                itemBuilder: (context, index) {
+                                  final deal = _deals[index];
+                                  return _buildDealCard(deal, index + 1);
+                                },
+                              ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDealCard(RecommendedCar deal, int rank) {
+    final priceDiff = deal.priceDiff;
+    final isGood = priceDiff > 0;
+    
+    return GestureDetector(
+      onTap: () => _showDealAnalysis(deal),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF252542),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isGood ? Colors.green.withOpacity(0.4) : Colors.white10,
+            width: isGood ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                // 순위 뱃지
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: rank <= 3 ? const Color(0xFF6C63FF) : Colors.grey[700],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$rank',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        deal.model,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${deal.year}년 • ${deal.formattedMileage} • ${deal.fuel}',
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isGood)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '추천',
+                      style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('실제가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text(
+                        '${deal.actualPrice}만원',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('예측가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text(
+                        '${deal.predictedPrice}만원',
+                        style: TextStyle(color: Colors.grey[300], fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('차이', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                    Text(
+                      '${priceDiff > 0 ? "-" : "+"}${priceDiff.abs()}만원',
+                      style: TextStyle(
+                        color: priceDiff > 0 ? Colors.green : Colors.red,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

@@ -47,6 +47,18 @@ class PredictionServiceV12:
         'has_smart_key': 50, 'has_rear_camera': 50,
     }
     
+    # 옵션 프리미엄 (국산차) - 시장 기반
+    DOMESTIC_OPT_PREMIUM = {
+        'has_sunroof': 60,          # 선루프: +60만원
+        'has_leather_seat': 50,     # 가죽시트: +50만원
+        'has_ventilated_seat': 70,  # 통풍시트: +70만원
+        'has_navigation': 30,       # 내비게이션: +30만원
+        'has_smart_key': 20,        # 스마트키: +20만원
+        'has_led_lamp': 30,         # LED램프: +30만원
+        'has_heated_seat': 30,      # 열선시트: +30만원
+        'has_rear_camera': 20,      # 후방카메라: +20만원
+    }
+    
     def __init__(self):
         self.domestic_model = None
         self.domestic_encoders = None
@@ -288,19 +300,23 @@ class PredictionServiceV12:
             
             if hasattr(self, 'domestic_version') and self.domestic_version == 'V12':
                 # V12: 가솔린 기준으로 예측 후 수동 연료 조정 적용
-                # (모델의 연료 피처 효과가 왜곡되어 있으므로 무력화)
                 features = self._create_domestic_features_v12(
                     model_name, year, mileage, '가솔린', options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
                 base_price = np.expm1(pred_log)
-                predicted_price = base_price * fuel_adj  # 시장 현실 기반 조정
+                base_price = base_price * fuel_adj  # 시장 현실 기반 연료 조정
             else:
-                # Fallback V11 (수동 연료 프리미엄)
+                # Fallback V11
                 features = self._create_domestic_features_v11(
                     model_name, year, mileage, options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
                 base_price = np.expm1(pred_log)
-                predicted_price = base_price * fuel_adj
+                base_price = base_price * fuel_adj
+            
+            # 국산차 옵션 프리미엄 명시적 추가
+            opt_total = sum(int(bool(options.get(k, False))) * v 
+                           for k, v in self.DOMESTIC_OPT_PREMIUM.items())
+            predicted_price = base_price + opt_total
             
             mape = 9.7  # V12 MAPE
             

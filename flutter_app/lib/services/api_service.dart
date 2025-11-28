@@ -1,8 +1,18 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import '../models/car.dart';  // RecommendedCar 타입 참조용
+
+// 모델 클래스 re-export (하위 호환성 유지)
+// 이제 모델들은 lib/models/ 디렉토리에서 관리됩니다.
+export '../models/prediction.dart';
+export '../models/car.dart';
+export '../models/deal.dart';
+export '../models/user.dart';
+export '../models/ai.dart';
 
 /// Car-Sentix API Service
 /// ML 서비스와 통신하는 클라이언트
@@ -51,8 +61,8 @@ class ApiService {
     return headers;
   }
   
-  /// 사용자 식별자 (이메일 또는 guest) - 관리자가 식별하기 쉬움
-  String get _userId => _authService.userEmail ?? 'guest';
+  /// 사용자 ID (로그인 시) 또는 guest
+  String get _userId => _authService.userId ?? 'guest';
 
   /// 가격 예측
   Future<PredictionResult> predict({
@@ -82,7 +92,6 @@ class ApiService {
           'has_leather_seat': hasLeatherSeat,
           'has_smart_key': hasSmartKey,
           'has_rear_camera': hasRearCamera,
-          'user_id': _userId,  // 사용자 ID 추가
         }),
       ).timeout(_timeout);
 
@@ -132,6 +141,8 @@ class ApiService {
     bool hasVentilatedSeat = false,
     bool hasLedLamp = false,
     bool isAccidentFree = true,
+    // 성능점검 등급 (1-5 별표 → normal/good/excellent)
+    String inspectionGrade = 'normal',
     // AI 분석용
     int? salePrice,
     String? dealerDescription,
@@ -156,7 +167,7 @@ class ApiService {
           'has_ventilated_seat': hasVentilatedSeat,
           'has_led_lamp': hasLedLamp,
           'is_accident_free': isAccidentFree,
-          'user_id': _userId,  // 사용자 ID 추가
+          'inspection_grade': inspectionGrade,
           if (salePrice != null) 'sale_price': salePrice,
           if (dealerDescription != null) 'dealer_description': dealerDescription,
         }),
@@ -263,6 +274,55 @@ class ApiService {
     }
   }
 
+  /// 검색 이력 추가
+  Future<void> addHistory({
+    required String brand,
+    required String model,
+    required int year,
+    required int mileage,
+    double? predictedPrice,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/history?user_id=$_userId'),
+      headers: _headers,
+      body: jsonEncode({
+        'brand': brand,
+        'model': model,
+        'year': year,
+        'mileage': mileage,
+        'predicted_price': predictedPrice,
+      }),
+    ).timeout(_timeout);
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw ApiException('검색 이력 저장 실패');
+    }
+  }
+
+  /// 검색 이력 삭제
+  Future<bool> removeHistory(int historyId) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/history/$historyId?user_id=$_userId'),
+      headers: _headers,
+    ).timeout(_timeout);
+
+    return response.statusCode == 200;
+  }
+
+  /// 검색 이력 전체 삭제
+  Future<int> clearHistory() async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/history?user_id=$_userId'),
+      headers: _headers,
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['deleted_count'] ?? 0;
+    }
+    return 0;
+  }
+
   /// 추천 차량 목록
   Future<List<RecommendedCar>> getRecommendations({
     String category = 'all',
@@ -302,6 +362,57 @@ class ApiService {
           .toList();
     } else {
       throw ApiException('가성비 차량 조회 실패');
+    }
+  }
+
+  /// 특정 모델의 가성비 좋은 매물
+  Future<List<RecommendedCar>> getModelDeals({
+    required String brand,
+    required String model,
+    int limit = 10,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/model-deals?brand=${Uri.encodeComponent(brand)}&model=${Uri.encodeComponent(model)}&limit=$limit'),
+    ).timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data['deals'] as List)
+          .map((e) => RecommendedCar.fromJson(e))
+          .toList();
+    } else {
+      throw ApiException('모델별 추천 차량 조회 실패');
+    }
+  }
+
+  /// 개별 매물 상세 분석
+  Future<DealAnalysis> analyzeDeal({
+    required String brand,
+    required String model,
+    required int year,
+    required int mileage,
+    required int actualPrice,
+    int? predictedPrice,
+    String fuel = '가솔린',
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/analyze-deal'),
+      headers: _headers,
+      body: jsonEncode({
+        'brand': brand,
+        'model': model,
+        'year': year,
+        'mileage': mileage,
+        'actual_price': actualPrice,
+        'predicted_price': predictedPrice ?? 0,
+        'fuel': fuel,
+      }),
+    ).timeout(const Duration(seconds: 20));
+
+    if (response.statusCode == 200) {
+      return DealAnalysis.fromJson(jsonDecode(response.body));
+    } else {
+      throw ApiException('매물 분석 실패');
     }
   }
 
@@ -345,6 +456,9 @@ class ApiService {
     required int year,
     required int mileage,
     double? predictedPrice,
+    int? actualPrice,
+    String? detailUrl,
+    String? carId,        // 엔카 차량 고유 ID (핵심 식별자)
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/favorites?user_id=$_userId'),
@@ -355,6 +469,9 @@ class ApiService {
         'year': year,
         'mileage': mileage,
         'predicted_price': predictedPrice,
+        'actual_price': actualPrice,
+        'detail_url': detailUrl,
+        'car_id': carId,
       }),
     ).timeout(_timeout);
 
@@ -527,6 +644,68 @@ class ApiService {
       return 'Status ${response.statusCode}';
     }
   }
+
+  // ========== Groq AI API (네고 대본 생성) ==========
+  
+  /// Groq AI로 네고 대본 생성 (고도화)
+  Future<NegotiationScript> generateNegotiationScript({
+    required String carName,
+    required String price,
+    required String info,
+    List<String> checkpoints = const [],
+    // 고도화: 정확한 가격 정보 (선택적)
+    int? actualPrice,
+    int? predictedPrice,
+    int? year,
+    int? mileage,
+  }) async {
+    try {
+      final body = {
+        'car_name': carName,
+        'price': price,
+        'info': info,
+        'checkpoints': checkpoints,
+      };
+      
+      // 정확한 가격 정보가 있으면 추가
+      if (actualPrice != null) body['actual_price'] = actualPrice;
+      if (predictedPrice != null) body['predicted_price'] = predictedPrice;
+      if (year != null) body['year'] = year;
+      if (mileage != null) body['mileage'] = mileage;
+      
+      final response = await http.post(
+        Uri.parse('$_baseUrl/negotiation/generate'),
+        headers: _headers,
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 30)); // AI 응답은 시간이 걸릴 수 있음
+
+      if (response.statusCode == 200) {
+        return NegotiationScript.fromJson(jsonDecode(response.body));
+      } else {
+        throw ApiException('네고 대본 생성 실패: ${_parseError(response)}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네고 대본 생성 오류: $e');
+    }
+  }
+
+  /// AI 상태 확인 (Groq API 연결 여부)
+  Future<AiStatus> getAiStatus() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/ai/status'),  // _baseUrl에 이미 /api 포함
+      ).timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        return AiStatus.fromJson(jsonDecode(response.body));
+      } else {
+        return AiStatus(isConnected: false, model: null, status: 'error');
+      }
+    } catch (e) {
+      return AiStatus(isConnected: false, model: null, status: 'disconnected');
+    }
+  }
 }
 
 // ========== Data Models ==========
@@ -669,118 +848,20 @@ class PopularCar {
       type: json['type'],
     );
   }
-}
-
-/// 차량 옵션 정보
-class CarOptions {
-  final bool sunroof;
-  final bool navigation;
-  final bool leatherSeat;
-  final bool smartKey;
-  final bool rearCamera;
-  final bool ledLamp;
-  final bool heatedSeat;
-  final bool ventilatedSeat;
-  final bool accidentFree;
-
-  CarOptions({
-    this.sunroof = false,
-    this.navigation = false,
-    this.leatherSeat = false,
-    this.smartKey = false,
-    this.rearCamera = false,
-    this.ledLamp = false,
-    this.heatedSeat = false,
-    this.ventilatedSeat = false,
-    this.accidentFree = false,
-  });
-
-  factory CarOptions.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return CarOptions();
-    return CarOptions(
-      sunroof: json['sunroof'] ?? false,
-      navigation: json['navigation'] ?? false,
-      leatherSeat: json['leather_seat'] ?? false,
-      smartKey: json['smart_key'] ?? false,
-      rearCamera: json['rear_camera'] ?? false,
-      ledLamp: json['led_lamp'] ?? false,
-      heatedSeat: json['heated_seat'] ?? false,
-      ventilatedSeat: json['ventilated_seat'] ?? false,
-      accidentFree: json['accident_free'] ?? false,
-    );
-  }
-
-  /// 주요 옵션 목록 (true인 것만)
-  List<String> get enabledOptions {
-    final options = <String>[];
-    if (sunroof) options.add('선루프');
-    if (navigation) options.add('네비');
-    if (leatherSeat) options.add('가죽시트');
-    if (smartKey) options.add('스마트키');
-    if (rearCamera) options.add('후방카메라');
-    if (ledLamp) options.add('LED');
-    if (heatedSeat) options.add('열선시트');
-    if (ventilatedSeat) options.add('통풍시트');
-    return options;
-  }
-
-  /// 옵션 개수
-  int get count => enabledOptions.length;
-}
-
-/// 추천 차량
-class RecommendedCar {
-  final String brand;
-  final String model;
-  final int year;
-  final int mileage;
-  final String fuel;
-  final int actualPrice;
-  final int predictedPrice;
-  final int priceDiff;
-  final bool isGoodDeal;
-  final double score;
-  final String type;
-  final CarOptions options;
-  final bool accidentFree;
-
-  RecommendedCar({
-    required this.brand,
-    required this.model,
-    required this.year,
-    required this.mileage,
-    required this.fuel,
-    required this.actualPrice,
-    required this.predictedPrice,
-    required this.priceDiff,
-    required this.isGoodDeal,
-    required this.score,
-    required this.type,
-    required this.options,
-    this.accidentFree = false,
-  });
-
-  factory RecommendedCar.fromJson(Map<String, dynamic> json) {
-    return RecommendedCar(
-      brand: json['brand'] ?? '',
-      model: json['model'] ?? '',
-      year: json['year'] ?? 0,
-      mileage: json['mileage'] ?? 0,
-      fuel: json['fuel'] ?? '가솔린',
-      actualPrice: json['actual_price'] ?? 0,
-      predictedPrice: json['predicted_price'] ?? 0,
-      priceDiff: json['price_diff'] ?? 0,
-      isGoodDeal: json['is_good_deal'] ?? false,
-      score: (json['score'] ?? 0).toDouble(),
-      type: json['type'] ?? 'domestic',
-      options: CarOptions.fromJson(json['options']),
-      accidentFree: json['accident_free'] ?? false,
-    );
-  }
   
-  String get formattedMileage => '${(mileage / 10000).toStringAsFixed(1)}만 km';
-  String get priceTag => isGoodDeal ? '🔥 가성비' : '';
+  Map<String, dynamic> toJson() {
+    return {
+      'brand': brand,
+      'model': model,
+      'listings': listings,
+      'avg_price': avgPrice,
+      'median_price': medianPrice,
+      'type': type,
+    };
+  }
 }
+
+// CarOptions, RecommendedCar는 models/car.dart에서 정의됨
 
 class SearchHistory {
   final int? id;
@@ -823,23 +904,29 @@ class SearchHistory {
 /// 즐겨찾기 모델
 class Favorite {
   final int id;
+  final String? carId;         // 엔카 차량 고유 ID (핵심 식별자)
   final String brand;
   final String model;
   final int year;
   final int mileage;
   final String? fuel;
   final double? predictedPrice;
+  final int? actualPrice;
+  final String? detailUrl;
   final String? memo;
   final String? createdAt;
 
   Favorite({
     required this.id,
+    this.carId,
     required this.brand,
     required this.model,
     required this.year,
     required this.mileage,
     this.fuel,
     this.predictedPrice,
+    this.actualPrice,
+    this.detailUrl,
     this.memo,
     this.createdAt,
   });
@@ -847,14 +934,243 @@ class Favorite {
   factory Favorite.fromJson(Map<String, dynamic> json) {
     return Favorite(
       id: json['id'] ?? 0,
+      carId: json['car_id']?.toString(),
       brand: json['brand'] ?? '',
       model: json['model'] ?? '',
       year: json['year'] ?? 0,
       mileage: json['mileage'] ?? 0,
       fuel: json['fuel'],
       predictedPrice: json['predicted_price']?.toDouble(),
+      actualPrice: json['actual_price'],
+      detailUrl: json['detail_url'],
       memo: json['memo'],
       createdAt: json['created_at'],
+    );
+  }
+  
+  /// 같은 매물인지 확인 (OR 조건 - 어떤 것이든 일치하면 true)
+  bool isSameDeal(RecommendedCar car) {
+    // URL에서 carId 추출하는 헬퍼 함수
+    String? extractCarIdFromUrl(String? url) {
+      if (url == null) return null;
+      final match = RegExp(r'carid=(\d+)').firstMatch(url);
+      return match?.group(1);
+    }
+    
+    final urlCarId = extractCarIdFromUrl(detailUrl);
+    final carUrlCarId = extractCarIdFromUrl(car.detailUrl);
+    
+    // 조건 1: carId 직접 비교 (가장 정확)
+    if (carId != null && carId!.isNotEmpty && 
+        car.carId != null && car.carId!.isNotEmpty &&
+        carId == car.carId) {
+      return true;
+    }
+    
+    // 조건 2: detailUrl 직접 비교
+    if (detailUrl != null && detailUrl!.isNotEmpty && 
+        car.detailUrl != null && car.detailUrl!.isNotEmpty &&
+        detailUrl == car.detailUrl) {
+      return true;
+    }
+    
+    // 조건 3: URL에서 추출한 carId 비교
+    if (urlCarId != null && carUrlCarId != null && urlCarId == carUrlCarId) {
+      return true;
+    }
+    
+    // 조건 4: carId ↔ URL의 carId 크로스 비교
+    if (carId != null && carId!.isNotEmpty && 
+        carUrlCarId != null && carId == carUrlCarId) {
+      return true;
+    }
+    if (urlCarId != null && 
+        car.carId != null && car.carId!.isNotEmpty &&
+        urlCarId == car.carId) {
+      return true;
+    }
+    
+    // 조건 5: brand + model + year + actualPrice (가격으로 구별)
+    if (brand == car.brand && 
+        model == car.model && 
+        year == car.year &&
+        actualPrice != null && actualPrice! > 0 &&
+        car.actualPrice > 0 &&
+        actualPrice == car.actualPrice) {
+      return true;
+    }
+    
+    return false;
+  }
+}
+
+/// 개별 매물 분석 결과
+class DealAnalysis {
+  final String brand;
+  final String model;
+  final int year;
+  final int mileage;
+  final String fuel;
+  final PriceFairness priceFairness;
+  final FraudRisk fraudRisk;
+  final List<String> negoPoints;
+  final DealSummary summary;
+
+  DealAnalysis({
+    required this.brand,
+    required this.model,
+    required this.year,
+    required this.mileage,
+    required this.fuel,
+    required this.priceFairness,
+    required this.fraudRisk,
+    required this.negoPoints,
+    required this.summary,
+  });
+
+  factory DealAnalysis.fromJson(Map<String, dynamic> json) {
+    return DealAnalysis(
+      brand: json['brand'] ?? '',
+      model: json['model'] ?? '',
+      year: json['year'] ?? 0,
+      mileage: json['mileage'] ?? 0,
+      fuel: json['fuel'] ?? '가솔린',
+      priceFairness: PriceFairness.fromJson(json['price_fairness'] ?? {}),
+      fraudRisk: FraudRisk.fromJson(json['fraud_risk'] ?? {}),
+      negoPoints: List<String>.from(json['nego_points'] ?? []),
+      summary: DealSummary.fromJson(json['summary'] ?? {}),
+    );
+  }
+}
+
+/// 가격 적정성
+class PriceFairness {
+  final int score;
+  final String label;
+  final int percentile;
+  final String description;
+
+  PriceFairness({
+    required this.score,
+    required this.label,
+    required this.percentile,
+    required this.description,
+  });
+
+  factory PriceFairness.fromJson(Map<String, dynamic> json) {
+    return PriceFairness(
+      score: json['score'] ?? 50,
+      label: json['label'] ?? '판단불가',
+      percentile: json['percentile'] ?? 50,
+      description: json['description'] ?? '',
+    );
+  }
+}
+
+/// 허위매물 위험도
+class FraudRisk {
+  final int score;
+  final String level;  // low, medium, high
+  final List<FraudFactor> factors;
+
+  FraudRisk({
+    required this.score,
+    required this.level,
+    required this.factors,
+  });
+
+  factory FraudRisk.fromJson(Map<String, dynamic> json) {
+    return FraudRisk(
+      score: json['score'] ?? 0,
+      level: json['level'] ?? 'low',
+      factors: (json['factors'] as List? ?? [])
+          .map((e) => FraudFactor.fromJson(e))
+          .toList(),
+    );
+  }
+  
+  Color get levelColor {
+    switch (level) {
+      case 'high': return const Color(0xFFE53935);
+      case 'medium': return const Color(0xFFFFA726);
+      default: return const Color(0xFF66BB6A);
+    }
+  }
+  
+  String get levelText {
+    switch (level) {
+      case 'high': return '높음';
+      case 'medium': return '보통';
+      default: return '낮음';
+    }
+  }
+}
+
+/// 허위매물 체크 요소
+class FraudFactor {
+  final String check;
+  final String status;  // pass, warn, fail, info
+  final String msg;
+
+  FraudFactor({
+    required this.check,
+    required this.status,
+    required this.msg,
+  });
+
+  factory FraudFactor.fromJson(Map<String, dynamic> json) {
+    return FraudFactor(
+      check: json['check'] ?? '',
+      status: json['status'] ?? 'info',
+      msg: json['msg'] ?? '',
+    );
+  }
+  
+  Color get statusColor {
+    switch (status) {
+      case 'pass': return const Color(0xFF66BB6A);
+      case 'warn': return const Color(0xFFFFA726);
+      case 'fail': return const Color(0xFFE53935);
+      default: return Colors.grey;
+    }
+  }
+  
+  IconData get statusIcon {
+    switch (status) {
+      case 'pass': return Icons.check_circle;
+      case 'warn': return Icons.warning;
+      case 'fail': return Icons.cancel;
+      default: return Icons.info;
+    }
+  }
+}
+
+/// 분석 요약
+class DealSummary {
+  final int actualPrice;
+  final int predictedPrice;
+  final int priceDiff;
+  final double priceDiffPct;
+  final bool isGoodDeal;
+  final String verdict;
+
+  DealSummary({
+    required this.actualPrice,
+    required this.predictedPrice,
+    required this.priceDiff,
+    required this.priceDiffPct,
+    required this.isGoodDeal,
+    required this.verdict,
+  });
+
+  factory DealSummary.fromJson(Map<String, dynamic> json) {
+    return DealSummary(
+      actualPrice: json['actual_price'] ?? 0,
+      predictedPrice: json['predicted_price'] ?? 0,
+      priceDiff: json['price_diff'] ?? 0,
+      priceDiffPct: (json['price_diff_pct'] ?? 0).toDouble(),
+      isGoodDeal: json['is_good_deal'] ?? false,
+      verdict: json['verdict'] ?? '',
     );
   }
 }
@@ -892,10 +1208,55 @@ class PriceAlert {
   }
 }
 
+/// AI 생성 네고 대본 모델
+class NegotiationScript {
+  final String messageScript;      // 문자용 대본
+  final List<String> phoneScript;  // 전화용 단계별 대본
+  final String tip;                // 협상 팁
+  final List<String> checkpoints;  // 체크포인트
+
+  NegotiationScript({
+    required this.messageScript,
+    required this.phoneScript,
+    required this.tip,
+    required this.checkpoints,
+  });
+
+  factory NegotiationScript.fromJson(Map<String, dynamic> json) {
+    return NegotiationScript(
+      messageScript: json['message_script'] ?? '',
+      phoneScript: List<String>.from(json['phone_script'] ?? []),
+      tip: json['tip'] ?? '',
+      checkpoints: List<String>.from(json['checkpoints'] ?? []),
+    );
+  }
+}
+
 class ApiException implements Exception {
   final String message;
   ApiException(this.message);
 
   @override
   String toString() => message;
+}
+
+/// AI 상태 모델
+class AiStatus {
+  final bool isConnected;
+  final String? model;
+  final String status;
+
+  AiStatus({
+    required this.isConnected,
+    this.model,
+    required this.status,
+  });
+
+  factory AiStatus.fromJson(Map<String, dynamic> json) {
+    return AiStatus(
+      isConnected: json['groq_available'] ?? false,
+      model: json['model'],
+      status: json['status'] ?? 'unknown',
+    );
+  }
 }
