@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../negotiation_page.dart';
+import 'common/option_badges.dart';
 
 /// 개별 매물 분석 모달
 /// 가격 적정성, 허위매물 위험도, 네고 포인트 등 상세 분석 제공
@@ -134,9 +135,18 @@ class _DealAnalysisModalState extends State<DealAnalysisModal> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "${widget.deal.brand} ${widget.deal.model} ${widget.deal.year}년",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "${widget.deal.brand} ${widget.deal.model} ${widget.deal.year}년",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                    ),
+                  ),
+                  // 옵션 배지 (compact)
+                  if (widget.deal.options != null)
+                    OptionBadges(options: widget.deal.options!, compact: true),
+                ],
               ),
               const SizedBox(height: 16),
               Row(
@@ -367,6 +377,12 @@ class _DealAnalysisModalState extends State<DealAnalysisModal> {
             )).toList(),
           ),
         ),
+        const SizedBox(height: 16),
+        
+        // 차량 옵션 상세 (옵션 데이터가 있는 경우만)
+        if (widget.deal.options != null)
+          OptionDetailSection(options: widget.deal.options!, isDark: isDark),
+        
         const SizedBox(height: 24),
 
         // 버튼

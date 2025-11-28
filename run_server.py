@@ -95,6 +95,9 @@ class FavoriteRequest(BaseModel):
     year: int
     mileage: int
     predicted_price: Optional[float] = None
+    actual_price: Optional[int] = None
+    detail_url: Optional[str] = None
+    car_id: Optional[str] = None  # 엔카 차량 고유 ID
 
 # ========== API ==========
 
@@ -314,7 +317,10 @@ async def add_favorite(request: FavoriteRequest, user_id: str = "guest"):
         'model': request.model,
         'year': request.year,
         'mileage': request.mileage,
-        'predicted_price': request.predicted_price
+        'predicted_price': request.predicted_price,
+        'actual_price': request.actual_price,
+        'detail_url': request.detail_url,
+        'car_id': request.car_id,  # 엔카 차량 고유 ID
     })
     return result
 

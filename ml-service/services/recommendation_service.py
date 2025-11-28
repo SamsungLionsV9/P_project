@@ -95,9 +95,11 @@ class RecommendationService:
         self._domestic_df = None
         self._imported_df = None
         self._prediction_service = None
+        self._car_details = {}  # car_id별 상세 옵션 정보
         
         self._init_db()
         self._load_data()
+        self._load_car_details()  # 옵션 상세 정보 로드
         self._analyze_popular()
     
     def _init_db(self):
@@ -131,11 +133,27 @@ class RecommendationService:
                 mileage INTEGER,
                 fuel TEXT,
                 predicted_price REAL,
-                source_url TEXT,
+                actual_price INTEGER,
+                car_id TEXT,
+                detail_url TEXT,
                 memo TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # 기존 테이블에 컬럼 추가 (마이그레이션)
+        try:
+            cursor.execute('ALTER TABLE favorites ADD COLUMN actual_price INTEGER')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE favorites ADD COLUMN car_id TEXT')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE favorites ADD COLUMN detail_url TEXT')
+        except:
+            pass
         
         # 전역 검색 통계 테이블
         cursor.execute('''
@@ -174,6 +192,55 @@ class RecommendationService:
                 print(f"✓ 외제차 데이터: {len(self._imported_df):,}건")
         except Exception as e:
             print(f"⚠️ 외제차 로드 실패: {e}")
+    
+    def _load_car_details(self):
+        """차량 상세 옵션 정보 로드 (car_id별 조회용)"""
+        try:
+            # 국산차 상세 정보
+            domestic_details_path = self.data_path / "complete_domestic_details.csv"
+            if domestic_details_path.exists():
+                df = pd.read_csv(domestic_details_path)
+                for _, row in df.iterrows():
+                    car_id = str(row.get('car_id', ''))
+                    if car_id:
+                        self._car_details[car_id] = {
+                            'is_accident_free': bool(row.get('is_accident_free', 0)),
+                            'inspection_grade': str(row.get('inspection_grade', '')),
+                            'has_sunroof': bool(row.get('has_sunroof', 0)),
+                            'has_navigation': bool(row.get('has_navigation', 0)),
+                            'has_leather_seat': bool(row.get('has_leather_seat', 0)),
+                            'has_smart_key': bool(row.get('has_smart_key', 0)),
+                            'has_rear_camera': bool(row.get('has_rear_camera', 0)),
+                            'has_heated_seat': bool(row.get('has_heated_seat', 0)),
+                            'has_ventilated_seat': bool(row.get('has_ventilated_seat', 0)),
+                        }
+                print(f"✓ 국산차 상세정보: {len(self._car_details):,}건")
+            
+            # 외제차 상세 정보
+            imported_details_path = self.data_path / "complete_imported_details.csv"
+            if imported_details_path.exists():
+                df = pd.read_csv(imported_details_path)
+                for _, row in df.iterrows():
+                    car_id = str(row.get('car_id', ''))
+                    if car_id and car_id not in self._car_details:
+                        self._car_details[car_id] = {
+                            'is_accident_free': bool(row.get('is_accident_free', 0)),
+                            'inspection_grade': str(row.get('inspection_grade', '')),
+                            'has_sunroof': bool(row.get('has_sunroof', 0)),
+                            'has_navigation': bool(row.get('has_navigation', 0)),
+                            'has_leather_seat': bool(row.get('has_leather_seat', 0)),
+                            'has_smart_key': bool(row.get('has_smart_key', 0)),
+                            'has_rear_camera': bool(row.get('has_rear_camera', 0)),
+                            'has_heated_seat': bool(row.get('has_heated_seat', 0)),
+                            'has_ventilated_seat': bool(row.get('has_ventilated_seat', 0)),
+                        }
+                print(f"✓ 전체 차량 상세정보: {len(self._car_details):,}건")
+        except Exception as e:
+            print(f"⚠️ 상세정보 로드 실패: {e}")
+    
+    def get_car_options(self, car_id: str) -> Optional[Dict]:
+        """car_id로 차량 옵션 정보 조회"""
+        return self._car_details.get(str(car_id))
     
     def _analyze_popular(self):
         """엔카 데이터 기반 인기 모델 분석"""
@@ -584,7 +651,9 @@ class RecommendationService:
         
         for _, row in sample.iterrows():
             try:
-                car_id = row.get('Id', '')
+                # car_id 처리: NaN, 빈 문자열, None 모두 None으로 통일
+                raw_car_id = row.get('Id', '')
+                car_id = str(raw_car_id).strip() if raw_car_id and str(raw_car_id).strip() and str(raw_car_id) != 'nan' else None
                 year = int(row.get('YearOnly', 2020))
                 mileage = int(row.get('Mileage', 50000))
                 actual_price = int(row.get('Price', 0))
@@ -596,12 +665,13 @@ class RecommendationService:
                 elif '디젤' in fuel.lower(): fuel_norm = '디젤'
                 elif 'lpg' in fuel.lower(): fuel_norm = 'LPG'
                 
-                # 예측 가격 계산
+                # 예측 가격 계산 (실제 데이터의 모델명 사용)
+                actual_model_name = str(row.get('Model', model))
                 predicted_price = actual_price
                 if self._prediction_service:
                     try:
                         result = self._prediction_service.predict(
-                            brand, model, year, mileage, fuel=fuel_norm
+                            brand, actual_model_name, year, mileage, fuel=fuel_norm
                         )
                         predicted_price = result.predicted_price
                     except:
@@ -625,6 +695,9 @@ class RecommendationService:
                 if car_id:
                     detail_url = self.ENCAR_DETAIL_URL.format(car_id=car_id)
                 
+                # 옵션 정보 조회
+                options = self.get_car_options(car_id) if car_id else None
+                
                 deals.append({
                     'brand': str(brand),
                     'model': str(row.get('Model', model)),
@@ -637,13 +710,15 @@ class RecommendationService:
                     'value_score': round(total_score, 1),
                     'is_good_deal': price_gap_pct > 5,
                     'car_id': str(car_id) if car_id else None,
-                    'detail_url': str(detail_url) if detail_url else None
+                    'detail_url': str(detail_url) if detail_url else None,
+                    # 옵션 정보 (수집된 데이터 기반)
+                    'options': options
                 })
             except:
                 continue
         
-        # 가치 점수 순 정렬
-        deals.sort(key=lambda x: x['value_score'], reverse=True)
+        # 정렬: 연식(최신순) → 가격(저렴순) → 주행거리(적은순)
+        deals.sort(key=lambda x: (-x['year'], x['actual_price'], x['mileage']))
         return deals[:limit]
     
     # ========== 개별 매물 분석 ==========
@@ -886,11 +961,20 @@ class RecommendationService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # 중복 체크
-        cursor.execute('''
-            SELECT id FROM favorites 
-            WHERE user_id = ? AND brand = ? AND model = ? AND year = ?
-        ''', (user_id, data.get('brand'), data.get('model'), data.get('year')))
+        car_id = data.get('car_id')
+        detail_url = data.get('detail_url')
+        actual_price = data.get('actual_price')
+        
+        # 중복 체크 (car_id > detail_url > actual_price 순)
+        if car_id:
+            cursor.execute('SELECT id FROM favorites WHERE user_id = ? AND car_id = ?', (user_id, car_id))
+        elif detail_url:
+            cursor.execute('SELECT id FROM favorites WHERE user_id = ? AND detail_url = ?', (user_id, detail_url))
+        else:
+            cursor.execute('''
+                SELECT id FROM favorites 
+                WHERE user_id = ? AND brand = ? AND model = ? AND year = ? AND actual_price = ?
+            ''', (user_id, data.get('brand'), data.get('model'), data.get('year'), actual_price))
         
         existing = cursor.fetchone()
         if existing:
@@ -898,8 +982,8 @@ class RecommendationService:
             return {'success': False, 'message': '이미 즐겨찾기에 있습니다', 'id': existing[0]}
         
         cursor.execute('''
-            INSERT INTO favorites (user_id, brand, model, year, mileage, fuel, predicted_price, memo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO favorites (user_id, brand, model, year, mileage, fuel, predicted_price, actual_price, car_id, detail_url, memo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id,
             data.get('brand'),
@@ -908,6 +992,9 @@ class RecommendationService:
             data.get('mileage'),
             data.get('fuel', '가솔린'),
             data.get('predicted_price'),
+            actual_price,
+            car_id,
+            detail_url,
             data.get('memo', '')
         ))
         
@@ -923,7 +1010,7 @@ class RecommendationService:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT id, brand, model, year, mileage, fuel, predicted_price, memo, created_at
+            SELECT id, brand, model, year, mileage, fuel, predicted_price, actual_price, car_id, detail_url, memo, created_at
             FROM favorites
             WHERE user_id = ?
             ORDER BY created_at DESC
@@ -939,8 +1026,11 @@ class RecommendationService:
                 'mileage': row[4],
                 'fuel': row[5],
                 'predicted_price': row[6],
-                'memo': row[7],
-                'created_at': row[8]
+                'actual_price': row[7],
+                'car_id': row[8],
+                'detail_url': row[9],
+                'memo': row[10],
+                'created_at': row[11]
             })
         
         conn.close()

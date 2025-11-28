@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
-import 'negotiation_page.dart';
 import 'widgets/deal_analysis_modal.dart';
+import 'widgets/common/option_badges.dart';
 import 'providers/recent_views_provider.dart';
 
 class ResultPage extends StatefulWidget {
@@ -13,6 +12,8 @@ class ResultPage extends StatefulWidget {
   final int year;
   final int mileage;
   final String fuel;
+  final Map<String, bool>? selectedOptions;  // 선택한 옵션 정보
+  final String? inspectionGrade;  // 성능점검 등급
 
   const ResultPage({
     super.key,
@@ -22,6 +23,8 @@ class ResultPage extends StatefulWidget {
     required this.year,
     required this.mileage,
     required this.fuel,
+    this.selectedOptions,
+    this.inspectionGrade,
   });
 
   @override
@@ -344,6 +347,13 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                 ),
             ],
           ),
+          
+          // 예측 조건 표시 (옵션, 성능점검 등)
+          if (widget.selectedOptions != null || widget.inspectionGrade != null) ...[
+            const SizedBox(height: 12),
+            _buildPredictionConditions(isDark),
+          ],
+          
           const SizedBox(height: 16),
           
           if (_loadingDeals)
@@ -374,9 +384,66 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     );
   }
   
+  /// 예측 조건 표시 위젯 (선택한 옵션, 성능점검 등급)
+  Widget _buildPredictionConditions(bool isDark) {
+    final options = widget.selectedOptions ?? {};
+    final grade = widget.inspectionGrade;
+    
+    // 활성화된 옵션만 필터
+    final activeOptions = <String>[];
+    if (options['sunroof'] == true) activeOptions.add('선루프');
+    if (options['navigation'] == true) activeOptions.add('내비게이션');
+    if (options['leatherSeat'] == true) activeOptions.add('가죽시트');
+    if (options['smartKey'] == true) activeOptions.add('스마트키');
+    if (options['rearCamera'] == true) activeOptions.add('후방카메라');
+    
+    // 성능점검 등급 텍스트
+    String gradeText = '';
+    if (grade == 'excellent') gradeText = '성능점검 ★★★★★';
+    else if (grade == 'good') gradeText = '성능점검 ★★★★';
+    else if (grade == 'average') gradeText = '성능점검 ★★★';
+    else if (grade == 'poor') gradeText = '성능점검 ★★';
+    
+    if (activeOptions.isEmpty && gradeText.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 16, color: Colors.blue[400]),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '예측 조건: ${[
+                '${widget.year}년식',
+                widget.fuel,
+                if (gradeText.isNotEmpty) gradeText,
+                ...activeOptions,
+              ].join(' · ')}',
+              style: TextStyle(
+                color: Colors.blue[400],
+                fontSize: 12,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
   /// 개별 매물 카드
   Widget _buildDealCard(RecommendedCar deal, Color textColor, bool isDark) {
-    final priceDiff = prediction.predictedPrice - deal.actualPrice;
+    // 매물의 고유 조건 기준 예측가와 비교 (연식, 연료 등 반영)
+    final priceDiff = deal.predictedPrice - deal.actualPrice;
     final isGood = priceDiff > 0;
     
     return GestureDetector(
@@ -430,6 +497,11 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                     "${deal.year}년 • ${(deal.mileage / 10000).toStringAsFixed(1)}만km • ${deal.fuel}",
                     style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
+                  // 옵션 정보 표시 (공통 위젯 사용)
+                  if (deal.options != null) ...[
+                    const SizedBox(height: 6),
+                    OptionBadges(options: deal.options!, compact: true),
+                  ],
                 ],
               ),
             ),
@@ -465,16 +537,19 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
   
   /// 개별 매물 분석 모달 표시
   Future<void> _showDealAnalysisModal(RecommendedCar deal) async {
-    // 최근 조회에 추가 (Provider를 통해 전역 저장)
-    context.read<RecentViewsProvider>().addRecentCar(deal);
+    // 최근 조회에 추가 (분석 페이지에서 클릭 = source: 'analysis')
+    final dealWithSource = deal.copyWith(source: 'analysis');
+    context.read<RecentViewsProvider>().addRecentCar(dealWithSource);
     
+    // 매물의 고유 조건(연식, 연료 등)에 맞는 예측가 사용
+    // deal.predictedPrice는 해당 매물의 실제 조건으로 계산된 예측가
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => DealAnalysisModal(
         deal: deal,
-        predictedPrice: prediction.predictedPrice.toInt(),
+        predictedPrice: deal.predictedPrice,
       ),
     );
   }

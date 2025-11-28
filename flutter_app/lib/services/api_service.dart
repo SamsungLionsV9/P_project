@@ -4,6 +4,15 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import '../models/car.dart';  // RecommendedCar 타입 참조용
+
+// 모델 클래스 re-export (하위 호환성 유지)
+// 이제 모델들은 lib/models/ 디렉토리에서 관리됩니다.
+export '../models/prediction.dart';
+export '../models/car.dart';
+export '../models/deal.dart';
+export '../models/user.dart';
+export '../models/ai.dart';
 
 /// Car-Sentix API Service
 /// ML 서비스와 통신하는 클라이언트
@@ -447,6 +456,9 @@ class ApiService {
     required int year,
     required int mileage,
     double? predictedPrice,
+    int? actualPrice,
+    String? detailUrl,
+    String? carId,        // 엔카 차량 고유 ID (핵심 식별자)
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/favorites?user_id=$_userId'),
@@ -457,6 +469,9 @@ class ApiService {
         'year': year,
         'mileage': mileage,
         'predicted_price': predictedPrice,
+        'actual_price': actualPrice,
+        'detail_url': detailUrl,
+        'car_id': carId,
       }),
     ).timeout(_timeout);
 
@@ -846,77 +861,7 @@ class PopularCar {
   }
 }
 
-/// 추천 차량
-class RecommendedCar {
-  final String brand;
-  final String model;
-  final int year;
-  final int mileage;
-  final String fuel;
-  final int actualPrice;
-  final int predictedPrice;
-  final int priceDiff;
-  final bool isGoodDeal;
-  final double score;
-  final String type;
-  final String? detailUrl;  // 상세페이지 URL
-  final String? imageUrl;   // 이미지 URL
-
-  RecommendedCar({
-    required this.brand,
-    required this.model,
-    required this.year,
-    required this.mileage,
-    required this.fuel,
-    required this.actualPrice,
-    required this.predictedPrice,
-    required this.priceDiff,
-    required this.isGoodDeal,
-    required this.score,
-    required this.type,
-    this.detailUrl,
-    this.imageUrl,
-  });
-
-  factory RecommendedCar.fromJson(Map<String, dynamic> json) {
-    return RecommendedCar(
-      brand: json['brand'] ?? '',
-      model: json['model'] ?? '',
-      year: json['year'] ?? 0,
-      mileage: json['mileage'] ?? 0,
-      fuel: json['fuel'] ?? '가솔린',
-      actualPrice: json['actual_price'] ?? 0,
-      predictedPrice: json['predicted_price'] ?? 0,
-      priceDiff: json['price_diff'] ?? 0,
-      isGoodDeal: json['is_good_deal'] ?? false,
-      score: (json['score'] ?? 0).toDouble(),
-      type: json['type'] ?? 'domestic',
-      detailUrl: json['detail_url'] ?? json['url'],
-      imageUrl: json['image_url'],
-    );
-  }
-  
-  String get formattedMileage => '${(mileage / 10000).toStringAsFixed(1)}만 km';
-  String get priceTag => isGoodDeal ? '🔥 가성비' : '';
-  
-  Map<String, dynamic> toJson() {
-    return {
-      'brand': brand,
-      'model': model,
-      'year': year,
-      'mileage': mileage,
-      'fuel': fuel,
-      'actual_price': actualPrice,
-      'predicted_price': predictedPrice,
-      'price_diff': priceDiff,
-      'is_good_deal': isGoodDeal,
-      'score': score,
-      'type': type,
-      'detail_url': detailUrl,
-      'image_url': imageUrl,
-    };
-  }
-}
+// CarOptions, RecommendedCar는 models/car.dart에서 정의됨
 
 class SearchHistory {
   final int? id;
@@ -959,23 +904,29 @@ class SearchHistory {
 /// 즐겨찾기 모델
 class Favorite {
   final int id;
+  final String? carId;         // 엔카 차량 고유 ID (핵심 식별자)
   final String brand;
   final String model;
   final int year;
   final int mileage;
   final String? fuel;
   final double? predictedPrice;
+  final int? actualPrice;
+  final String? detailUrl;
   final String? memo;
   final String? createdAt;
 
   Favorite({
     required this.id,
+    this.carId,
     required this.brand,
     required this.model,
     required this.year,
     required this.mileage,
     this.fuel,
     this.predictedPrice,
+    this.actualPrice,
+    this.detailUrl,
     this.memo,
     this.createdAt,
   });
@@ -983,15 +934,73 @@ class Favorite {
   factory Favorite.fromJson(Map<String, dynamic> json) {
     return Favorite(
       id: json['id'] ?? 0,
+      carId: json['car_id']?.toString(),
       brand: json['brand'] ?? '',
       model: json['model'] ?? '',
       year: json['year'] ?? 0,
       mileage: json['mileage'] ?? 0,
       fuel: json['fuel'],
       predictedPrice: json['predicted_price']?.toDouble(),
+      actualPrice: json['actual_price'],
+      detailUrl: json['detail_url'],
       memo: json['memo'],
       createdAt: json['created_at'],
     );
+  }
+  
+  /// 같은 매물인지 확인 (OR 조건 - 어떤 것이든 일치하면 true)
+  bool isSameDeal(RecommendedCar car) {
+    // URL에서 carId 추출하는 헬퍼 함수
+    String? extractCarIdFromUrl(String? url) {
+      if (url == null) return null;
+      final match = RegExp(r'carid=(\d+)').firstMatch(url);
+      return match?.group(1);
+    }
+    
+    final urlCarId = extractCarIdFromUrl(detailUrl);
+    final carUrlCarId = extractCarIdFromUrl(car.detailUrl);
+    
+    // 조건 1: carId 직접 비교 (가장 정확)
+    if (carId != null && carId!.isNotEmpty && 
+        car.carId != null && car.carId!.isNotEmpty &&
+        carId == car.carId) {
+      return true;
+    }
+    
+    // 조건 2: detailUrl 직접 비교
+    if (detailUrl != null && detailUrl!.isNotEmpty && 
+        car.detailUrl != null && car.detailUrl!.isNotEmpty &&
+        detailUrl == car.detailUrl) {
+      return true;
+    }
+    
+    // 조건 3: URL에서 추출한 carId 비교
+    if (urlCarId != null && carUrlCarId != null && urlCarId == carUrlCarId) {
+      return true;
+    }
+    
+    // 조건 4: carId ↔ URL의 carId 크로스 비교
+    if (carId != null && carId!.isNotEmpty && 
+        carUrlCarId != null && carId == carUrlCarId) {
+      return true;
+    }
+    if (urlCarId != null && 
+        car.carId != null && car.carId!.isNotEmpty &&
+        urlCarId == car.carId) {
+      return true;
+    }
+    
+    // 조건 5: brand + model + year + actualPrice (가격으로 구별)
+    if (brand == car.brand && 
+        model == car.model && 
+        year == car.year &&
+        actualPrice != null && actualPrice! > 0 &&
+        car.actualPrice > 0 &&
+        actualPrice == car.actualPrice) {
+      return true;
+    }
+    
+    return false;
   }
 }
 

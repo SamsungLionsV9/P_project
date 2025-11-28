@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'result_page.dart';
 import 'services/api_service.dart';
+import 'utils/model_name_mapper.dart' as mapper;
 
 class CarInfoInputPage extends StatefulWidget {
-  const CarInfoInputPage({super.key});
+  /// 탭에서 열렸을 때는 false, push로 열렸을 때만 true
+  final bool showBackButton;
+  
+  const CarInfoInputPage({super.key, this.showBackButton = false});
 
   @override
   State<CarInfoInputPage> createState() => _CarInfoInputPageState();
@@ -34,227 +38,8 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
   bool _hasSmartKey = false;
   bool _hasRearCamera = false;
   
-  // 사용자에게 보여줄 간단한 모델 목록
-  final Map<String, List<String>> _brandModels = {
-    '현대': ['아반떼', '쏘나타', '그랜저', '투싼', '싼타페', '팰리세이드', '스타리아'],
-    '기아': ['모닝', '레이', 'K3', 'K5', 'K8', 'K9', '셀토스', '스포티지', '쏘렌토', '카니발', 'EV6', 'EV9'],
-    '제네시스': ['G70', 'G80', 'G90', 'GV60', 'GV70', 'GV80'],
-    'BMW': ['3시리즈', '5시리즈', '7시리즈', 'X3', 'X5', 'X7'],
-    '벤츠': ['C-클래스', 'E-클래스', 'S-클래스', 'GLC', 'GLE', 'GLS'],
-    '아우디': ['A4', 'A6', 'A8', 'Q3', 'Q5', 'Q7', 'Q8'],
-  };
-
-  // 연식에 따른 실제 백엔드 모델명 매핑
-  String _getBackendModelName(String brand, String model, int year) {
-    // 현대
-    if (brand == '현대') {
-      if (model == '아반떼') {
-        if (year >= 2021) return '아반떼 (CN7)';
-        if (year >= 2016) return '아반떼 AD';
-        return '아반떼 MD';
-      }
-      if (model == '쏘나타') {
-        if (year >= 2024) return '쏘나타 디 엣지(DN8)';
-        if (year >= 2020) return '쏘나타 (DN8)';
-        if (year >= 2015) return 'LF 쏘나타';
-        return 'YF 쏘나타';
-      }
-      if (model == '그랜저') {
-        if (year >= 2023) return '그랜저 (GN7)';
-        if (year >= 2020) return '더 뉴 그랜저 IG';
-        if (year >= 2017) return '그랜저 IG';
-        return '그랜저 HG';
-      }
-      if (model == '투싼') {
-        if (year >= 2024) return '더 뉴 투싼 (NX4)';
-        if (year >= 2021) return '투싼 (NX4)';
-        return '올 뉴 투싼';
-      }
-      if (model == '싼타페') {
-        if (year >= 2024) return '싼타페 (MX5)';
-        if (year >= 2019) return '싼타페 TM';
-        return '싼타페 DM';
-      }
-      if (model == '팰리세이드') {
-        if (year >= 2023) return '더 뉴 팰리세이드';
-        return '팰리세이드';
-      }
-      if (model == '스타리아') {
-        return '스타리아';
-      }
-    }
-    // 기아
-    if (brand == '기아') {
-      if (model == 'K5') {
-        if (year >= 2024) return '더 뉴 K5 (DL3)';
-        if (year >= 2020) return 'K5 (DL3)';
-        return 'K5';
-      }
-      if (model == '스포티지') {
-        if (year >= 2024) return '더 뉴 스포티지 (NQ5)';
-        if (year >= 2022) return '스포티지 (NQ5)';
-        return '스포티지';
-      }
-      if (model == '쏘렌토') {
-        if (year >= 2024) return '더 뉴 쏘렌토 (MQ4)';
-        if (year >= 2020) return '쏘렌토 (MQ4)';
-        return '쏘렌토';
-      }
-      if (model == '카니발') {
-        if (year >= 2024) return '더 뉴 카니발 (KA4)';
-        if (year >= 2021) return '카니발 (KA4)';
-        return '카니발';
-      }
-      if (model == 'K9') {
-        if (year >= 2022) return '더 뉴 K9 2세대';
-        if (year >= 2018) return '더 K9';
-        return 'K9';
-      }
-      if (model == 'K8') {
-        if (year >= 2024) return '더 뉴 K8';
-        if (year >= 2021) return 'K8';
-        return 'K8';
-      }
-      if (model == 'K3') {
-        if (year >= 2022) return '더 뉴 K3 (BD)';
-        if (year >= 2019) return 'K3 (BD)';
-        return 'K3';
-      }
-      if (model == 'EV6') {
-        return 'EV6';
-      }
-      if (model == 'EV9') {
-        return 'EV9';
-      }
-      if (model == '셀토스') {
-        if (year >= 2023) return '더 뉴 셀토스';
-        return '셀토스';
-      }
-      if (model == '모닝') {
-        if (year >= 2020) return '더 뉴 모닝';
-        return '올 뉴 모닝';
-      }
-      if (model == '레이') {
-        if (year >= 2022) return '더 뉴 레이';
-        return '레이';
-      }
-    }
-    // 제네시스
-    if (brand == '제네시스') {
-      if (model == 'G70') {
-        if (year >= 2024) return 'G70 (IK F/L)';
-        return 'G70 (IK)';
-      }
-      if (model == 'G80') {
-        if (year >= 2024) return 'G80 (RG3 F/L)';
-        if (year >= 2020) return 'G80 (RG3)';
-        return 'EQ900';
-      }
-      if (model == 'G90') {
-        if (year >= 2022) return 'G90 (RS4)';
-        return 'EQ900';
-      }
-      if (model == 'GV60') return 'GV60';
-      if (model == 'GV70') {
-        if (year >= 2024) return 'GV70 (JK1 F/L)';
-        return 'GV70 (JK1)';
-      }
-      if (model == 'GV80') {
-        if (year >= 2024) return 'GV80 (JX1 F/L)';
-        return 'GV80 (JX1)';
-      }
-    }
-    // BMW
-    if (brand == 'BMW') {
-      if (model == '3시리즈') {
-        if (year >= 2019) return '3시리즈 (G20)';
-        if (year >= 2012) return '3시리즈 (F30)';
-        return '3시리즈 (E90)';
-      }
-      if (model == '5시리즈') {
-        if (year >= 2024) return '5시리즈 (G60)';
-        if (year >= 2017) return '5시리즈 (G30)';
-        if (year >= 2010) return '5시리즈 (F10)';
-        return '5시리즈 (E60)';
-      }
-      if (model == '7시리즈') {
-        if (year >= 2023) return '7시리즈 (G70)';
-        if (year >= 2016) return '7시리즈 (G11)';
-        return '7시리즈 (F01)';
-      }
-      if (model == 'X3') {
-        if (year >= 2018) return 'X3 (G01)';
-        return 'X3 (F25)';
-      }
-      if (model == 'X5') {
-        if (year >= 2019) return 'X5 (G05)';
-        if (year >= 2014) return 'X5 (F15)';
-        return 'X5';
-      }
-      if (model == 'X7') return 'X7 (G07)';
-    }
-    // 벤츠
-    if (brand == '벤츠') {
-      if (model == 'C-클래스') {
-        if (year >= 2022) return 'C-클래스 W206';
-        if (year >= 2014) return 'C-클래스 W205';
-        return 'C-클래스 W204';
-      }
-      if (model == 'E-클래스') {
-        if (year >= 2024) return 'E-클래스 W214';
-        if (year >= 2016) return 'E-클래스 W213';
-        if (year >= 2010) return 'E-클래스 W212';
-        return 'E-클래스 W211';
-      }
-      if (model == 'S-클래스') {
-        if (year >= 2021) return 'S-클래스 W223';
-        if (year >= 2014) return 'S-클래스 W222';
-        return 'S-클래스 W221';
-      }
-      if (model == 'GLC') {
-        if (year >= 2023) return 'GLC-클래스 X254';
-        return 'GLC-클래스 X253';
-      }
-      if (model == 'GLE') {
-        if (year >= 2019) return 'GLE-클래스 V167';
-        return 'GLE-클래스 W166';
-      }
-      if (model == 'GLS') {
-        if (year >= 2020) return 'GLS-클래스 X167';
-        return 'GLS-클래스 X166';
-      }
-    }
-    // 아우디
-    if (brand == '아우디') {
-      if (model == 'A4') {
-        if (year >= 2020) return '뉴 A4';
-        return 'A4 (B9)';
-      }
-      if (model == 'A6') {
-        if (year >= 2019) return '뉴 A6';
-        return 'A6 (C8)';
-      }
-      if (model == 'A8') {
-        if (year >= 2018) return '뉴 A8';
-        return 'A8 (D5)';
-      }
-      if (model == 'Q3') {
-        if (year >= 2019) return '뉴 Q3';
-        return 'Q3';
-      }
-      if (model == 'Q5') {
-        if (year >= 2021) return '뉴 Q5';
-        return 'Q5 (FY)';
-      }
-      if (model == 'Q7') {
-        if (year >= 2020) return '뉴 Q7';
-        return 'Q7 (4M)';
-      }
-      if (model == 'Q8') return 'Q8';
-    }
-    // 기본: 모델명 그대로 반환
-    return model;
-  }
+  // 브랜드별 모델 목록 (utils/model_name_mapper.dart에서 가져옴)
+  Map<String, List<String>> get _brandModels => mapper.brandModels;
 
   @override
   Widget build(BuildContext context) {
@@ -269,10 +54,15 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
+        // 명시적 파라미터로 뒤로가기 버튼 제어
+        // 탭에서는 showBackButton = false (기본값)
+        leading: widget.showBackButton 
+          ? IconButton(
+              icon: Icon(Icons.arrow_back_ios, color: textColor),
+              onPressed: () => Navigator.pop(context),
+            )
+          : null,
+        automaticallyImplyLeading: false,
         title: Text(
           "차량 정보 입력",
           style: TextStyle(
@@ -342,11 +132,11 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // 연식 선택
+                    // 연식 선택 (현재 연도 기준 동적 생성)
                     _buildDropdown(
-                      hint: "2024년",
+                      hint: "${DateTime.now().year}년",
                       value: _selectedYear,
-                      items: List.generate(10, (index) => "${2024 - index}년"),
+                      items: List.generate(10, (index) => "${DateTime.now().year - index}년"),
                       onChanged: (val) => setState(() => _selectedYear = val),
                       isDark: isDark,
                       textColor: textColor,
@@ -679,8 +469,8 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
     });
     
     try {
-      // 연식에 따른 정확한 모델명 변환
-      final backendModel = _getBackendModelName(_selectedBrand!, _selectedModel!, year);
+      // 연식에 따른 정확한 모델명 변환 (utils/model_name_mapper.dart 사용)
+      final backendModel = mapper.getBackendModelName(_selectedBrand!, _selectedModel!, year);
       
       // 성능점검 별표 → 등급 변환 (1-2: normal, 3-4: good, 5: excellent)
       String inspectionGrade;
@@ -729,7 +519,7 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
       
       if (!mounted) return;
       
-      // 결과 페이지로 이동
+      // 결과 페이지로 이동 (선택한 옵션 정보 포함)
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -740,6 +530,14 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
             year: year,
             mileage: mileage,
             fuel: _selectedFuel,
+            selectedOptions: {
+              'sunroof': _hasSunroof,
+              'navigation': _hasNavigation,
+              'leatherSeat': _hasLeatherSeats,
+              'smartKey': _hasSmartKey,
+              'rearCamera': _hasRearCamera,
+            },
+            inspectionGrade: inspectionGrade,
           ),
         ),
       );

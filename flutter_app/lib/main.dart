@@ -9,10 +9,13 @@ import 'comparison_page.dart';
 import 'oauth_webview_page.dart';
 import 'signup_page.dart';
 import 'services/auth_service.dart';
+import 'services/api_service.dart';
 import 'theme/theme_provider.dart';
 import 'providers/comparison_provider.dart';
 import 'providers/recent_views_provider.dart';
 import 'providers/popular_cars_provider.dart';
+import 'widgets/deal_analysis_modal.dart';
+import 'widgets/model_deals_modal.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +31,6 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ComparisonProvider()),
         ChangeNotifierProvider(create: (_) {
           final provider = RecentViewsProvider();
-          provider.setLoginState(authService.isLoggedIn);
           provider.loadRecentViews();
           return provider;
         }),
@@ -622,14 +624,14 @@ class _HomePageContentState extends State<HomePageContent> {
   Widget _buildRecentViewsList({required bool isDark}) {
     return Consumer<RecentViewsProvider>(
       builder: (context, provider, child) {
-        if (provider.isLoading && provider.recentViews.isEmpty) {
+        if (provider.isLoading && provider.recentViewedCars.isEmpty) {
           return const SizedBox(
             height: 190,
             child: Center(child: CircularProgressIndicator()),
           );
         }
         
-        if (provider.recentViews.isEmpty) {
+        if (provider.recentViewedCars.isEmpty) {
           return SizedBox(
             height: 190,
             child: Center(
@@ -653,16 +655,19 @@ class _HomePageContentState extends State<HomePageContent> {
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
-            itemCount: provider.recentViews.length,
+            itemCount: provider.recentViewedCars.length,
             separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
-              final car = provider.recentViews[index];
+              final car = provider.recentViewedCars[index];
+              // RecommendedCar 모델에서 CarCard 형식으로 변환
+              final displayColor = car.isGoodDeal ? Colors.green : Colors.blue;
               return CarCard(
-                name: car.name,
-                info: car.info,
-                price: car.price,
-                color: car.color,
+                name: '${car.brand} ${car.model}',
+                info: '${car.year}년 · ${car.formattedMileage}',
+                price: '${car.actualPrice}만원',
+                color: displayColor,
                 isDark: isDark,
+                onTap: () => _showRecentCarDetail(car),
               );
             },
           ),
@@ -671,6 +676,41 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
   
+  /// 최근 조회 차량 클릭 시 상세 분석 모달 표시
+  void _showRecentCarDetail(RecommendedCar car) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DealAnalysisModal(
+        deal: car,
+        predictedPrice: car.predictedPrice,
+      ),
+    );
+  }
+
+  /// 인기 모델 클릭 시 해당 모델의 실매물 모달 표시
+  void _showPopularModelDeals(PopularCar car) {
+    // 최근 조회 Provider (모달에서 매물 클릭 시 기록 추가용)
+    final recentViewsProvider = context.read<RecentViewsProvider>();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ModelDealsModal(
+        brand: car.brand,
+        model: car.model,
+        avgPrice: car.avgPrice,
+        medianPrice: car.medianPrice,
+        listings: car.listings,
+        onCarViewed: (viewedCar) {
+          recentViewsProvider.addRecentCar(viewedCar);
+        },
+      ),
+    );
+  }
+
   // 매물 수 포맷팅 (직접적인 대수 대신 친근한 표현)
   String _formatListingsCount(int count) {
     if (count >= 3000) {
@@ -744,6 +784,7 @@ class _HomePageContentState extends State<HomePageContent> {
                 price: _formatListingsCount(car.listings),
                 color: colors[index % colors.length],
                 isDark: isDark,
+                onTap: () => _showPopularModelDeals(car),
               );
             },
           ),
@@ -760,6 +801,7 @@ class CarCard extends StatelessWidget {
   final String price;
   final Color color;
   final bool isDark;
+  final VoidCallback? onTap;
 
   const CarCard({
     super.key,
@@ -768,6 +810,7 @@ class CarCard extends StatelessWidget {
     required this.price,
     required this.color,
     required this.isDark,
+    this.onTap,
   });
 
   @override
@@ -775,7 +818,9 @@ class CarCard extends StatelessWidget {
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       width: 140,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -843,6 +888,7 @@ class CarCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

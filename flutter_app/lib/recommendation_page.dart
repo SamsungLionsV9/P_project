@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'providers/recent_views_provider.dart';
+import 'widgets/common/option_badges.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -22,6 +23,7 @@ class _RecommendationPageState extends State<RecommendationPage>
   List<PopularCar> _popularDomestic = [];
   List<PopularCar> _popularImported = [];
   List<RecommendedCar> _recommendations = [];
+  List<Favorite> _favorites = [];  // 찜 목록
 
   bool _isLoading = true;
   String? _error;
@@ -36,10 +38,86 @@ class _RecommendationPageState extends State<RecommendationPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
+    _loadFavorites();  // 찜 목록 로드
     // Provider 초기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RecentViewsProvider>().loadRecentViews();
     });
+  }
+  
+  /// 찜 목록 로드
+  Future<void> _loadFavorites() async {
+    try {
+      final favorites = await _api.getFavorites();
+      if (mounted) {
+        setState(() => _favorites = favorites);
+      }
+    } catch (e) {
+      // 무시
+    }
+  }
+  
+  /// 찜 토글 (고유 매물 단위로 구별 + 즉시 UI 반영)
+  Future<void> _toggleFavorite(RecommendedCar car) async {
+    // isSameDeal로 정확한 매물 구별
+    final existing = _favorites.where((f) => f.isSameDeal(car)).toList();
+    final isCurrentlyFavorite = existing.isNotEmpty;
+
+    // 1. 즉시 로컬 상태 업데이트 (optimistic update)
+    if (isCurrentlyFavorite) {
+      setState(() {
+        _favorites.removeWhere((f) => f.isSameDeal(car));
+      });
+    } else {
+      // 임시 Favorite 객체 생성
+      final tempFavorite = Favorite(
+        id: DateTime.now().millisecondsSinceEpoch,
+        carId: car.carId,
+        brand: car.brand,
+        model: car.model,
+        year: car.year,
+        mileage: car.mileage,
+        predictedPrice: car.predictedPrice.toDouble(),
+        actualPrice: car.actualPrice,
+        detailUrl: car.detailUrl,
+      );
+      setState(() {
+        _favorites.add(tempFavorite);
+      });
+    }
+
+    // 2. 서버에 요청
+    try {
+      if (isCurrentlyFavorite) {
+        await _api.removeFavorite(existing.first.id);
+        _showSnackBar("'${car.brand} ${car.model}' 찜 목록에서 삭제되었습니다.");
+      } else {
+        await _api.addFavorite(
+          brand: car.brand,
+          model: car.model,
+          year: car.year,
+          mileage: car.mileage,
+          predictedPrice: car.predictedPrice.toDouble(),
+          actualPrice: car.actualPrice,
+          detailUrl: car.detailUrl,
+          carId: car.carId,
+        );
+        _showSnackBar("'${car.brand} ${car.model}' 찜 목록에 추가되었습니다.");
+      }
+      
+      // 3. 서버에서 최신 상태로 동기화
+      await _loadFavorites();
+    } catch (e) {
+      // 실패 시 원래 상태로 복구
+      await _loadFavorites();
+      _showSnackBar("오류가 발생했습니다.");
+    }
+  }
+  
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
   }
 
   @override
@@ -454,6 +532,11 @@ class _RecommendationPageState extends State<RecommendationPage>
               _buildInfoChip(Icons.local_gas_station, car.fuel),
             ],
           ),
+          // 옵션 배지 표시
+          if (car.options != null) ...[
+            const SizedBox(height: 10),
+            OptionBadges(options: car.options!, compact: true),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
@@ -528,11 +611,12 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  /// 최근 조회 탭 (Provider 기반 - 전역 저장)
+  /// 최근 조회 탭 (Provider 기반 - 추천 탭에서 클릭한 매물만)
   Widget _buildHistoryTab() {
     return Consumer<RecentViewsProvider>(
       builder: (context, provider, child) {
-        final recentCars = provider.recentViewedCars;
+        // 추천 탭에서 조회한 차량만 표시 (분석 페이지 매물 제외)
+        final recentCars = provider.recommendationOnlyCars;
         
         if (recentCars.isEmpty) {
           return Center(
@@ -547,7 +631,7 @@ class _RecommendationPageState extends State<RecommendationPage>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '추천 차량 또는 분석 결과의 매물을\n클릭하면 여기에 기록됩니다',
+                  '인기 모델이나 추천 차량의 매물을\n클릭하면 여기에 기록됩니다',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey[600], fontSize: 14),
                 ),
@@ -582,6 +666,8 @@ class _RecommendationPageState extends State<RecommendationPage>
                 itemCount: recentCars.length,
                 itemBuilder: (context, index) {
                   final car = recentCars[index];
+                  // 고유 매물 단위로 찜 여부 확인
+                  final isFavorite = _favorites.any((f) => f.isSameDeal(car));
                   return GestureDetector(
                     onTap: () => _showRecommendationAnalysis(car),
                     child: Container(
@@ -594,67 +680,90 @@ class _RecommendationPageState extends State<RecommendationPage>
                           color: car.isGoodDeal ? Colors.green.withOpacity(0.4) : Colors.white10,
                         ),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: car.isGoodDeal ? Colors.green.withOpacity(0.1) : Colors.white10,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              car.isGoodDeal ? Icons.thumb_up : Icons.directions_car,
-                              color: car.isGoodDeal ? Colors.green : Colors.white54,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${car.brand} ${car.model}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${car.year}년 • ${(car.mileage / 10000).toStringAsFixed(1)}만km • ${car.fuel}',
-                                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                          Row(
                             children: [
-                              Text(
-                                '${car.actualPrice}만원',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: car.isGoodDeal ? Colors.green.withOpacity(0.1) : Colors.white10,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  car.isGoodDeal ? Icons.thumb_up : Icons.directions_car,
+                                  color: car.isGoodDeal ? Colors.green : Colors.white54,
                                 ),
                               ),
-                              if (car.priceDiff > 0)
-                                Text(
-                                  '-${car.priceDiff}만원',
-                                  style: const TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 12,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${car.brand} ${car.model}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${car.year}년 • ${(car.mileage / 10000).toStringAsFixed(1)}만km • ${car.fuel}',
+                                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // 찜하기 버튼
+                              GestureDetector(
+                                onTap: () => _toggleFavorite(car),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(
+                                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                                    color: isFavorite ? Colors.red : Colors.grey[500],
+                                    size: 22,
                                   ),
                                 ),
+                              ),
+                              const SizedBox(width: 4),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${car.actualPrice}만원',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  if (car.priceDiff > 0)
+                                    Text(
+                                      '-${car.priceDiff}만원',
+                                      style: const TextStyle(
+                                        color: Colors.green,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () => provider.removeAt(index),
+                                child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
+                              ),
                             ],
                           ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => provider.removeAt(index),
-                            child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
-                          ),
+                          // 옵션 배지 표시
+                          if (car.options != null) ...[
+                            const SizedBox(height: 10),
+                            OptionBadges(options: car.options!, compact: true),
+                          ],
                         ],
                       ),
                     ),
