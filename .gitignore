@@ -23,7 +23,7 @@ data/*.csv
 !data/new_car_schedule.csv
 
 # Model files
-models/*.pkl
+#models/*.pkl  # 주석처리 - 모델 파일 필요
 models/*.h5
 models/*.pt
 *.pkl
@@ -96,3 +96,6 @@ target/
 *.db
 *.sqlite
 *.sqlite3
+
+# Backup files
+models/backup/

@@ -72,71 +72,68 @@ python src/integrated_advisor_real.py 현대 그랜저 2022 50000 가솔린
 ## 📂 프로젝트 구조 (마이크로서비스 아키텍처)
 
 > **중요**: 이 프로젝트는 2개의 독립적인 마이크로서비스로 구성됩니다!
-> 자세한 내용은 **[MICROSERVICES_GUIDE.md](MICROSERVICES_GUIDE.md)** 참조
+> 자세한 내용은 **[setup/docs/MICROSERVICES_GUIDE.md](setup/docs/MICROSERVICES_GUIDE.md)** 참조
 
 ```
 used-car-price-predictor/
-├── MICROSERVICES_GUIDE.md               # 🔥 마이크로서비스 아키텍처 가이드
 │
-├── ml-service/                          # 🟢 ML & 차량 분석 서비스 (FastAPI, 포트 8000)
-│   ├── main.py                          # FastAPI 메인 애플리케이션
-│   ├── run.sh                           # 서버 실행 스크립트
-│   ├── models/                          # Pydantic 스키마
-│   ├── services/                        # 비즈니스 로직
-│   │   ├── prediction.py                # 가격 예측 서비스
-│   │   ├── timing.py                    # 타이밍 분석 서비스
-│   │   └── groq_service.py              # Groq AI 서비스
-│   └── utils/                           # 유틸리티
-│       ├── model_loader.py              # ML 모델 로더
-│       └── validators.py                # 입력 검증
+├── 📱 flutter_app/              # Flutter 모바일/웹 앱
+│   ├── lib/                     # Dart 소스 코드
+│   │   ├── main.dart            # 메인 앱 진입점
+│   │   ├── services/            # API 서비스
+│   │   └── *.dart               # 페이지 및 위젯
+│   └── pubspec.yaml             # Flutter 의존성
 │
-├── user-service/                        # 🔵 사용자 관리 서비스 (Spring Boot, 포트 8080)
-│   ├── src/                             # Spring Boot 소스
-│   │   └── main/java/com/example/carproject/
-│   │       ├── controller/              # REST API 컨트롤러
-│   │       ├── service/                 # 비즈니스 로직
-│   │       ├── entity/                  # JPA 엔티티
-│   │       ├── repository/              # JPA Repository
-│   │       ├── security/                # JWT 인증
-│   │       └── config/                  # Spring Security 설정
-│   ├── build.gradle                     # Gradle 설정
-│   └── setup_mysql.sql                  # MySQL 초기화 스크립트
+├── 🟢 ml-service/               # ML 분석 서비스 (FastAPI, 포트 8001)
+│   ├── main.py                  # FastAPI 애플리케이션
+│   ├── services/                # 비즈니스 로직
+│   │   ├── prediction_v11.py    # 가격 예측 서비스
+│   │   └── timing.py            # 타이밍 분석 서비스
+│   └── utils/                   # 유틸리티
 │
-├── src/                                 # 기존 소스 코드 (CLI 버전)
-│   ├── predict_car_price.py             # Track 1: 가격 예측
-│   │
-│   ├── smart_advisor.py                 # 🤖 스마트 어드바이저 (Groq AI)
-│   ├── groq_advisor.py                  # 🤖 Groq LLM 기능 (3대 킬러)
-│   │
-│   ├── car_sentix_real.py              # ⭐ Track 2: 타이밍 분석 (실제 데이터)
-│   ├── integrated_advisor_real.py       # ⭐ 통합 어드바이저 (실제 데이터)
-│   ├── timing_engine_real.py            # ⭐ 타이밍 엔진 (3요소)
-│   ├── data_collectors_real_only.py     # ⭐ 실제 데이터 수집기
-│   │
-│   ├── car_sentix.py                    # (구버전) 타이밍 분석
-│   ├── integrated_advisor.py            # (구버전) 통합 어드바이저
-│   ├── timing_engine.py                 # (구버전) 타이밍 엔진
-│   ├── data_collectors_complete.py      # (구버전) 데이터 수집
-│   ├── bobaedream_scraper.py            # 보배드림 크롤러
-│   ├── sentiment_database.py            # 정적 감성 DB
-│   └── train_model_improved.py          # 모델 학습
+├── 🔵 user-service/             # 사용자 관리 서비스 (Spring Boot, 포트 8080)
+│   ├── src/main/java/...        # Spring Boot 소스
+│   │   ├── controller/          # REST API 컨트롤러
+│   │   ├── service/             # 비즈니스 로직
+│   │   ├── oauth2/              # 소셜 로그인 (네이버/카카오/구글)
+│   │   └── security/            # JWT 인증
+│   └── build.gradle             # Gradle 설정
 │
-├── improved_car_price_model.pkl         # 학습된 ML 모델
+├── 📊 models/                   # ML 모델 파일
+│   ├── domestic_v11.pkl         # 국산차 모델
+│   ├── imported_v13.pkl         # 수입차 모델
+│   └── backup/                  # 백업 모델
 │
-├── data/                                # 데이터
-│   ├── processed_encar_data.csv         # 중고차 데이터 (119,343대)
-│   └── new_car_schedule.csv             # 신차 출시 일정
+├── 📁 data/                     # 데이터 파일
+│   └── *.csv                    # 차량/일정 데이터
 │
-├── docs/                                 # 문서
-│   ├── GROQ_AI_FEATURES.md              # 🤖 Groq AI 킬러 기능 가이드
-│   ├── REAL_DATA_USAGE.md               # ⭐ 실제 데이터 사용 가이드
-│   ├── TIMING_ADVISOR_PLAN.md            # 타이밍 시스템 설계
-│   ├── API_SETUP_GUIDE.md                # API 설정 가이드
-│   └── IMPLEMENTATION_STATUS.md          # 구현 현황
+├── 📚 docs/                     # 문서
+│   ├── guides/                  # 설정 가이드
+│   ├── reports/                 # 테스트 결과/리포트
+│   ├── API_SPECIFICATION.md     # API 명세
+│   └── ARCHITECTURE.md          # 아키텍처 설명
 │
-├── .env                          # API 키 (gitignore)
-├── requirements.txt              # 의존성
-└── README.md                     # 이 문서
+├── 🔧 setup/                    # 설정 및 초기화
+│   ├── config/                  # 설정 예시 파일
+│   ├── docs/                    # 설정 관련 문서
+│   ├── sql/                     # SQL 스크립트
+│   └── scripts/                 # 설정 스크립트
+│
+├── 📜 scripts/                  # 유틸리티 스크립트
+│   ├── analysis/                # 분석 스크립트
+│   ├── flutter/                 # Flutter 실행 스크립트
+│   ├── scraping/                # 데이터 수집
+│   ├── tests/                   # 테스트 스크립트
+│   ├── training/                # 모델 훈련
+│   └── utils/                   # 기타 유틸리티
+│
+├── 🖥️ src/                      # CLI 버전 소스 코드
+│   └── *.py                     # Python 스크립트
+│
+├── run_server.py                # 🚀 메인 서버 실행 (FastAPI)
+├── start_all_services.sh        # 🚀 전체 서비스 시작
+├── requirements.txt             # Python 의존성
+└── README.md                    # 이 문서
 ```
 
 ## 🚀 사용 방법

@@ -31,11 +31,39 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
         
         log.error("OAuth2 로그인 실패: {}", exception.getMessage());
         
-        String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
+        // 리다이렉트 URI 결정 (Referer 확인)
+        String targetRedirectUri = determineRedirectUri(request);
+        
+        String targetUrl = UriComponentsBuilder.fromUriString(targetRedirectUri)
                 .queryParam("error", URLEncoder.encode(exception.getMessage(), StandardCharsets.UTF_8))
                 .build().toUriString();
         
+        log.info("OAuth2 실패 리다이렉트: {}", targetUrl);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
+    }
+    
+    /**
+     * 리다이렉트 URI 결정
+     * 1. Referer 헤더에서 origin 추출
+     * 2. 기본값 사용
+     */
+    private String determineRedirectUri(HttpServletRequest request) {
+        // Referer 헤더 확인
+        String referer = request.getHeader("Referer");
+        if (referer != null && !referer.isEmpty()) {
+            try {
+                java.net.URI refererUri = java.net.URI.create(referer);
+                String origin = refererUri.getScheme() + "://" + refererUri.getAuthority();
+                log.debug("리다이렉트 URI (Referer): {}", origin + "/oauth2/redirect");
+                return origin + "/oauth2/redirect";
+            } catch (Exception e) {
+                log.warn("Referer 파싱 실패: {}", referer, e);
+            }
+        }
+        
+        // 기본값 사용
+        log.debug("리다이렉트 URI (기본값): {}", redirectUri);
+        return redirectUri;
     }
 }
 

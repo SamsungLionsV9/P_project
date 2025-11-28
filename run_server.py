@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 
 # 서비스 임포트
-from services.prediction_v12 import PredictionServiceV12  # V12 (FuelType 포함)
+from services.prediction_v11 import PredictionServiceV11  # V11 (재학습됨)
 from services.timing import TimingService
 from services.groq_service import GroqService
 from services.recommendation_service import get_recommendation_service  # 신규: 추천 서비스
@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # 서비스 초기화
-prediction_service = PredictionServiceV12()
+prediction_service = PredictionServiceV11()
 timing_service = TimingService()
 groq_service = GroqService()
 recommendation_service = get_recommendation_service()  # 신규: DB 기반 추천
@@ -56,6 +56,7 @@ class PredictRequest(BaseModel):
     has_leather_seat: Optional[bool] = None
     has_smart_key: Optional[bool] = None
     has_rear_camera: Optional[bool] = None
+    user_id: Optional[str] = "guest"  # 사용자 ID (이력 저장용)
 
 class TimingRequest(BaseModel):
     model: str
@@ -79,6 +80,8 @@ class SmartAnalysisRequest(BaseModel):
     # AI 분석용
     sale_price: Optional[int] = None
     dealer_description: Optional[str] = None
+    # 사용자 ID (이력 저장용)
+    user_id: Optional[str] = "guest"
 
 class SimilarRequest(BaseModel):
     brand: str
@@ -115,9 +118,25 @@ async def predict(request: PredictRequest):
         model_name=request.model,
         year=request.year,
         mileage=request.mileage,
-        options=options,
-        fuel=request.fuel  # 연료 타입 전달
+        options=options
     )
+    
+    # 검색 이력 저장
+    try:
+        recommendation_service.add_search_history(
+            user_id=request.user_id or "guest",
+            search_data={
+                'brand': request.brand,
+                'model': request.model,
+                'year': request.year,
+                'mileage': request.mileage,
+                'fuel': request.fuel,
+                'predicted_price': float(result.predicted_price)
+            }
+        )
+    except Exception as e:
+        print(f"⚠️ 이력 저장 실패: {e}")
+    
     return {
         "predicted_price": float(result.predicted_price),
         "price_range": [float(result.price_range[0]), float(result.price_range[1])],
@@ -146,19 +165,34 @@ async def smart_analysis(request: SmartAnalysisRequest):
     # 디버그: 옵션 로그 출력
     print(f"📊 [smart-analysis] model={request.model}, fuel={request.fuel}, options={options}")
     
-    # 가격 예측 (옵션 + 연료 포함)
+    # 가격 예측 (옵션 포함)
     pred = prediction_service.predict(
         brand=request.brand,
         model_name=request.model,
         year=request.year,
         mileage=request.mileage,
         options=options,
-        accident_free=request.is_accident_free or True,
-        fuel=request.fuel  # 연료 타입 전달
+        accident_free=request.is_accident_free or True
     )
     
     # 타이밍
     timing = timing_service.analyze_timing(request.model)
+    
+    # 검색 이력 저장
+    try:
+        recommendation_service.add_search_history(
+            user_id=request.user_id or "guest",
+            search_data={
+                'brand': request.brand,
+                'model': request.model,
+                'year': request.year,
+                'mileage': request.mileage,
+                'fuel': request.fuel,
+                'predicted_price': float(pred.predicted_price)
+            }
+        )
+    except Exception as e:
+        print(f"⚠️ smart-analysis 이력 저장 실패: {e}")
     
     # Groq AI
     groq = None
@@ -244,6 +278,33 @@ async def history(user_id: str = "guest", limit: int = 10):
     """사용자 검색 이력 (DB 저장)"""
     return {"history": recommendation_service.get_search_history(user_id, limit)}
 
+@app.get("/api/admin/history")
+async def admin_history(limit: int = 100):
+    """관리자용 - 모든 사용자의 분석 이력 조회"""
+    try:
+        history_data = recommendation_service.get_all_history(limit)
+        return {"success": True, "history": history_data, "total": len(history_data)}
+    except Exception as e:
+        return {"success": False, "error": str(e), "history": [], "total": 0}
+
+@app.get("/api/admin/dashboard-stats")
+async def admin_dashboard_stats():
+    """관리자 대시보드 통계"""
+    try:
+        stats = recommendation_service.get_dashboard_stats()
+        return {"success": True, **stats}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/admin/daily-requests")
+async def admin_daily_requests(days: int = 7):
+    """일별 분석 요청 수"""
+    try:
+        daily_data = recommendation_service.get_daily_request_stats(days)
+        return {"success": True, "data": daily_data}
+    except Exception as e:
+        return {"success": False, "error": str(e), "data": []}
+
 @app.get("/api/favorites")
 async def favorites(user_id: str = "guest"):
     """사용자 즐겨찾기 목록 (DB 기반)"""
@@ -309,6 +370,51 @@ async def remove_alert(alert_id: int, user_id: str = "guest"):
     """알림 삭제"""
     success = recommendation_service.remove_alert(user_id, alert_id)
     return {"success": success}
+
+
+# ========== 차량 데이터 관리 API (관리자용) ==========
+
+@app.get("/api/admin/vehicle-stats")
+async def get_vehicle_stats():
+    """차량 데이터 통계"""
+    try:
+        stats = recommendation_service.get_vehicle_stats()
+        return {"success": True, **stats}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/admin/vehicles")
+async def get_vehicles(
+    brand: str = None,
+    model: str = None,
+    year_min: int = None,
+    year_max: int = None,
+    price_min: int = None,
+    price_max: int = None,
+    category: str = "all",
+    page: int = 1,
+    limit: int = 20
+):
+    """관리자용 차량 데이터 조회"""
+    try:
+        vehicles = recommendation_service.get_vehicles_for_admin(
+            brand=brand, model=model, year_min=year_min, year_max=year_max,
+            price_min=price_min, price_max=price_max, category=category,
+            page=page, limit=limit
+        )
+        return {"success": True, **vehicles}
+    except Exception as e:
+        return {"success": False, "error": str(e), "vehicles": [], "total": 0}
+
+@app.get("/api/admin/vehicles/{vehicle_id}")
+async def get_vehicle_detail(vehicle_id: int, category: str = "domestic"):
+    """차량 상세 정보 조회"""
+    try:
+        vehicle = recommendation_service.get_vehicle_detail(vehicle_id, category)
+        return {"success": True, "vehicle": vehicle}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 
 if __name__ == "__main__":
     import uvicorn

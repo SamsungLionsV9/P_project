@@ -81,7 +81,21 @@ public class User implements UserDetails {
     
     @Override
     public String getUsername() {
-        return email;  // 이메일을 username으로 사용
+        return email;  // Spring Security용 - 이메일을 username으로 사용
+    }
+    
+    /**
+     * 실제 사용자명(닉네임) 반환 - DB의 username 필드
+     */
+    public String getDisplayName() {
+        return username;
+    }
+    
+    /**
+     * 사용자명(닉네임) 설정 - DB의 username 필드
+     */
+    public void setDisplayName(String displayName) {
+        this.username = displayName;
     }
     
     @Override

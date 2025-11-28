@@ -51,8 +51,8 @@ class ApiService {
     return headers;
   }
   
-  /// 사용자 ID (로그인 시) 또는 guest
-  String get _userId => _authService.userId ?? 'guest';
+  /// 사용자 식별자 (이메일 또는 guest) - 관리자가 식별하기 쉬움
+  String get _userId => _authService.userEmail ?? 'guest';
 
   /// 가격 예측
   Future<PredictionResult> predict({
@@ -82,6 +82,7 @@ class ApiService {
           'has_leather_seat': hasLeatherSeat,
           'has_smart_key': hasSmartKey,
           'has_rear_camera': hasRearCamera,
+          'user_id': _userId,  // 사용자 ID 추가
         }),
       ).timeout(_timeout);
 
@@ -155,6 +156,7 @@ class ApiService {
           'has_ventilated_seat': hasVentilatedSeat,
           'has_led_lamp': hasLedLamp,
           'is_accident_free': isAccidentFree,
+          'user_id': _userId,  // 사용자 ID 추가
           if (salePrice != null) 'sale_price': salePrice,
           if (dealerDescription != null) 'dealer_description': dealerDescription,
         }),

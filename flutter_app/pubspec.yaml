@@ -31,6 +31,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # 상태 관리
+  provider: ^6.1.1
+
   # HTTP 통신
   http: ^1.2.0
   
