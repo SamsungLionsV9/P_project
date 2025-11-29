@@ -16,15 +16,16 @@ export '../models/ai.dart';
 
 /// Car-Sentix API Service
 /// ML 서비스와 통신하는 클라이언트
-/// 
-/// 고도화 버전 v2.1
+///
+/// 고도화 버전 v2.2
 /// - 에뮬레이터 자동 감지 (Android: 10.0.2.2)
 /// - 타임아웃 설정 (15초)
 /// - 에러 핸들링 강화
 /// - JWT 인증 헤더 지원
+/// - 포트 수정: 8001 → 8000 (ML Service 실제 포트)
 class ApiService {
-  // 서버 포트
-  static const int _port = 8001;
+  // 서버 포트 (ML Service: 8000)
+  static const int _port = 8000;
   
   // 타임아웃 설정
   static const Duration _timeout = Duration(seconds: 15);
@@ -149,8 +150,8 @@ class ApiService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl/smart-analysis'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$_baseUrl/smart-analysis?user_id=$_userId'),
+        headers: _headers,
         body: jsonEncode({
           'brand': brand,
           'model': model,

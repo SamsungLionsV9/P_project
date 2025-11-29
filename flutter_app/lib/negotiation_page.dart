@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/api_service.dart';
+import 'widgets/common/bottom_nav_bar.dart';
 
 class NegotiationPage extends StatefulWidget {
   final int initialTabIndex; // 0: 문자 전송, 1: 전화 통화
@@ -130,6 +131,14 @@ class _NegotiationPageState extends State<NegotiationPage> {
           ),
         ),
         centerTitle: true,
+      ),
+      // 하단 네비게이션 바 추가 (현재 탭: 내 차 찾기 = 1)
+      bottomNavigationBar: SharedBottomNavBar(
+        currentIndex: 1, // 내 차 찾기 탭
+        onTap: (index) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          MainScreenNavigator.of(context)?.switchTab(index);
+        },
       ),
       body: SafeArea(
         child: SingleChildScrollView(

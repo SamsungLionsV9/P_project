@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/common/option_badges.dart';
+import 'widgets/common/bottom_nav_bar.dart';
 import 'providers/recent_views_provider.dart';
 
 class ResultPage extends StatefulWidget {
@@ -122,6 +123,15 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           ),
         ),
         centerTitle: true,
+      ),
+      // 하단 네비게이션 바 추가 (현재 탭: 내 차 찾기 = 1)
+      bottomNavigationBar: SharedBottomNavBar(
+        currentIndex: 1, // 내 차 찾기 탭
+        onTap: (index) {
+          // 홈으로 돌아간 후 탭 전환
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          MainScreenNavigator.of(context)?.switchTab(index);
+        },
       ),
       body: Column(
         children: [

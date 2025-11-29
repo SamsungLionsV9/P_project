@@ -12,6 +12,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -27,6 +28,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
     
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -55,15 +57,18 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 공개 엔드포인트
                         .requestMatchers(
-                                "/api/auth/signup", 
-                                "/api/auth/login", 
-                                "/api/auth/health", 
+                                "/api/auth/signup",
+                                "/api/auth/login",
+                                "/api/auth/health",
                                 "/api/auth/logout",
                                 "/api/auth/email/**",  // 이메일 인증 엔드포인트
+                                "/api/admin/login",    // 관리자 로그인은 공개
                                 // OAuth2 관련 엔드포인트
                                 "/oauth2/**",
                                 "/login/oauth2/**"
                         ).permitAll()
+                        // Admin API는 ADMIN 권한 필요 (로그인 제외)
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

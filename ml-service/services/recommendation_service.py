@@ -567,7 +567,10 @@ class RecommendationService:
                 detail_url = None
                 if car_id:
                     detail_url = self.ENCAR_DETAIL_URL.format(car_id=car_id)
-                
+
+                # 옵션 정보 조회
+                options = self.get_car_options(car_id) if car_id else None
+
                 recommendations.append({
                     'brand': str(brand),
                     'model': str(model),
@@ -581,7 +584,8 @@ class RecommendationService:
                     'score': float(round(score, 1)),
                     'type': str(row.get('Type', 'domestic')),
                     'car_id': str(car_id) if car_id else None,
-                    'detail_url': detail_url
+                    'detail_url': detail_url,
+                    'options': options
                 })
                 
             except Exception as e:
