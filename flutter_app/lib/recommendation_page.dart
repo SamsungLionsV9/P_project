@@ -5,6 +5,7 @@ import 'services/api_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'providers/recent_views_provider.dart';
 import 'widgets/common/option_badges.dart';
+import 'utils/car_image_mapper.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -163,15 +164,50 @@ class _RecommendationPageState extends State<RecommendationPage>
     context.read<RecentViewsProvider>().addRecentCar(car);
   }
 
+  /// 차량 이미지 위젯 빌더 (네트워크 이미지 사용)
+  Widget _buildCarImage(String model, {double size = 48, String? brand}) {
+    final imageUrl = brand != null
+        ? CarImageMapper.getImageUrlByBrandModel(brand, model)
+        : CarImageMapper.getImageUrl(model);
+    if (imageUrl != null) {
+      return Image.network(
+        imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) => Icon(
+          Icons.directions_car,
+          color: const Color(0xFF6C63FF),
+          size: size * 0.7,
+        ),
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Icon(Icons.directions_car, color: const Color(0xFF6C63FF).withValues(alpha: 0.3), size: size * 0.7);
+        },
+      );
+    }
+    return Icon(
+      Icons.directions_car,
+      color: const Color(0xFF6C63FF),
+      size: size * 0.7,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A2E),
-        title: const Text(
-          '🚗 차량 추천',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Icon(Icons.directions_car, color: Colors.white),
+            const SizedBox(width: 8),
+            const Text(
+              '차량 추천',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
         bottom: TabBar(
           controller: _tabController,
@@ -240,11 +276,11 @@ class _RecommendationPageState extends State<RecommendationPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionTitle('🇰🇷 국산차 인기 모델', '엔카 등록 기준'),
+          _buildSectionTitle('국산차 인기 모델', '엔카 등록 기준', Icons.flag),
           const SizedBox(height: 12),
           ..._popularDomestic.map((car) => _buildPopularCard(car)),
           const SizedBox(height: 24),
-          _buildSectionTitle('🌍 수입차 인기 모델', '엔카 등록 기준'),
+          _buildSectionTitle('수입차 인기 모델', '엔카 등록 기준', Icons.public),
           const SizedBox(height: 12),
           ..._popularImported.map((car) => _buildPopularCard(car)),
         ],
@@ -252,9 +288,13 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  Widget _buildSectionTitle(String title, String subtitle) {
+  Widget _buildSectionTitle(String title, String subtitle, [IconData? icon]) {
     return Row(
       children: [
+        if (icon != null) ...[
+          Icon(icon, color: Colors.white70, size: 20),
+          const SizedBox(width: 8),
+        ],
         Text(
           title,
           style: const TextStyle(
@@ -306,10 +346,13 @@ class _RecommendationPageState extends State<RecommendationPage>
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withOpacity(0.2),
+              color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.directions_car, color: Color(0xFF6C63FF)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _buildCarImage(car.model, size: 36),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -677,7 +720,7 @@ class _RecommendationPageState extends State<RecommendationPage>
                         color: const Color(0xFF252542),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: car.isGoodDeal ? Colors.green.withOpacity(0.4) : Colors.white10,
+                          color: car.isGoodDeal ? Colors.green.withValues(alpha: 0.4) : Colors.white10,
                         ),
                       ),
                       child: Column(
@@ -689,12 +732,12 @@ class _RecommendationPageState extends State<RecommendationPage>
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: car.isGoodDeal ? Colors.green.withOpacity(0.1) : Colors.white10,
+                                  color: car.isGoodDeal ? Colors.green.withValues(alpha: 0.1) : Colors.white10,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Icon(
-                                  car.isGoodDeal ? Icons.thumb_up : Icons.directions_car,
-                                  color: car.isGoodDeal ? Colors.green : Colors.white54,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: _buildCarImage(car.model, size: 40),
                                 ),
                               ),
                               const SizedBox(width: 16),

@@ -16,6 +16,8 @@ import 'providers/recent_views_provider.dart';
 import 'providers/popular_cars_provider.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/model_deals_modal.dart';
+import 'widgets/common/bottom_nav_bar.dart';
+import 'utils/car_image_mapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -109,68 +111,72 @@ class _MainScreenState extends State<MainScreen> {
     final isDark = themeProvider.isDarkMode;
     final navBgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final unselectedItemColor = isDark ? Colors.grey[600] : Colors.grey[400];
-    
+
     // 페이지 리스트 (빌드 시점에 생성)
     final pages = [
-      const HomePageContent(),
+      HomePageContent(onNavigateToSearch: () => _onItemTapped(1)),
       const CarInfoInputPage(),
       const RecommendationPage(),
       const MyPage(),
       const SettingsPage(),
     ];
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
+    // MainScreenNavigator로 감싸서 하위 화면에서도 탭 전환 가능
+    return MainScreenNavigator(
+      switchTab: _onItemTapped,
+      child: Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: pages,
         ),
-        child: BottomNavigationBar(
-          backgroundColor: navBgColor,
-          type: BottomNavigationBarType.fixed,
-          currentIndex: _selectedIndex,
-          selectedItemColor: const Color(0xFF0066FF),
-          unselectedItemColor: unselectedItemColor,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          onTap: _onItemTapped,
-          elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: '홈',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              activeIcon: Icon(Icons.search),
-              label: '내 차 찾기',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.recommend_outlined),
-              activeIcon: Icon(Icons.recommend),
-              label: '추천',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: '마이',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined),
-              activeIcon: Icon(Icons.settings),
-              label: '설정',
-            ),
-          ],
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: BottomNavigationBar(
+            backgroundColor: navBgColor,
+            type: BottomNavigationBarType.fixed,
+            currentIndex: _selectedIndex,
+            selectedItemColor: const Color(0xFF0066FF),
+            unselectedItemColor: unselectedItemColor,
+            selectedFontSize: 12,
+            unselectedFontSize: 12,
+            onTap: _onItemTapped,
+            elevation: 0,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: '홈',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.search),
+                activeIcon: Icon(Icons.search),
+                label: '내 차 찾기',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.recommend_outlined),
+                activeIcon: Icon(Icons.recommend),
+                label: '추천',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                activeIcon: Icon(Icons.person),
+                label: '마이',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.settings_outlined),
+                activeIcon: Icon(Icons.settings),
+                label: '설정',
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -178,7 +184,9 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class HomePageContent extends StatefulWidget {
-  const HomePageContent({super.key});
+  final VoidCallback? onNavigateToSearch;
+
+  const HomePageContent({super.key, this.onNavigateToSearch});
 
   @override
   State<HomePageContent> createState() => _HomePageContentState();
@@ -339,7 +347,7 @@ class _HomePageContentState extends State<HomePageContent> {
 
             const SizedBox(height: 32),
 
-            // 2. 바로가기 버튼 (로그인 없이 조회)
+            // 2. 바로가기 버튼 (로그인 없이 조회) - 탭 전환 방식
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SizedBox(
@@ -347,10 +355,8 @@ class _HomePageContentState extends State<HomePageContent> {
                 height: 52,
                 child: OutlinedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CarInfoInputPage()),
-                    );
+                    // Navigator.push 대신 탭 전환 (BottomNavigationBar 유지)
+                    widget.onNavigateToSearch?.call();
                   },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF0066FF)),
@@ -813,10 +819,23 @@ class CarCard extends StatelessWidget {
     this.onTap,
   });
 
+  // 모델명에서 브랜드 로고 URL 추출
+  String? _getImageUrl() {
+    // name 형식: "브랜드 모델명" (예: "현대 그랜저", "기아 K5")
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      final brand = parts[0];
+      final model = parts.sublist(1).join(' ');
+      return CarImageMapper.getImageUrlByBrandModel(brand, model);
+    }
+    return CarImageMapper.getImageUrl(name);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
+    final imageUrl = _getImageUrl();
 
     return GestureDetector(
       onTap: onTap,
@@ -829,7 +848,7 @@ class CarCard extends StatelessWidget {
         border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[50]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -838,24 +857,43 @@ class CarCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 차량 이미지 영역 (플레이스홀더)
+          // 차량 이미지 영역
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: color,
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
-                child: Icon(
-                  Icons.directions_car_filled,
-                  color: Colors.white.withOpacity(0.5),
-                  size: 48,
-                ),
+                child: imageUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          imageUrl,
+                          width: 80,
+                          height: 60,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.directions_car_filled,
+                            color: color,
+                            size: 48,
+                          ),
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Icon(Icons.directions_car_filled, color: color.withValues(alpha: 0.3), size: 48);
+                          },
+                        ),
+                      )
+                    : Icon(
+                        Icons.directions_car_filled,
+                        color: color,
+                        size: 48,
+                      ),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // 차량 정보 텍스트
           Text(
             name,

@@ -9,39 +9,42 @@ import json
 
 class HistoryService:
     """검색 히스토리 관리"""
-    
+
     def __init__(self):
         # 메모리 저장소 (추후 Redis/DB로 교체)
         self._history: Dict[str, List[Dict]] = defaultdict(list)
         self._favorites: Dict[str, List[Dict]] = defaultdict(list)
         self._alerts: Dict[str, List[Dict]] = defaultdict(list)
+        self._ai_logs: List[Dict] = []  # AI 분석 로그 (네고 대본 등)
     
     def add_history(self, user_id: str, search_data: Dict) -> Dict:
         """검색 이력 추가"""
         entry = {
             "id": f"h_{len(self._history[user_id]) + 1}",
             "timestamp": datetime.now().isoformat(),
+            "searched_at": datetime.now().isoformat(),  # admin-dashboard 호환
             "brand": search_data.get("brand"),
             "model": search_data.get("model"),
             "year": search_data.get("year"),
             "mileage": search_data.get("mileage"),
+            "fuel": search_data.get("fuel"),  # 연료 타입 추가
             "predicted_price": search_data.get("predicted_price"),
             "timing_score": search_data.get("timing_score")
         }
-        
+
         # 중복 제거 (같은 차량 재검색 시 업데이트)
         self._history[user_id] = [
             h for h in self._history[user_id]
-            if not (h["brand"] == entry["brand"] and 
+            if not (h["brand"] == entry["brand"] and
                    h["model"] == entry["model"] and
                    h["year"] == entry["year"])
         ]
-        
+
         self._history[user_id].insert(0, entry)
-        
-        # 최대 50개 유지
-        self._history[user_id] = self._history[user_id][:50]
-        
+
+        # 최대 100개 유지 (관리자용으로 늘림)
+        self._history[user_id] = self._history[user_id][:100]
+
         return entry
     
     def get_history(self, user_id: str, limit: int = 10) -> List[Dict]:
@@ -161,6 +164,62 @@ class HistoryService:
             a for a in self._alerts[user_id] if a["id"] != alert_id
         ]
         return len(self._alerts[user_id]) < before
+
+    # ========== AI 로그 (네고 대본 등) ==========
+
+    def add_ai_log(self, log_type: str, user_id: str, request_data: Dict,
+                   response_data: Dict, ai_model: str = "Llama 3.3 70B") -> Dict:
+        """AI 분석 로그 저장"""
+        entry = {
+            "id": f"ai_{len(self._ai_logs) + 1}",
+            "timestamp": datetime.now().isoformat(),
+            "type": log_type,  # negotiation, signal, fraud_detection
+            "user_id": user_id,
+            "ai_model": ai_model,
+            "request": {
+                "brand": request_data.get("brand"),
+                "model": request_data.get("model"),
+                "year": request_data.get("year"),
+                "predicted_price": request_data.get("predicted_price"),
+                "sale_price": request_data.get("sale_price"),
+            },
+            "response": {
+                "success": response_data.get("success", True),
+                "signal": response_data.get("signal"),
+                "script_preview": str(response_data.get("script", ""))[:200] if response_data.get("script") else None,
+                "confidence": response_data.get("confidence"),
+            }
+        }
+
+        self._ai_logs.insert(0, entry)
+        # 최대 500개 유지
+        self._ai_logs = self._ai_logs[:500]
+
+        return entry
+
+    def get_ai_logs(self, log_type: str = None, limit: int = 50) -> List[Dict]:
+        """AI 로그 조회"""
+        logs = self._ai_logs
+
+        if log_type:
+            logs = [log for log in logs if log.get("type") == log_type]
+
+        return logs[:limit]
+
+    def get_ai_stats(self) -> Dict:
+        """AI 사용 통계"""
+        total = len(self._ai_logs)
+        by_type = defaultdict(int)
+
+        for log in self._ai_logs:
+            by_type[log.get("type", "unknown")] += 1
+
+        return {
+            "total_calls": total,
+            "negotiation_scripts": by_type.get("negotiation", 0),
+            "signal_reports": by_type.get("signal", 0),
+            "fraud_detections": by_type.get("fraud_detection", 0),
+        }
 
 
 class PopularService:

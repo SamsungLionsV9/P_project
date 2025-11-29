@@ -1,292 +1,242 @@
 package com.example.carproject.controller;
 
-import com.example.carproject.dto.UserLoginDto;
-import com.example.carproject.dto.UserResponseDto;
 import com.example.carproject.entity.User;
-import com.example.carproject.service.UserService;
+import com.example.carproject.repository.UserRepository;
+import com.example.carproject.service.JwtService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+/**
+ * 관리자용 API 컨트롤러
+ * admin-dashboard에서 사용하는 사용자 관리 API
+ */
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
-@Slf4j
 public class AdminController {
-    
-    private final UserService userService;
+
+    private final UserRepository userRepository;
+    private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
     
     /**
      * 관리자 로그인
      * POST /api/admin/login
      */
     @PostMapping("/login")
-    public ResponseEntity<?> adminLogin(@Valid @RequestBody UserLoginDto dto) {
-        try {
-            // 먼저 일반 로그인 시도
-            String token = userService.login(dto);
-            
-            // 관리자인지 확인
-            UserResponseDto user = userService.getUserInfo(dto.getEmail());
-            if (!"ADMIN".equals(user.getRole())) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "관리자 권한이 없습니다");
-                return ResponseEntity.status(403).body(response);
-            }
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "관리자 로그인 성공");
-            response.put("token", token);
-            response.put("user", user);
-            
-            log.info("관리자 로그인 성공: {}", dto.getEmail());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("관리자 로그인 실패: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "이메일 또는 비밀번호가 올바르지 않습니다");
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<?> adminLogin(@RequestBody Map<String, String> credentials) {
+        Map<String, Object> response = new HashMap<>();
+
+        String email = credentials.get("email");
+        String password = credentials.get("password");
+
+        return userRepository.findByEmail(email)
+                .map(user -> {
+                    // 비밀번호 확인
+                    if (!passwordEncoder.matches(password, user.getPassword())) {
+                        response.put("success", false);
+                        response.put("message", "이메일 또는 비밀번호가 올바르지 않습니다");
+                        return ResponseEntity.badRequest().body(response);
+                    }
+
+                    // 관리자 권한 확인
+                    if (user.getRole() != User.Role.ADMIN) {
+                        response.put("success", false);
+                        response.put("message", "관리자 권한이 필요합니다");
+                        return ResponseEntity.status(403).body(response);
+                    }
+
+                    // 활성 상태 확인
+                    if (!user.getIsActive()) {
+                        response.put("success", false);
+                        response.put("message", "비활성화된 계정입니다");
+                        return ResponseEntity.status(403).body(response);
+                    }
+
+                    // JWT 토큰 생성
+                    String token = jwtService.generateToken(user);
+
+                    response.put("success", true);
+                    response.put("message", "로그인 성공");
+                    response.put("token", token);
+                    response.put("user", convertUserToMap(user));
+
+                    return ResponseEntity.ok(response);
+                })
+                .orElseGet(() -> {
+                    response.put("success", false);
+                    response.put("message", "이메일 또는 비밀번호가 올바르지 않습니다");
+                    return ResponseEntity.badRequest().body(response);
+                });
     }
-    
+
     /**
-     * 관리자 정보 조회
+     * 현재 관리자 정보 조회
      * GET /api/admin/me
      */
     @GetMapping("/me")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAdminInfo(Authentication authentication) {
+    public ResponseEntity<?> getCurrentAdmin(Authentication authentication) {
         if (authentication == null) {
-            return ResponseEntity.status(401).body("인증되지 않은 사용자입니다");
+            return ResponseEntity.status(401).body(Map.of("error", "인증되지 않은 사용자입니다"));
         }
-        
-        UserResponseDto user = userService.getUserInfo(authentication.getName());
-        return ResponseEntity.ok(user);
+
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        return userRepository.findByEmail(userDetails.getUsername())
+                .map(user -> ResponseEntity.ok(convertUserToMap(user)))
+                .orElse(ResponseEntity.notFound().build());
     }
-    
+
     /**
-     * 전체 사용자 목록 조회 (관리자 전용)
+     * 전체 사용자 목록 조회
      * GET /api/admin/users
      */
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getAllUsers(Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(401).body("인증되지 않은 사용자입니다");
-        }
+    public ResponseEntity<?> getAllUsers() {
+        List<User> users = userRepository.findAll();
         
-        List<UserResponseDto> users = userService.getAllUsers();
+        List<Map<String, Object>> userList = users.stream()
+                .map(this::convertUserToMap)
+                .collect(Collectors.toList());
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("users", users);
-        response.put("total", users.size());
+        response.put("users", userList);
+        response.put("total", userList.size());
         
         return ResponseEntity.ok(response);
     }
     
     /**
-     * 사용자 역할 변경 (관리자 전용)
-     * PUT /api/admin/users/{userId}/role
+     * 사용자 정보 수정
+     * PUT /api/admin/users/{id}
      */
-    @PutMapping("/users/{userId}/role")
+    @PutMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateUserRole(
-            @PathVariable Long userId,
-            @RequestBody Map<String, String> request,
-            Authentication authentication) {
-        
-        try {
-            String newRole = request.get("role");
-            if (newRole == null || (!newRole.equals("USER") && !newRole.equals("ADMIN"))) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "유효하지 않은 역할입니다 (USER 또는 ADMIN)");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            userService.updateUserRole(userId, User.Role.valueOf(newRole));
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "사용자 역할이 변경되었습니다");
-            
-            log.info("사용자 역할 변경: userId={}, newRole={}", userId, newRole);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-    
-    /**
-     * 사용자 비활성화 (관리자 전용)
-     * PUT /api/admin/users/{userId}/deactivate
-     */
-    @PutMapping("/users/{userId}/deactivate")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deactivateUser(
-            @PathVariable Long userId,
-            Authentication authentication) {
-        
-        try {
-            userService.deactivateUser(userId);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "사용자가 비활성화되었습니다");
-            
-            log.info("사용자 비활성화: userId={}", userId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-    
-    /**
-     * 사용자 활성화 (관리자 전용)
-     * PUT /api/admin/users/{userId}/activate
-     */
-    @PutMapping("/users/{userId}/activate")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> activateUser(
-            @PathVariable Long userId,
-            Authentication authentication) {
-        
-        try {
-            userService.activateUser(userId);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "사용자가 활성화되었습니다");
-            
-            log.info("사용자 활성화: userId={}", userId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-    
-    /**
-     * 대시보드 통계 조회 (관리자 전용)
-     * GET /api/admin/dashboard/stats
-     */
-    @GetMapping("/dashboard/stats")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getDashboardStats(Authentication authentication) {
-        Map<String, Object> stats = userService.getDashboardStats();
-        
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
         Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("stats", stats);
         
-        return ResponseEntity.ok(response);
+        return userRepository.findById(id)
+                .map(user -> {
+                    if (updates.containsKey("username")) {
+                        user.setUsername((String) updates.get("username"));
+                    }
+                    if (updates.containsKey("phoneNumber")) {
+                        user.setPhoneNumber((String) updates.get("phoneNumber"));
+                    }
+                    if (updates.containsKey("role")) {
+                        String roleStr = (String) updates.get("role");
+                        user.setRole(User.Role.valueOf(roleStr));
+                    }
+                    
+                    userRepository.save(user);
+                    
+                    response.put("success", true);
+                    response.put("message", "사용자 정보가 수정되었습니다");
+                    response.put("user", convertUserToMap(user));
+                    
+                    return ResponseEntity.ok(response);
+                })
+                .orElseGet(() -> {
+                    response.put("success", false);
+                    response.put("message", "사용자를 찾을 수 없습니다");
+                    return ResponseEntity.badRequest().body(response);
+                });
     }
     
     /**
-     * 사용자 정보 수정 (관리자 전용)
-     * PUT /api/admin/users/{userId}
+     * 사용자 삭제
+     * DELETE /api/admin/users/{id}
      */
-    @PutMapping("/users/{userId}")
+    @DeleteMapping("/users/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateUser(
-            @PathVariable Long userId,
-            @RequestBody Map<String, Object> request,
-            Authentication authentication) {
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
         
-        try {
-            String username = (String) request.get("username");
-            String phoneNumber = (String) request.get("phoneNumber");
-            String role = (String) request.get("role");
-            
-            UserResponseDto updatedUser = userService.updateUserByAdmin(userId, username, phoneNumber, role);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "사용자 정보가 수정되었습니다");
-            response.put("user", updatedUser);
-            
-            log.info("사용자 정보 수정: userId={}", userId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+        return userRepository.findById(id)
+                .map(user -> {
+                    userRepository.delete(user);
+                    
+                    response.put("success", true);
+                    response.put("message", "사용자가 삭제되었습니다");
+                    
+                    return ResponseEntity.ok(response);
+                })
+                .orElseGet(() -> {
+                    response.put("success", false);
+                    response.put("message", "사용자를 찾을 수 없습니다");
+                    return ResponseEntity.badRequest().body(response);
+                });
     }
     
     /**
-     * 사용자 삭제 (관리자 전용)
-     * DELETE /api/admin/users/{userId}
+     * 사용자 활성화
+     * PUT /api/admin/users/{id}/activate
      */
-    @DeleteMapping("/users/{userId}")
+    @PutMapping("/users/{id}/activate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteUser(
-            @PathVariable Long userId,
-            Authentication authentication) {
-        
-        try {
-            userService.deleteUserByAdmin(userId);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "사용자가 삭제되었습니다");
-            
-            log.info("사용자 삭제: userId={}", userId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+    public ResponseEntity<?> activateUser(@PathVariable Long id) {
+        return toggleUserActive(id, true);
     }
     
     /**
-     * 단일 사용자 조회 (관리자 전용)
-     * GET /api/admin/users/{userId}
+     * 사용자 비활성화
+     * PUT /api/admin/users/{id}/deactivate
      */
-    @GetMapping("/users/{userId}")
+    @PutMapping("/users/{id}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> getUser(
-            @PathVariable Long userId,
-            Authentication authentication) {
+    public ResponseEntity<?> deactivateUser(@PathVariable Long id) {
+        return toggleUserActive(id, false);
+    }
+    
+    private ResponseEntity<?> toggleUserActive(Long id, boolean active) {
+        Map<String, Object> response = new HashMap<>();
         
-        try {
-            UserResponseDto user = userService.getUserById(userId);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("user", user);
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+        return userRepository.findById(id)
+                .map(user -> {
+                    user.setIsActive(active);
+                    userRepository.save(user);
+                    
+                    response.put("success", true);
+                    response.put("message", active ? "사용자가 활성화되었습니다" : "사용자가 비활성화되었습니다");
+                    response.put("user", convertUserToMap(user));
+                    
+                    return ResponseEntity.ok(response);
+                })
+                .orElseGet(() -> {
+                    response.put("success", false);
+                    response.put("message", "사용자를 찾을 수 없습니다");
+                    return ResponseEntity.badRequest().body(response);
+                });
+    }
+    
+    /**
+     * User 엔티티를 Map으로 변환 (비밀번호 제외)
+     */
+    private Map<String, Object> convertUserToMap(User user) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", user.getId());
+        map.put("email", user.getEmail());
+        map.put("username", user.getUsername());
+        map.put("phoneNumber", user.getPhoneNumber());
+        map.put("role", user.getRole().name());
+        map.put("provider", user.getProvider().name());
+        map.put("isActive", user.getIsActive());
+        map.put("createdAt", user.getCreatedAt());
+        map.put("updatedAt", user.getUpdatedAt());
+        return map;
     }
 }
 
