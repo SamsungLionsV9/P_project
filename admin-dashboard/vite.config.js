@@ -15,6 +15,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/api/admin/popular-models': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       '/api/admin/vehicle-stats': {
         target: 'http://localhost:8000',
         changeOrigin: true,
@@ -27,6 +31,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/api/admin/analysis-history': {  // 분석 이력
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       '/api/admin/history': {
         target: 'http://localhost:8000',
         changeOrigin: true,
@@ -35,8 +43,12 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/api/ai': {  // AI 상태 확인 (Groq)
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       // User Service API (포트 8080)
-      '/api/admin': {
+      '/api/admin/users': {  // 사용자 관리
         target: 'http://localhost:8080',
         changeOrigin: true,
       },

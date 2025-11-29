@@ -14,7 +14,7 @@ function HistoryPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/history?limit=100");
+      const response = await fetch("/api/admin/analysis-history?limit=100");
       if (!response.ok) {
         throw new Error(`서버 오류: ${response.status}`);
       }
