@@ -8,6 +8,7 @@ import 'recommendation_page.dart';
 import 'comparison_page.dart';
 import 'oauth_webview_page.dart';
 import 'signup_page.dart';
+import 'forgot_password_page.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'theme/theme_provider.dart';
@@ -98,10 +99,18 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  final GlobalKey _myPageKey = GlobalKey();
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+    });
+  }
+  
+  // 로그인 상태 변경 시 MyPage 업데이트
+  void _refreshMyPage() {
+    setState(() {
+      // IndexedStack을 재빌드하여 MyPage도 재빌드되도록 함
     });
   }
 
@@ -114,10 +123,13 @@ class _MainScreenState extends State<MainScreen> {
 
     // 페이지 리스트 (빌드 시점에 생성)
     final pages = [
-      HomePageContent(onNavigateToSearch: () => _onItemTapped(1)),
+      HomePageContent(
+        onNavigateToSearch: () => _onItemTapped(1),
+        onLoginSuccess: _refreshMyPage,
+      ),
       const CarInfoInputPage(),
       const RecommendationPage(),
-      const MyPage(),
+      MyPage(key: _myPageKey),
       const SettingsPage(),
     ];
 
@@ -185,8 +197,9 @@ class _MainScreenState extends State<MainScreen> {
 
 class HomePageContent extends StatefulWidget {
   final VoidCallback? onNavigateToSearch;
+  final VoidCallback? onLoginSuccess;
 
-  const HomePageContent({super.key, this.onNavigateToSearch});
+  const HomePageContent({super.key, this.onNavigateToSearch, this.onLoginSuccess});
 
   @override
   State<HomePageContent> createState() => _HomePageContentState();
@@ -233,6 +246,8 @@ class _HomePageContentState extends State<HomePageContent> {
       _showMessage('로그인 성공!');
       _emailController.clear();
       _passwordController.clear();
+      // 로그인 성공 시 MyPage 업데이트
+      widget.onLoginSuccess?.call();
     } else {
       _showMessage(result['message'] ?? '로그인 실패', isError: true);
     }
@@ -269,6 +284,8 @@ class _HomePageContentState extends State<HomePageContent> {
     if (result != null && result['success'] == true) {
       setState(() => _isLoggedIn = true);
       _showMessage('${_getProviderName(provider)} 로그인 성공!');
+      // 로그인 성공 시 MyPage 업데이트
+      widget.onLoginSuccess?.call();
     }
   }
 
@@ -296,6 +313,17 @@ class _HomePageContentState extends State<HomePageContent> {
   /// 로그아웃
   Future<void> _logout() async {
     await _authService.logout();
+    
+    // 로컬 상태 초기화
+    try {
+      // 최근 조회 목록 초기화
+      if (mounted) {
+        context.read<RecentViewsProvider>().clearAll();
+      }
+    } catch (e) {
+      debugPrint('최근 조회 목록 초기화 실패: $e');
+    }
+    
     setState(() => _isLoggedIn = false);
     _showMessage('로그아웃되었습니다');
   }
@@ -484,6 +512,36 @@ class _HomePageContentState extends State<HomePageContent> {
           hintText: "비밀번호",
           obscureText: true,
           isDark: isDark,
+        ),
+        const SizedBox(height: 8),
+        
+        // 비밀번호 재설정 링크
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () async {
+              final result = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+              );
+              if (result == true) {
+                _showMessage('비밀번호가 재설정되었습니다. 새 비밀번호로 로그인하세요.');
+              }
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text(
+              "비밀번호 재설정",
+              style: TextStyle(
+                color: Color(0xFF0066FF),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 20),
 

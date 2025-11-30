@@ -310,5 +310,41 @@ public class UserService implements UserDetailsService {
         
         return UserResponseDto.from(user);
     }
+    
+    /**
+     * 비밀번호 재설정 (이메일 인증 후)
+     */
+    @Transactional
+    public void resetPassword(String email, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
+        
+        // 소셜 로그인 사용자는 비밀번호 재설정 불가
+        // 일반 회원가입 사용자는 provider = LOCAL
+        if (user.getProvider() != null && user.getProvider() != User.Provider.LOCAL) {
+            throw new IllegalArgumentException("소셜 로그인 계정은 비밀번호 재설정이 불가능합니다");
+        }
+        
+        // 새 비밀번호 암호화하여 저장
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+    
+    /**
+     * 이메일로 사용자 존재 여부 확인 (비밀번호 재설정 가능한 사용자)
+     */
+    @Transactional(readOnly = true)
+    public boolean existsByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(user -> {
+                    // 활성화된 사용자이고
+                    if (!user.getIsActive()) {
+                        return false;
+                    }
+                    // 일반 회원가입 사용자 (LOCAL)이거나 비밀번호가 있는 사용자
+                    return user.getProvider() == User.Provider.LOCAL || user.getPassword() != null;
+                })
+                .orElse(false);
+    }
 }
 

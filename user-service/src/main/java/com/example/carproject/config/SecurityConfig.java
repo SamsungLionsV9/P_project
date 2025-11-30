@@ -66,6 +66,7 @@ public class SecurityConfig {
                                 "/api/auth/health", 
                                 "/api/auth/logout",
                                 "/api/auth/email/**",  // 이메일 인증 엔드포인트
+                                "/api/auth/password/**",  // 비밀번호 재설정 엔드포인트
                                 "/api/admin/login",    // 관리자 로그인
                                 // OAuth2 관련 엔드포인트
                                 "/oauth2/**",

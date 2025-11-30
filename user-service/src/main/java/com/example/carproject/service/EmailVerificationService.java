@@ -50,6 +50,9 @@ public class EmailVerificationService {
         verificationRepository.save(verification);
         
         // 개발 환경: 항상 콘솔에 인증 코드 출력
+        log.info("========================================");
+        log.info("🔐 [인증 코드] {} -> {}", email, code);
+        log.info("========================================");
         System.out.println("========================================");
         System.out.println("🔐 [인증 코드] " + email + " -> " + code);
         System.out.println("========================================");

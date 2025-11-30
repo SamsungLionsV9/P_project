@@ -176,7 +176,7 @@ class PredictionServiceV12:
             'Age': age,
             'Age_log': np.log1p(age),
             'Age_sq': age ** 2,
-            'Mileage': mileage,
+            'Mileage': mileage,  # 대문자 M (모델이 기대하는 이름)
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
             'is_accident_free': 1 if accident_free else 0,
@@ -265,7 +265,7 @@ class PredictionServiceV12:
             'Class_Rank': cls_rank,
             'Age': age,
             'Age_log': np.log1p(age),
-            'Mileage': mileage,
+            'Mileage': mileage,  # 대문자 M (모델이 기대하는 이름)
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
             'is_accident_free': 1 if accident_free else 0,

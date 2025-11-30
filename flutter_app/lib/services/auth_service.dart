@@ -290,4 +290,52 @@ class AuthService {
       return null;
     }
   }
+
+  /// 비밀번호 찾기 - 이메일 인증 코드 발송
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/password/forgot'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      ).timeout(const Duration(seconds: 30));
+
+      final data = jsonDecode(response.body);
+      return {
+        'success': data['success'] ?? false,
+        'message': data['message'] ?? '인증 코드 발송 실패',
+      };
+    } catch (e) {
+      debugPrint('비밀번호 찾기 에러: $e');
+      return {'success': false, 'message': '서버 연결 실패'};
+    }
+  }
+
+  /// 비밀번호 재설정
+  Future<Map<String, dynamic>> resetPassword(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/password/reset'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'code': code,
+          'newPassword': newPassword,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+      return {
+        'success': data['success'] ?? false,
+        'message': data['message'] ?? '비밀번호 재설정 실패',
+      };
+    } catch (e) {
+      debugPrint('비밀번호 재설정 에러: $e');
+      return {'success': false, 'message': '서버 연결 실패'};
+    }
+  }
 }

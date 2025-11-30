@@ -2,7 +2,10 @@
 /// ML 서버에서 이미지 제공 (APK 크기 최소화 + 실제 차량 이미지 사용)
 
 class CarImageMapper {
-  // ML 서버 이미지 베이스 URL (에뮬레이터: 10.0.2.2, 실기기: 실제IP)
+  // ML 서버 이미지 베이스 URL
+  // - Android 에뮬레이터: 10.0.2.2 (호스트 PC의 localhost)
+  // - iOS 시뮬레이터: localhost
+  // - 실제 기기: 서버 IP 주소로 변경 필요
   static const String _baseUrl = 'http://10.0.2.2:8000/car-images';
 
   // 모델명 → 이미지 파일명 매핑 (폴더에 있는 113개 실제 파일)

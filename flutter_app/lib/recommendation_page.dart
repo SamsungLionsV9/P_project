@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'services/api_service.dart';
+import 'services/auth_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'providers/recent_views_provider.dart';
 import 'widgets/common/option_badges.dart';
@@ -19,6 +19,7 @@ class RecommendationPage extends StatefulWidget {
 class _RecommendationPageState extends State<RecommendationPage>
     with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
+  final AuthService _auth = AuthService();
   late TabController _tabController;
 
   List<PopularCar> _popularDomestic = [];
@@ -46,8 +47,24 @@ class _RecommendationPageState extends State<RecommendationPage>
     });
   }
   
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 로그인 상태 변경 감지
+    if (!_auth.isLoggedIn && _favorites.isNotEmpty) {
+      // 로그아웃 상태면 찜 목록 초기화
+      setState(() => _favorites = []);
+    }
+  }
+  
   /// 찜 목록 로드
   Future<void> _loadFavorites() async {
+    // 로그인 상태일 때만 로드
+    if (!_auth.isLoggedIn) {
+      setState(() => _favorites = []);
+      return;
+    }
+    
     try {
       final favorites = await _api.getFavorites();
       if (mounted) {
@@ -60,6 +77,13 @@ class _RecommendationPageState extends State<RecommendationPage>
   
   /// 찜 토글 (고유 매물 단위로 구별 + 즉시 UI 반영)
   Future<void> _toggleFavorite(RecommendedCar car) async {
+    // 로그인 체크
+    final auth = AuthService();
+    if (!auth.isLoggedIn) {
+      _showSnackBar('로그인 후 찜 기능을 이용할 수 있습니다.');
+      return;
+    }
+    
     // isSameDeal로 정확한 매물 구별
     final existing = _favorites.where((f) => f.isSameDeal(car)).toList();
     final isCurrentlyFavorite = existing.isNotEmpty;
