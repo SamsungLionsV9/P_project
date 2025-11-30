@@ -173,9 +173,10 @@ body {
   font-size: 22px;
 }
 
-.stat-icon-green { background: #e8f5e9; }
-.stat-icon-yellow { background: #fff8e1; }
-.stat-icon-blue { background: #e3f2fd; }
+.stat-icon-green { background: #e8f5e9; color: #4caf50; }
+.stat-icon-yellow { background: #fff8e1; color: #ff9800; }
+.stat-icon-blue { background: #e3f2fd; color: #2196f3; }
+.stat-icon-red { background: #ffebee; color: #f44336; }
 
 .stat-label {
   font-size: 14px;
@@ -220,20 +221,40 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex: 1;
+  height: 100%;
 }
 
 .bar {
   width: 40px;
+  min-height: 8px;
   background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
   border-radius: 6px 6px 0 0;
   transition: height 0.3s ease;
+  position: relative;
+}
+
+.bar::after {
+  content: attr(data-value);
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #667eea;
 }
 
 .bar-label {
-  font-size: 13px;
+  font-size: 12px;
   color: #666;
+  text-align: center;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 라인 차트 */
@@ -557,6 +578,28 @@ body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
   border: none;
+}
+
+.page-ellipsis {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.page-info {
+  font-size: 13px;
+  color: #666;
+  margin-left: 16px;
+  white-space: nowrap;
+}
+
+.page-link:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ========== 모달 ========== */
@@ -940,5 +983,610 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ========== 레이아웃 수정 (오버플로우 방지) ========== */
+.main {
+  overflow-x: hidden;
+  max-width: calc(100vw - 260px);
+}
+
+.table-section {
+  overflow: hidden;
+}
+
+.table-card {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 800px;
+  table-layout: auto;
+}
+
+.data-table th,
+.data-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.data-table td:nth-child(3) {
+  max-width: 150px; /* 모델명 */
+}
+
+/* ========== 카테고리 뱃지 ========== */
+.category-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.category-badge.domestic {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.category-badge.imported {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+/* ========== 역할 뱃지 ========== */
+.role-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.role-badge.admin {
+  background: #fce4ec;
+  color: #c2185b;
+}
+
+.role-badge.user {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+/* ========== 상태 뱃지 ========== */
+.status-badge.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.inactive {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* ========== 필터 그리드 5열 ========== */
+.filter-grid.five {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+@media (max-width: 1200px) {
+  .filter-grid.five {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .filter-grid.five,
+  .filter-grid.three {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========== AI 로그 상세 패널 ========== */
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.clickable-row:hover {
+  background: #f8f9ff;
+}
+
+.clickable-row.expanded {
+  background: #f0f4ff;
+}
+
+.detail-row td {
+  padding: 0 !important;
+  background: #fafbff;
+}
+
+.log-detail-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.log-detail-panel .detail-section {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e8e8e8;
+}
+
+.log-detail-panel .detail-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.log-detail-panel .detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.log-detail-panel .detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-detail-panel .detail-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.log-detail-panel .detail-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+/* 시그널 분석 스타일 */
+.signal-section {
+  border-left: 3px solid #667eea;
+}
+
+.signal-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.signal-badge.buy, .signal-badge.strong_buy {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.signal-badge.sell, .signal-badge.strong_sell {
+  background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+  color: white;
+}
+
+.signal-badge.hold, .signal-badge.neutral {
+  background: linear-gradient(135deg, #ecc94b 0%, #d69e2e 100%);
+  color: white;
+}
+
+.signal-summary {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #444;
+  margin: 8px 0;
+}
+
+/* 허위매물 탐지 스타일 */
+.fraud-section {
+  border-left: 3px solid #f56565;
+}
+
+.risk-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.risk-badge.low {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.risk-badge.medium {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.risk-badge.high {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.warnings-list ul {
+  margin: 8px 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.warnings-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #c62828;
+}
+
+.fraud-summary {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #444;
+  margin: 8px 0;
+  background: #fff8e1;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+/* 네고 대본 스타일 */
+.negotiation-section {
+  border-left: 3px solid #48bb78;
+}
+
+.scripts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.script-item {
+  background: #f8faf8;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.script-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #38a169;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.script-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  margin: 0;
+}
+
+/* Raw 데이터 섹션 */
+.raw-data-section {
+  margin-top: 8px;
+}
+
+.raw-data-section summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #888;
+  padding: 8px;
+}
+
+.raw-data-section pre {
+  background: #1a1a2e;
+  color: #a5b4fc;
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  overflow-x: auto;
+  max-height: 300px;
+}
+
+.no-data {
+  color: #888;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* 유형 뱃지 */
+.type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.type-badge.negotiation {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.type-badge.signal {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.type-badge.fraud_detection {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* ========== 알림 내역 페이지 ========== */
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notification-item:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.notification-item.unread {
+  background: #f8faff;
+  border-left: 3px solid #667eea;
+}
+
+.notification-item.read {
+  opacity: 0.7;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.notification-title {
+  font-weight: 600;
+  color: #1a1a2e;
+  font-size: 15px;
+}
+
+.notification-time {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.notification-message {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.5;
+  margin: 0 0 10px 0;
+}
+
+.notification-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.notification-car-info {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: #666;
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border-radius: 6px;
+}
+
+.notification-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.unread-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #667eea;
+}
+
+.risk-score {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 메시지 스크립트 스타일 */
+.message-script {
+  background: #e8f5e9 !important;
+  border-left: 3px solid #48bb78;
+}
+
+/* ========== 상단바 알림 드롭다운 ========== */
+.notification-wrapper {
+  position: relative;
+}
+
+.top-icon-btn.has-notif {
+  position: relative;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #dc2626;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 360px;
+  max-height: 400px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.notif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.notif-header button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #666;
+  display: flex;
+  align-items: center;
+}
+
+.notif-header button:hover {
+  color: #333;
+}
+
+.notif-list {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.notif-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #888;
+  font-size: 14px;
+}
+
+.notif-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.notif-item:hover {
+  background: #f8f8f8;
+}
+
+.notif-item.unread {
+  background: #fff8f8;
+}
+
+.notif-item.read {
+  opacity: 0.7;
+}
+
+.notif-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: #fef2f2;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notif-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.notif-desc {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.notif-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #999;
+}
+
+.notif-dot {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: #dc2626;
+  border-radius: 50%;
 }
 

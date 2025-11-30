@@ -5,6 +5,8 @@ function VehiclePage() {
   const [modelFilter, setModelFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
   const [vehicles, setVehicles] = useState([]);
   const [displayedVehicles, setDisplayedVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,6 +19,11 @@ function VehiclePage() {
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [vehicleDetail, setVehicleDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
   const closeDetail = () => {
     setSelectedVehicle(null);
     setVehicleDetail(null);
@@ -46,7 +53,7 @@ function VehiclePage() {
     loadVehicleDetail(vehicle);
   };
 
-  const loadVehicles = async () => {
+  const loadVehicles = async (page = currentPage) => {
     setLoading(true);
     setError(null);
     try {
@@ -54,7 +61,10 @@ function VehiclePage() {
       if (brandFilter) params.append("brand", brandFilter);
       if (modelFilter) params.append("model", modelFilter);
       params.append("category", categoryFilter);
-      params.append("limit", "50");
+      params.append("page", String(page));
+      params.append("limit", String(PAGE_SIZE));
+      if (priceMin) params.append("price_min", priceMin);
+      if (priceMax) params.append("price_max", priceMax);
 
       const response = await fetch(`/api/admin/vehicles?${params}`);
       if (!response.ok) {
@@ -64,6 +74,9 @@ function VehiclePage() {
       if (data.success) {
         setVehicles(data.vehicles);
         setDisplayedVehicles(data.vehicles);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.total || 0);
+        setCurrentPage(data.page || 1);
       } else {
         throw new Error(data.message || "데이터 로드 실패");
       }
@@ -82,18 +95,30 @@ function VehiclePage() {
   };
 
   useEffect(() => {
-    loadVehicles();
+    loadVehicles(1);
   }, []);
 
   const handleSearch = () => {
-    loadVehicles();
+    setCurrentPage(1);
+    loadVehicles(1);
+  };
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      loadVehicles(page);
+    }
   };
 
   const handleReset = () => {
     setModelFilter("");
+    setPriceMin("");
+    setPriceMax("");
     setBrandFilter("");
     setCategoryFilter("all");
-    loadVehicles();
+    setCurrentPage(1);
+    // 필터 초기화 후 1페이지 로드
+    setTimeout(() => loadVehicles(1), 0);
   };
 
   const formatPrice = (price) => {
@@ -119,7 +144,7 @@ function VehiclePage() {
 
       <section className="filter-section">
         <div className="filter-card">
-          <div className="filter-grid three">
+          <div className="filter-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px" }}>
             <div className="filter-field">
               <label>브랜드</label>
               <input
@@ -147,6 +172,24 @@ function VehiclePage() {
                 <option value="imported">수입차</option>
               </select>
             </div>
+            <div className="filter-field">
+              <label>최소 가격 (만원)</label>
+              <input
+                type="number"
+                placeholder="100"
+                value={priceMin}
+                onChange={(e) => setPriceMin(e.target.value)}
+              />
+            </div>
+            <div className="filter-field">
+              <label>최대 가격 (만원)</label>
+              <input
+                type="number"
+                placeholder="100000"
+                value={priceMax}
+                onChange={(e) => setPriceMax(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="filter-actions">
@@ -167,7 +210,7 @@ function VehiclePage() {
       <section className="table-section">
         <div className="table-header-row">
           <div className="table-header-left">
-            차량 목록 ({displayedVehicles.length}대)
+            차량 목록 (전체 {totalCount.toLocaleString()}대 / 페이지 {currentPage} / {totalPages})
           </div>
         </div>
 
@@ -231,7 +274,11 @@ function VehiclePage() {
             </table>
           )}
 
-          <Pagination />
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
         </div>
       </section>
 
@@ -304,6 +351,8 @@ function VehiclePage() {
               <div className="detail-label">옵션</div>
               {detailLoading ? (
                 <p>옵션 정보 로딩 중...</p>
+              ) : !vehicleDetail?.options && !selectedVehicle?.options ? (
+                <p style={{ color: '#888', fontSize: '13px' }}>옵션 정보가 없습니다 (데이터셋 미포함)</p>
               ) : (
                 <div className="detail-options-grid">
                   <label className="checkbox-row">
@@ -376,9 +425,13 @@ function VehiclePage() {
 
             <div className="detail-section">
               <div className="detail-label">지역</div>
-              <div className="detail-region-pill">
-                {vehicleDetail?.region || selectedVehicle.region || "-"}
-              </div>
+              {vehicleDetail?.region || selectedVehicle?.region ? (
+                <div className="detail-region-pill">
+                  {vehicleDetail?.region || selectedVehicle.region}
+                </div>
+              ) : (
+                <p style={{ color: '#888', fontSize: '13px' }}>지역 정보 없음</p>
+              )}
             </div>
           </div>
         </div>

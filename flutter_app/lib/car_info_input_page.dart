@@ -485,6 +485,7 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
       // 디버그: API 호출 전 파라미터 출력
       debugPrint('🚗 API 호출: brand=$_selectedBrand, model=$_selectedModel → $backendModel, year=$year, mileage=$mileage, fuel=$_selectedFuel');
       debugPrint('⚙️ 옵션: 선루프=$_hasSunroof, 내비=$_hasNavigation, 가죽시트=$_hasLeatherSeats, 스마트키=$_hasSmartKey, 후방카메라=$_hasRearCamera');
+      debugPrint('🔒 무사고: $_isAccidentFree');
       debugPrint('⭐ 성능점검: $_performanceRating → $inspectionGrade');
       debugPrint('🌐 API URL: ${_apiService.currentBaseUrl}');
       
@@ -501,6 +502,8 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
         hasLeatherSeat: _hasLeatherSeats,
         hasSmartKey: _hasSmartKey,
         hasRearCamera: _hasRearCamera,
+        // 무사고 여부 전달
+        isAccidentFree: _isAccidentFree,
         // 성능점검 등급 전달
         inspectionGrade: inspectionGrade,
       );

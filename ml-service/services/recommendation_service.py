@@ -172,24 +172,36 @@ class RecommendationService:
         print(f"✓ DB 초기화 완료: {self.db_path}")
     
     def _load_data(self):
-        """엔카 데이터 로드"""
+        """엔카 데이터 로드 (가격 이상치 필터링 적용)"""
         try:
             domestic_path = self.data_path / "encar_raw_domestic.csv"
             if domestic_path.exists():
                 self._domestic_df = pd.read_csv(domestic_path)
                 self._domestic_df['YearOnly'] = (self._domestic_df['Year'] // 100).astype(int)
                 self._domestic_df['Type'] = 'domestic'
-                print(f"✓ 국산차 데이터: {len(self._domestic_df):,}건")
+                # 가격 이상치 필터링 (가격 미정/상담 차량 제외)
+                original_count = len(self._domestic_df)
+                self._domestic_df = self._domestic_df[
+                    (self._domestic_df['Price'] >= self.PRICE_MIN) &
+                    (self._domestic_df['Price'] <= self.PRICE_MAX)
+                ]
+                print(f"✓ 국산차 데이터: {len(self._domestic_df):,}건 (필터링: {original_count - len(self._domestic_df):,}건 제외)")
         except Exception as e:
             print(f"⚠️ 국산차 로드 실패: {e}")
-        
+
         try:
             imported_path = self.data_path / "encar_imported_data.csv"
             if imported_path.exists():
                 self._imported_df = pd.read_csv(imported_path)
                 self._imported_df['YearOnly'] = (self._imported_df['Year'] // 100).astype(int)
                 self._imported_df['Type'] = 'imported'
-                print(f"✓ 외제차 데이터: {len(self._imported_df):,}건")
+                # 가격 이상치 필터링 (가격 미정/상담 차량 제외)
+                original_count = len(self._imported_df)
+                self._imported_df = self._imported_df[
+                    (self._imported_df['Price'] >= self.PRICE_MIN) &
+                    (self._imported_df['Price'] <= self.PRICE_MAX)
+                ]
+                print(f"✓ 외제차 데이터: {len(self._imported_df):,}건 (필터링: {original_count - len(self._imported_df):,}건 제외)")
         except Exception as e:
             print(f"⚠️ 외제차 로드 실패: {e}")
     

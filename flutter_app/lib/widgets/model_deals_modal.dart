@@ -135,7 +135,7 @@ class _ModelDealsModalState extends State<ModelDealsModal> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '등록 ${widget.listings}건 • 평균 ${widget.avgPrice}만원 • 중앙값 ${widget.medianPrice}만원',
+                      '등록 ${widget.listings}건 • 평균 ${widget.avgPrice}만원 • 예측가 ${widget.medianPrice}만원',
                       style: TextStyle(color: subtextColor, fontSize: 13),
                     ),
                     const SizedBox(height: 16),

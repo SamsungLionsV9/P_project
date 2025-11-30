@@ -71,44 +71,46 @@ class PredictionServiceV12:
     def _load_models(self):
         """모델 로드 (V12/V14 우선, 없으면 V11/V13)"""
         try:
-            # 국산차 V12 (FuelType 포함)
-            domestic_path = os.path.join(MODEL_DIR, 'domestic_v12.pkl')
-            if os.path.exists(domestic_path):
-                self.domestic_model = joblib.load(domestic_path)
+            # 국산차 V12 (FuelType 포함) - features 파일도 확인
+            domestic_v12_path = os.path.join(MODEL_DIR, 'domestic_v12.pkl')
+            domestic_v12_features_path = os.path.join(MODEL_DIR, 'domestic_v12_features.pkl')
+            domestic_v11_path = os.path.join(MODEL_DIR, 'domestic_v11.pkl')
+
+            if os.path.exists(domestic_v12_path) and os.path.exists(domestic_v12_features_path):
+                self.domestic_model = joblib.load(domestic_v12_path)
                 self.domestic_encoders = joblib.load(os.path.join(MODEL_DIR, 'domestic_v12_encoders.pkl'))
-                self.domestic_features = joblib.load(os.path.join(MODEL_DIR, 'domestic_v12_features.pkl'))
+                self.domestic_features = joblib.load(domestic_v12_features_path)
                 self.domestic_version = 'V12'
-                print("✓ 국산차 V12 모델 로드 완료 (FuelType 포함)")
-            else:
-                # Fallback to V11
-                domestic_path = os.path.join(MODEL_DIR, 'domestic_v11.pkl')
-                if os.path.exists(domestic_path):
-                    self.domestic_model = joblib.load(domestic_path)
-                    self.domestic_encoders = joblib.load(os.path.join(MODEL_DIR, 'domestic_v11_encoders.pkl'))
-                    self.domestic_features = joblib.load(os.path.join(MODEL_DIR, 'domestic_v11_features.pkl'))
-                    self.domestic_version = 'V11'
-                    print("✓ 국산차 V11 모델 로드 완료")
-            
-            # 외제차 V14 (FuelType 포함)
-            imported_path = os.path.join(MODEL_DIR, 'imported_v14.pkl')
-            if os.path.exists(imported_path):
-                self.imported_model = joblib.load(imported_path)
+                print("[OK] Domestic V12 model loaded (with FuelType)")
+            elif os.path.exists(domestic_v11_path):
+                # V12 features가 없으면 V11으로 폴백
+                self.domestic_model = joblib.load(domestic_v11_path)
+                self.domestic_encoders = joblib.load(os.path.join(MODEL_DIR, 'domestic_v11_encoders.pkl'))
+                self.domestic_features = joblib.load(os.path.join(MODEL_DIR, 'domestic_v11_features.pkl'))
+                self.domestic_version = 'V11'
+                print("[OK] Domestic V11 model loaded (V12 features missing)")
+
+            # 외제차 V14 (FuelType 포함) - features 파일도 확인
+            imported_v14_path = os.path.join(MODEL_DIR, 'imported_v14.pkl')
+            imported_v14_features_path = os.path.join(MODEL_DIR, 'imported_v14_features.pkl')
+            imported_v13_path = os.path.join(MODEL_DIR, 'imported_v13.pkl')
+
+            if os.path.exists(imported_v14_path) and os.path.exists(imported_v14_features_path):
+                self.imported_model = joblib.load(imported_v14_path)
                 self.imported_encoders = joblib.load(os.path.join(MODEL_DIR, 'imported_v14_encoders.pkl'))
-                self.imported_features = joblib.load(os.path.join(MODEL_DIR, 'imported_v14_features.pkl'))
+                self.imported_features = joblib.load(imported_v14_features_path)
                 self.imported_version = 'V14'
-                print("✓ 외제차 V14 모델 로드 완료 (FuelType 포함)")
-            else:
-                # Fallback to V13
-                imported_path = os.path.join(MODEL_DIR, 'imported_v13.pkl')
-                if os.path.exists(imported_path):
-                    self.imported_model = joblib.load(imported_path)
-                    self.imported_encoders = joblib.load(os.path.join(MODEL_DIR, 'imported_v13_encoders.pkl'))
-                    self.imported_features = joblib.load(os.path.join(MODEL_DIR, 'imported_v13_features.pkl'))
-                    self.imported_version = 'V13'
-                    print("✓ 외제차 V13 모델 로드 완료")
-                    
+                print("[OK] Imported V14 model loaded (with FuelType)")
+            elif os.path.exists(imported_v13_path):
+                # V14 features가 없으면 V13으로 폴백
+                self.imported_model = joblib.load(imported_v13_path)
+                self.imported_encoders = joblib.load(os.path.join(MODEL_DIR, 'imported_v13_encoders.pkl'))
+                self.imported_features = joblib.load(os.path.join(MODEL_DIR, 'imported_v13_features.pkl'))
+                self.imported_version = 'V13'
+                print("[OK] Imported V13 model loaded (V14 features missing)")
+
         except Exception as e:
-            print(f"⚠️ 모델 로드 실패: {e}")
+            print(f"[WARN] Model load failed: {e}")
     
     def _get_model_type(self, brand: str) -> str:
         for b in self.DOMESTIC_BRANDS:
@@ -176,7 +178,7 @@ class PredictionServiceV12:
             'Age': age,
             'Age_log': np.log1p(age),
             'Age_sq': age ** 2,
-            'Mileage': mileage,
+            'Mileage': mileage,  # 대문자 M (모델이 기대하는 이름)
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
             'is_accident_free': 1 if accident_free else 0,
@@ -187,7 +189,56 @@ class PredictionServiceV12:
         }
         
         return pd.DataFrame([f])[self.domestic_features]
-    
+
+    def _create_domestic_features_v11(self, model_name: str, year: int, mileage: int,
+                                       options: Dict, accident_free: bool,
+                                       grade: str) -> pd.DataFrame:
+        """국산차 V11 피처 생성 (FuelType 미포함 - 폴백용)"""
+        age = 2025 - year
+        mg = self._get_mileage_group(mileage)
+        my = f"{model_name}_{year}"
+        mymg = f"{my}_{mg}"
+
+        enc = self.domestic_encoders
+        default_val = 2500
+
+        model_enc_val = enc.get('model_enc', {}).get(model_name, default_val)
+        my_enc_val = enc.get('model_year_enc', {}).get(my, model_enc_val)
+        mymg_enc_val = enc.get('model_year_mg_enc', {}).get(mymg, my_enc_val)
+        brand_enc_val = enc.get('brand_enc', {}).get('현대', default_val)
+
+        opt_keys = ['has_sunroof', 'has_leather_seat', 'has_navigation',
+                    'has_smart_key', 'has_rear_camera', 'has_heated_seat']
+        opt_values = {k: 1 if options.get(k, False) else 0 for k in opt_keys}
+        opt_count = sum(opt_values.values())
+        opt_premium = sum(int(bool(options.get(k, False))) * v
+                        for k, v in self.DOMESTIC_OPT_PREMIUM.items() if k in options)
+
+        grade_map = {'normal': 0, 'good': 1, 'excellent': 2}
+        grade_enc = grade_map.get(grade, 0)
+
+        f = {
+            'Model_enc': model_enc_val,
+            'Model_Year_enc': my_enc_val,
+            'Model_Year_MG_enc': mymg_enc_val,
+            'Brand_enc': brand_enc_val,
+            'Age': age,
+            'Age_log': np.log1p(age),
+            'Age_sq': age ** 2,
+            'Mileage': mileage,
+            'Mile_log': np.log1p(mileage),
+            'Km_per_Year': mileage / (age + 1),
+            'is_accident_free': 1 if accident_free else 0,
+            'inspection_grade_enc': grade_enc,
+            'Opt_Count': opt_count,
+            'Opt_Premium': opt_premium,
+            **opt_values
+        }
+
+        # V11 피처만 선택
+        available_features = [col for col in self.domestic_features if col in f]
+        return pd.DataFrame([{k: f.get(k, 0) for k in available_features}])[available_features]
+
     def _extract_class(self, model_name: str, brand: str) -> tuple:
         """외제차 클래스 추출"""
         model = str(model_name)
@@ -265,7 +316,7 @@ class PredictionServiceV12:
             'Class_Rank': cls_rank,
             'Age': age,
             'Age_log': np.log1p(age),
-            'Mileage': mileage,
+            'Mileage': mileage,  # 대문자 M (모델이 기대하는 이름)
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
             'is_accident_free': 1 if accident_free else 0,
@@ -273,7 +324,51 @@ class PredictionServiceV12:
         }
         
         return pd.DataFrame([f])[self.imported_features]
-    
+
+    def _create_imported_features_v13(self, model_name: str, brand: str, year: int,
+                                       mileage: int, options: Dict,
+                                       accident_free: bool, grade: str) -> pd.DataFrame:
+        """외제차 V13 피처 생성 (FuelType 미포함 - 폴백용)"""
+        age = 2025 - year
+        mg = self._get_mileage_group(mileage)
+        my = f"{model_name}_{year}"
+        mymg = f"{my}_{mg}"
+        cls, cls_rank = self._extract_class(model_name, brand)
+        cls_year = f"{cls}_{year}"
+
+        enc = self.imported_encoders
+        global_mean = enc.get('global_mean', 5000)
+
+        BRAND_TIER = {
+            '벤츠': 4, 'BMW': 4, '아우디': 4, '포르쉐': 5, '렉서스': 4,
+            '볼보': 3, '폭스바겐': 2, '미니': 2, '테슬라': 4,
+        }
+
+        grade_map = {'normal': 0, 'good': 1, 'excellent': 2}
+
+        f = {
+            'Model_enc': enc.get('model_enc', {}).get(model_name, global_mean),
+            'Brand_enc': enc.get('brand_enc', {}).get(brand, global_mean),
+            'Model_Year_enc': enc.get('model_year_enc', {}).get(my, global_mean),
+            'Model_Year_MG_enc': enc.get('model_year_mg_enc', {}).get(mymg, global_mean),
+            'Class_enc': enc.get('class_enc', {}).get(cls, global_mean),
+            'Class_Year_enc': enc.get('class_year_enc', {}).get(cls_year, global_mean),
+            'Class_Rank': cls_rank,
+            'Brand_Tier': BRAND_TIER.get(brand, 2),
+            'Age': age,
+            'Age_log': np.log1p(age),
+            'Age_sq': age ** 2,
+            'Mileage': mileage,
+            'Mile_log': np.log1p(mileage),
+            'Km_per_Year': mileage / (age + 1),
+            'is_accident_free': 1 if accident_free else 0,
+            'inspection_grade_enc': grade_map.get(grade, 0),
+        }
+
+        # V13 피처만 선택
+        available_features = [col for col in self.imported_features if col in f]
+        return pd.DataFrame([{k: f.get(k, 0) for k in available_features}])[available_features]
+
     # 시장 현실 기반 연료별 가격 조정 (실제 중고차 시장 데이터 기반)
     # 동일 모델/연식/주행거리 조건에서의 연료별 가격 차이
     FUEL_ADJUSTMENT = {
@@ -303,14 +398,16 @@ class PredictionServiceV12:
                 features = self._create_domestic_features_v12(
                     model_name, year, mileage, '가솔린', options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
-                base_price = np.expm1(pred_log)
+                # 모델 출력(억원) -> 만원 변환
+                base_price = np.expm1(pred_log) * 1000
                 base_price = base_price * fuel_adj  # 시장 현실 기반 연료 조정
             else:
                 # Fallback V11
                 features = self._create_domestic_features_v11(
                     model_name, year, mileage, options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
-                base_price = np.expm1(pred_log)
+                # 모델 출력(억원) -> 만원 변환
+                base_price = np.expm1(pred_log) * 1000
                 base_price = base_price * fuel_adj
             
             # 국산차 옵션 프리미엄 명시적 추가
@@ -332,13 +429,15 @@ class PredictionServiceV12:
                 features = self._create_imported_features_v14(
                     model_name, brand, year, mileage, '가솔린', options, accident_free, grade)
                 pred_log = self.imported_model.predict(features)[0]
-                base_price = np.expm1(pred_log)
+                # 모델 출력(억원) -> 만원 변환
+                base_price = np.expm1(pred_log) * 1000
             else:
                 # Fallback V13
                 features = self._create_imported_features_v13(
                     model_name, brand, year, mileage, options, accident_free, grade)
                 pred_log = self.imported_model.predict(features)[0]
-                base_price = np.expm1(pred_log)
+                # 모델 출력(억원) -> 만원 변환
+                base_price = np.expm1(pred_log) * 1000
             
             # 연료 조정 + 옵션 프리미엄
             base_price = base_price * imported_fuel_adj

@@ -47,6 +47,9 @@ public class User implements UserDetails {
     @Column(length = 500)
     private String profileImageUrl;  // 프로필 이미지 URL
     
+    @Column(length = 100)
+    private String displayName;  // 표시 이름 (소셜 로그인 시 사용)
+    
     @Column(length = 10)
     @Enumerated(EnumType.STRING)
     @Builder.Default

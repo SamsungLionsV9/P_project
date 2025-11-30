@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,16 +11,22 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
+  /// 로컬 호스트 주소 (플랫폼별)
+  /// - Android 에뮬레이터: 10.0.2.2 (호스트 PC 접근용)
+  /// - iOS 시뮬레이터/Web/Desktop: localhost
+  static String get _localHost {
+    if (kIsWeb) return 'localhost';
+    try {
+      if (Platform.isAndroid) {
+        return '10.0.2.2';  // Android 에뮬레이터 → 호스트 PC
+      }
+    } catch (_) {}
+    return 'localhost';
+  }
+
   // 백엔드 URL (Spring Boot)
   static String get _baseUrl {
-    if (kIsWeb) {
-      // 웹 환경에서는 현재 호스트의 8080 포트 사용
-      return 'http://localhost:8080/api';
-    }
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8080/api';
-    }
-    return 'http://localhost:8080/api';
+    return 'http://$_localHost:8080/api';
   }
 
   // SharedPreferences 키
@@ -186,28 +192,75 @@ class AuthService {
     }
   }
 
-  /// 소셜 로그인 URL 생성
-  String getSocialLoginUrl(String provider) {
-    // Android 에뮬레이터에서는 10.0.2.2 사용
-    final host = !kIsWeb && Platform.isAndroid ? '10.0.2.2' : 'localhost';
-    
-    switch (provider.toLowerCase()) {
-      case 'naver':
-        return 'http://$host:8080/oauth2/authorization/naver';
-      case 'kakao':
-        return 'http://$host:8080/oauth2/authorization/kakao';
-      case 'google':
-        return 'http://$host:8080/oauth2/authorization/google';
-      default:
-        throw ArgumentError('Unknown provider: $provider');
+  /// OAuth 회원가입 (이메일 인증 불필요)
+  Future<Map<String, dynamic>> oauthSignup(
+    String email,
+    String name,
+    String provider,
+    String providerId,
+    String? profileImageUrl,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/oauth/signup'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'username': name,
+          'provider': provider.toUpperCase(),
+          'providerId': providerId,
+          'profileImageUrl': profileImageUrl,
+          'phoneNumber': null,  // 선택적 필드
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        // OAuth 회원가입 성공 시 JWT 토큰 생성하여 반환
+        // 백엔드에서 토큰을 생성하여 반환하도록 수정 필요
+        return {
+          'success': true,
+          'message': '회원가입 성공',
+          'token': data['token'],  // 백엔드에서 토큰 반환 시
+        };
+      }
+      
+      return {'success': false, 'message': data['message'] ?? '회원가입 실패'};
+    } catch (e) {
+      debugPrint('OAuth 회원가입 에러: $e');
+      return {'success': false, 'message': '서버 연결 실패: $e'};
     }
   }
 
+  /// 소셜 로그인 URL 생성
+  String getSocialLoginUrl(String provider) {
+    // 플랫폼별 호스트 주소 사용
+    final host = _localHost;
+
+    // 웹 환경에서는 현재 origin을 리다이렉트 URI로 사용
+    String redirectUri = '';
+    if (kIsWeb) {
+      // 현재 페이지의 origin 가져오기
+      redirectUri = Uri.base.origin;
+    } else {
+      redirectUri = 'http://$host:3000';
+    }
+
+    final baseUrl = 'http://$host:8080/oauth2/authorization/${provider.toLowerCase()}';
+    final uri = Uri.parse(baseUrl).replace(queryParameters: {
+      'redirect_uri': '$redirectUri/oauth2/redirect',
+    });
+
+    return uri.toString();
+  }
+
   /// 소셜 로그인 콜백 처리 (토큰 저장)
-  void handleOAuthCallback(String token, String email, String providerName) {
+  Future<void> handleOAuthCallback(String token, String email, String providerName) async {
     _token = token;
     _userEmail = email;
     _provider = providerName;
+    await _saveToken();  // 토큰 저장
     debugPrint('소셜 로그인 성공: $email ($providerName)');
   }
 
@@ -241,6 +294,54 @@ class AuthService {
     } catch (e) {
       debugPrint('사용자 정보 조회 에러: $e');
       return null;
+    }
+  }
+
+  /// 비밀번호 찾기 - 이메일 인증 코드 발송
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/password/forgot'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      ).timeout(const Duration(seconds: 30));
+
+      final data = jsonDecode(response.body);
+      return {
+        'success': data['success'] ?? false,
+        'message': data['message'] ?? '인증 코드 발송 실패',
+      };
+    } catch (e) {
+      debugPrint('비밀번호 찾기 에러: $e');
+      return {'success': false, 'message': '서버 연결 실패'};
+    }
+  }
+
+  /// 비밀번호 재설정
+  Future<Map<String, dynamic>> resetPassword(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/password/reset'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'code': code,
+          'newPassword': newPassword,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+      return {
+        'success': data['success'] ?? false,
+        'message': data['message'] ?? '비밀번호 재설정 실패',
+      };
+    } catch (e) {
+      debugPrint('비밀번호 재설정 에러: $e');
+      return {'success': false, 'message': '서버 연결 실패'};
     }
   }
 }

@@ -11,7 +11,6 @@ from typing import Dict
 # 1. 같은 폴더의 data_collectors 사용
 try:
     from .data_collectors import collect_real_data_only
-    print("✓ data_collectors 임포트 성공 (ml-service 내부)")
 except ImportError:
     # 2. Fallback: src 폴더에서
     src_path = Path(__file__).parent.parent.parent / 'src'
@@ -19,9 +18,7 @@ except ImportError:
         sys.path.insert(0, str(src_path))
     try:
         from data_collectors_real_only import collect_real_data_only
-        print("✓ data_collectors 임포트 성공 (src 폴더)")
     except ImportError as e:
-        print(f"⚠️ data_collectors 없음: {e}")
         collect_real_data_only = None
 
 # timing_engine은 src에서 가져옴
@@ -30,9 +27,7 @@ try:
     if str(src_path) not in sys.path:
         sys.path.insert(0, str(src_path))
     from timing_engine_real import RealTimingEngine
-    print("✓ RealTimingEngine 임포트 성공")
 except ImportError as e:
-    print(f"⚠️ RealTimingEngine 없음: {e}")
     RealTimingEngine = None
 
 
@@ -78,9 +73,19 @@ class TimingService:
             )
             
             # API 응답 형식으로 변환
+            score = float(result['final_score'])
+            decision = result['decision']
+            
+            # 앱 호환 label
+            label = self._get_label(score, decision)
+            
+            # 앱 호환 factors
+            factors = self._convert_reasons_to_factors(result.get('reasons', []))
+            
             return {
-                'timing_score': float(result['final_score']),
-                'decision': result['decision'],
+                'timing_score': score,
+                'decision': decision,
+                'label': label,
                 'color': result['color'],
                 'breakdown': {
                     'macro': float(result['scores']['macro']),
@@ -88,6 +93,7 @@ class TimingService:
                     'schedule': float(result['scores']['schedule'])
                 },
                 'reasons': result['reasons'],
+                'factors': factors,
                 'action': result['action'],
                 'confidence': result['confidence'],
                 'data_available': True
@@ -96,6 +102,38 @@ class TimingService:
         except Exception as e:
             print(f"⚠️ 타이밍 분석 중 오류: {e}")
             return self._fallback_timing_analysis(car_model)
+    
+    def _get_label(self, score: float, decision: str) -> str:
+        """타이밍 점수에 따른 라벨 반환"""
+        if score >= 70:
+            return "적극 매수"
+        elif score >= 55:
+            return "매수 추천"
+        elif score >= 45:
+            return "보통"
+        else:
+            return "대기 권장"
+    
+    def _convert_reasons_to_factors(self, reasons: list) -> list:
+        """reasons 리스트를 앱 호환 factors 형식으로 변환"""
+        factors = []
+        for reason in reasons:
+            # 이모지와 키워드로 상태 판단
+            clean_reason = reason.replace('✅ ', '').replace('⚠️ ', '').replace('❌ ', '').replace('🟢 ', '').replace('🟡 ', '').replace('🔴 ', '')
+            
+            if '✅' in reason or '🟢' in reason or '좋' in reason or '추천' in reason or '상승' in reason:
+                status = 'positive'
+            elif '❌' in reason or '🔴' in reason or '주의' in reason or '하락' in reason or '위험' in reason:
+                status = 'negative'
+            else:
+                status = 'neutral'
+            
+            factors.append({
+                'factor': 'timing',
+                'status': status,
+                'description': clean_reason
+            })
+        return factors
     
     def _fallback_timing_analysis(self, car_model: str) -> Dict:
         """
@@ -107,21 +145,25 @@ class TimingService:
         Returns:
             dict: 기본 타이밍 분석 결과
         """
-        # 기본값 반환
+        reasons = [
+            "⚠️ 실시간 데이터를 불러올 수 없습니다",
+            "⚠️ 기본 분석 결과를 제공합니다",
+            "⚠️ 자세한 분석을 위해 시스템 관리자에게 문의하세요"
+        ]
+        
+        # 기본값 반환 (앱 호환 필드 포함)
         return {
-            'timing_score': 65.0,
+            'timing_score': 60.0,
             'decision': '관망',
+            'label': '보통',
             'color': '🟡',
             'breakdown': {
-                'macro': 65.0,
-                'trend': 65.0,
-                'schedule': 65.0
+                'macro': 60.0,
+                'trend': 60.0,
+                'schedule': 60.0
             },
-            'reasons': [
-                "⚠️ 실시간 데이터를 불러올 수 없습니다",
-                "⚠️ 기본 분석 결과를 제공합니다",
-                "⚠️ 자세한 분석을 위해 시스템 관리자에게 문의하세요"
-            ],
+            'reasons': reasons,
+            'factors': self._convert_reasons_to_factors(reasons),
             'action': '시장 상황 지켜보기',
             'confidence': 'low',
             'data_available': False

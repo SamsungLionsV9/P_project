@@ -1,0 +1,98 @@
+# ============================================
+# Augment Code Ignore File
+# AI 컨텍스트에서 제외할 파일/폴더
+# ============================================
+
+# === 빌드 아티팩트 ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# === Java/Gradle 빌드 ===
+user-service/build/
+user-service/.gradle/
+user-service/bin/
+*.class
+*.jar
+*.war
+
+# === Flutter 빌드 ===
+flutter_app/build/
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.packages
+flutter_app/.pub-cache/
+flutter_app/.pub/
+*.iml
+
+# === 의존성 ===
+node_modules/
+venv/
+.venv/
+env/
+.env.local
+
+# === IDE 설정 ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# === 로그 및 임시 파일 ===
+*.log
+logs/
+*.tmp
+*.temp
+*.bak
+
+# === 데이터 및 모델 파일 (대용량) ===
+data/*.csv
+data/*.xlsx
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# === 테스트 커버리지 ===
+htmlcov/
+.coverage
+.pytest_cache/
+.tox/
+coverage.xml
+
+# === 아카이브 (레거시 코드) ===
+_archive/
+_backup/
+_old/
+
+# === 환경 설정 (민감 정보) ===
+.env
+*.env
+secrets/
+credentials/
+
+# === 문서 자동 생성 ===
+docs/_build/
+site/
+.docusaurus/
+
+# === H2 데이터베이스 파일 ===
+*.db
+*.mv.db
+*.trace.db
+data/car_database*
+
+# === Git ===
+.git/
+.gitattributes
+

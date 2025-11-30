@@ -1,62 +1,61 @@
+import '../config/environment.dart';
+
 /// 차량 모델 이미지 매핑 유틸리티
 /// ML 서버에서 이미지 제공 (APK 크기 최소화 + 실제 차량 이미지 사용)
 
 class CarImageMapper {
-  // ML 서버 이미지 베이스 URL (에뮬레이터: 10.0.2.2, 실기기: 실제IP)
-  static const String _baseUrl = 'http://10.0.2.2:8000/car-images';
+  // ML 서버 이미지 베이스 URL (환경 설정에서 가져옴)
+  static String get _baseUrl => Environment.imageServiceUrl;
 
-  // 모델명 → 이미지 파일명 매핑 (폴더에 있는 113개 실제 파일)
+  // 모델명 → 이미지 파일명 매핑 (실제 존재하는 파일만 - 검증 완료)
+  // 존재하지 않는 파일은 유사 모델로 대체
   static const Map<String, String> _modelToImage = {
-    // 기아 (현행)
+    // 기아 (검증됨)
     'K3': 'K3', 'K5': 'K5', 'K7': 'K7', 'K8': 'K8', 'K9': 'K9',
     'EV3': 'EV3', 'EV4': 'EV4', 'EV5': 'EV5', 'EV6': 'EV6', 'EV9': 'EV9', 'PV5': 'PV5',
     '모닝': '모닝', '레이': '레이', '니로': '니로', '셀토스': '셀토스',
-    '스포티지': '스포티지', '쏘렌토': '쏘렌토', '카니발': '카니발',
-    '스토닉': '스토닉', '쏘울': '쏘울', '스팅어': '스팅어',
+    '쏘렌토': '쏘렌토', '스토닉': '스토닉', '쏘울': '쏘울', '스팅어': '스팅어',
     '포르테': '포르테', '카렌스': '카렌스', '프라이드': '프라이드',
     '스펙트라': '스펙트라', '엔터프라이즈': '엔터프라이즈', '타스만': '타스만',
     '카스타': '카스타', '엘란': '엘란', '비스토': '비스토', '캐피탈': '캐피탈',
-    // 기아 (과거/단종)
+    // 기아 카니발 계열 (존재하는 파일로 매핑)
+    '카니발': '그랜드 카니발', '카니발 4세대': '그랜드 카니발',
     '그랜드 카니발': '그랜드 카니발', '카니발 II': '카니발 II',
-    // 현대 (현행)
+    // 현대 (검증됨)
     '그랜저': '그랜저', '쏘나타': '쏘나타', '아반떼': '아반떼',
-    '투싼': '투싼', '싼타페': '싼타페', '팰리세이드': '팰리세이드',
-    '코나': '코나', '스타리아': '스타리아', '스타렉스': '스타렉스',
-    '아이오닉': '아이오닉', '캐스퍼': '캐스퍼', '베뉴': '베뉴',
-    // 현대 (과거/단종)
-    '베리타스': '베리타스', '슈퍼살롱': '슈퍼살롱', '뉴 다마스': '뉴 다마스',
-    '다마스 II': '다마스 II', '라보': '라보', '포텐샤': '포텐샤',
-    '에스페로': '에스페로', '스테이츠맨': '스테이츠맨', '파크타운': '파크타운',
-    // 제네시스
+    '더 뉴 아반떼': '아반떼', '더 뉴 그랜저': '그랜저', '더 뉴 쏘나타': '쏘나타',
+    '투싼': '투싼', '싼타페': '싼타페', '스타리아': '스타리아', '스타렉스': '스타렉스',
+    '아이오닉': '아이오닉', '베리타스': '베리타스', '슈퍼살롱': '슈퍼살롱',
+    '뉴 다마스': '뉴 다마스', '다마스 II': '다마스 II', '라보': '라보', '포텐샤': '포텐샤',
+    '에스페로': '에스페로', '스테이츠맨': '스테이츠맨',
+    // 제네시스 (검증됨)
     'G70': 'G70', 'G80': 'G80', 'G90': 'G90', 'G2X': 'G2X',
     'GV60': 'GV60', 'GV70': 'GV70', 'GV80': 'GV80',
-    // 르노코리아/르노삼성
+    // 르노코리아 (검증됨)
     'SM3': 'SM3', 'SM5': 'SM5', 'SM6': 'SM6', 'SM7': 'SM7',
     'QM3': 'QM3', 'QM5': 'QM5', 'QM6': 'QM6', 'XM3': 'XM3',
     '클리오': '클리오', '조에': '조에', '캡처': '캡처', '마스터': '마스터',
     '그랑 콜레오스': '그랑 콜레오스', '아르카나': '아르카나',
-    // 쉐보레/GM (현행)
+    // 쉐보레/GM (검증됨)
     '스파크': '스파크', '크루즈': '크루즈', '말리부': '말리부',
     '임팔라': '임팔라', '트랙스': '트랙스', '이쿼녹스': '이쿼녹스',
     '트래버스': '트래버스', '볼트': '볼트', '캡티바': '캡티바',
-    '올란도': '올란도', '토스카': '토스카', '콜로라도': '콜로라도',
+    '울란도': '울란도', '토스카': '토스카', '콜로라도': '콜로라도',
     '타호': '타호', '아카디아': '아카디아', '카마로': '카마로',
-    // 쉐보레/GM (과거/단종)
     '라세티 프리미어': '라세티 프리미어', '젠트라': '젠트라', '알페온': '알페온',
     '마티즈 클래식': '마티즈 클래식', '아베오 세단': '아베오 세단',
-    '아베오 해치백': '아베오 해치백', '윈스톰': '윈스톰', '울란도': '울란도',
-    '크레도스': '크레도스', '리갈': '리갈',
-    // 쌍용/KG모빌리티 (현행)
-    '티볼리': '티볼리', '토레스': '토레스', '코란도': '코란도',
-    '렉스턴': '렉스턴', '모하비': '모하비', '액티언': '액티언',
+    '아베오 해치백': '아베오 해치백', '윈스톰': '윈스톰', '크레도스': '크레도스', '리갈': '리갈',
+    // 쌍용/KG (검증됨 - 존재하는 파일로 매핑)
+    '티볼리': '티볼리', '토레스': '토레스', '모하비': '모하비', '액티언': '액티언',
     '더 뉴 티볼리': '더 뉴 티볼리', '더 뉴 토레스': '더 뉴 토레스',
     '티볼리 에어': '티볼리 에어', '코란도 C': '코란도 C',
-    // 쌍용/KG모빌리티 (과거/단종)
+    '코란도': '뷰티풀 코란도', // 코란도.png 없음 → 대체
+    '렉스턴': '렉스턴 II', // 렉스턴.png 없음 → 대체
     '더 뉴 렉스턴 스포츠': '더 뉴 렉스턴 스포츠', '렉스턴 스포츠 칸': '렉스턴 스포츠 칸',
     '렉스턴 II': '렉스턴 II', '더 뉴 코란도 스포츠': '더 뉴 코란도 스포츠',
     '뷰티풀 코란도': '뷰티풀 코란도', '뉴무쏘': '뉴무쏘', '뉴체어맨': '뉴체어맨',
     '로디우스 유로': '로디우스 유로', '이스타나': '이스타나',
-    // 대우/기타
+    // 기타
     '로체': '로체', '티코': '티코', '프레지오': '프레지오',
   };
 
@@ -87,22 +86,51 @@ class CarImageMapper {
 
   /// 모델명으로 이미지 URL 반환 (서버에서 제공)
   static String? getImageUrl(String model) {
-    // 1. 정확한 매칭
-    if (_modelToImage.containsKey(model)) {
-      return '$_baseUrl/${Uri.encodeComponent(_modelToImage[model]!)}.png';
+    // 괄호 제거 및 정규화 (예: "그랜저 (GN7)" → "그랜저")
+    final cleanModel = model.replaceAll(RegExp(r'\s*\([^)]*\)'), '').trim();
+    
+    String? resultUrl;
+    String matchType = '';
+    
+    // 1. 정규화된 모델명으로 정확한 매칭
+    if (_modelToImage.containsKey(cleanModel)) {
+      resultUrl = '$_baseUrl/${Uri.encodeComponent(_modelToImage[cleanModel]!)}.png';
+      matchType = 'exact-clean';
     }
-
-    // 2. 부분 매칭
-    for (final key in _partialMatchKeys) {
-      if (model.contains(key)) {
-        if (_modelToImage.containsKey(key)) {
-          return '$_baseUrl/${Uri.encodeComponent(_modelToImage[key]!)}.png';
+    // 2. 원본으로 정확한 매칭
+    else if (_modelToImage.containsKey(model)) {
+      resultUrl = '$_baseUrl/${Uri.encodeComponent(_modelToImage[model]!)}.png';
+      matchType = 'exact-original';
+    }
+    else {
+      // 3. 부분 매칭 (정규화된 모델명으로)
+      for (final key in _partialMatchKeys) {
+        if (cleanModel.contains(key) || model.contains(key)) {
+          if (_modelToImage.containsKey(key)) {
+            resultUrl = '$_baseUrl/${Uri.encodeComponent(_modelToImage[key]!)}.png';
+            matchType = 'partial:$key';
+            break;
+          }
         }
       }
     }
 
-    // 3. 모델명 그대로 시도
-    return '$_baseUrl/${Uri.encodeComponent(model)}.png';
+    // 4. 매칭 실패시 null 반환 (존재하지 않는 파일 요청 방지)
+    // 이렇게 하면 Flutter에서 placeholder 아이콘을 표시함
+    if (resultUrl == null) {
+      matchType = 'no-match';
+      if (Environment.isDebug) {
+        print('[CarImageMapper] model="$model" → clean="$cleanModel" → NO IMAGE FOUND');
+      }
+      return null;
+    }
+    
+    // 디버그 로그 (개발 환경에서만)
+    if (Environment.isDebug) {
+      print('[CarImageMapper] model="$model" → clean="$cleanModel" → match=$matchType → $resultUrl');
+    }
+    
+    return resultUrl;
   }
 
   /// 브랜드와 모델명으로 이미지 URL 반환

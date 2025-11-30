@@ -3,17 +3,67 @@ ML 서비스 실행 스크립트
 """
 import sys
 import os
+import logging
+import time
+from functools import lru_cache
+from dotenv import load_dotenv
+
+# .env 파일 로드 (API 키 등)
+load_dotenv()
 
 # ml-service 경로 추가
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'ml-service'))
 
-from fastapi import FastAPI, HTTPException, Request
+# 로깅 설정
+from utils.logger import get_logger
+logger = get_logger('server')
+
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from typing import List, Optional
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Literal, Dict, Any
 from urllib.parse import unquote
+from io import BytesIO
+
+# 이미지 압축용 (선택적)
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    logger.warning("PIL not available - images will be served without compression")
+
+# ========== 간단한 TTL 캐시 ==========
+class SimpleCache:
+    """TTL 기반 간단한 캐시"""
+    def __init__(self, ttl_seconds: int = 60):
+        self._cache: Dict[str, Any] = {}
+        self._timestamps: Dict[str, float] = {}
+        self._ttl = ttl_seconds
+    
+    def get(self, key: str) -> Any:
+        if key in self._cache:
+            if time.time() - self._timestamps[key] < self._ttl:
+                return self._cache[key]
+            else:
+                del self._cache[key]
+                del self._timestamps[key]
+        return None
+    
+    def set(self, key: str, value: Any):
+        self._cache[key] = value
+        self._timestamps[key] = time.time()
+    
+    def clear(self):
+        self._cache.clear()
+        self._timestamps.clear()
+
+# 차량 목록 캐시 (60초 TTL)
+vehicle_cache = SimpleCache(ttl_seconds=60)
+# 대시보드 통계 캐시 (30초 TTL)
+stats_cache = SimpleCache(ttl_seconds=30)
 
 # 서비스 임포트
 from services.prediction_v12 import PredictionServiceV12  # V12 (FuelType 포함)
@@ -54,7 +104,7 @@ admin_service = AdminService()  # 관리자 대시보드
 history_service = get_history_service()  # 분석 이력 및 AI 로그
 db_service = get_database_service()  # 영구 DB 저장소
 
-print("✅ 모든 서비스 초기화 완료!")
+logger.info("All services initialized successfully")
 
 # ========== 스키마 ==========
 
@@ -74,11 +124,12 @@ class TimingRequest(BaseModel):
     model: str
 
 class SmartAnalysisRequest(BaseModel):
-    brand: str
-    model: str
-    year: int
-    mileage: int
-    fuel: str = "가솔린"
+    """통합 분석 요청 스키마 (검증 포함)"""
+    brand: str = Field(..., min_length=1, description="제조사")
+    model: str = Field(..., min_length=1, description="모델명")
+    year: int = Field(..., ge=1990, le=2026, description="연식")
+    mileage: int = Field(..., ge=0, le=1000000, description="주행거리(km)")
+    fuel: Literal["가솔린", "디젤", "LPG", "하이브리드", "전기", "가솔린+전기", "디젤+전기"] = "가솔린"
     # 옵션
     has_sunroof: Optional[bool] = False
     has_navigation: Optional[bool] = False
@@ -89,12 +140,12 @@ class SmartAnalysisRequest(BaseModel):
     has_ventilated_seat: Optional[bool] = False
     has_led_lamp: Optional[bool] = False
     is_accident_free: Optional[bool] = True
-    # 성능점검 등급 (normal/good/excellent)
-    inspection_grade: Optional[str] = "normal"
+    # 성능점검 등급
+    inspection_grade: Literal["normal", "good", "excellent"] = "normal"
     # AI 분석용
-    sale_price: Optional[int] = None
+    sale_price: Optional[int] = Field(None, ge=0, le=500000000, description="판매가(만원)")
     dealer_description: Optional[str] = None
-    # 차량 상세 URL (선택)
+    # 차량 상세 URL
     detail_url: Optional[str] = None
 
 class SimilarRequest(BaseModel):
@@ -118,13 +169,121 @@ class FavoriteRequest(BaseModel):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "healthy", "version": "2.0.0", "message": "Car-Sentix API 정상 작동"}
+    """기본 헬스체크"""
+    return {"status": "healthy", "version": "2.0.0", "message": "Car-Sentix API"}
+
+@app.get("/api/health/detailed")
+async def health_detailed():
+    """상세 헬스체크 - 모든 서비스 상태 확인"""
+    import time
+    start = time.time()
+    
+    services = {
+        "prediction": {"status": "unknown", "message": ""},
+        "timing": {"status": "unknown", "message": ""},
+        "groq_ai": {"status": "unknown", "message": ""},
+        "database": {"status": "unknown", "message": ""},
+        "recommendation": {"status": "unknown", "message": ""},
+    }
+    
+    # 예측 서비스 체크
+    try:
+        prediction_service.predict("현대", "그랜저", 2023, 50000)
+        services["prediction"] = {"status": "healthy", "message": "OK"}
+    except Exception as e:
+        services["prediction"] = {"status": "unhealthy", "message": str(e)[:50]}
+    
+    # 타이밍 서비스 체크
+    try:
+        timing_service.analyze_timing("그랜저")
+        services["timing"] = {"status": "healthy", "message": "OK"}
+    except Exception as e:
+        services["timing"] = {"status": "unhealthy", "message": str(e)[:50]}
+    
+    # Groq AI 체크
+    services["groq_ai"] = {
+        "status": "healthy" if groq_service.is_available() else "unavailable",
+        "message": "Connected" if groq_service.is_available() else "API key missing"
+    }
+    
+    # DB 체크
+    try:
+        db_service.get_dashboard_stats()
+        services["database"] = {"status": "healthy", "message": "OK"}
+    except Exception as e:
+        services["database"] = {"status": "unhealthy", "message": str(e)[:50]}
+    
+    # 추천 서비스 체크
+    try:
+        recommendation_service.get_popular_models("domestic", 1)
+        services["recommendation"] = {"status": "healthy", "message": "OK"}
+    except Exception as e:
+        services["recommendation"] = {"status": "unhealthy", "message": str(e)[:50]}
+    
+    # 전체 상태 결정
+    all_healthy = all(s["status"] == "healthy" for s in services.values() if s["status"] != "unavailable")
+    
+    return {
+        "status": "healthy" if all_healthy else "degraded",
+        "version": "2.0.0",
+        "response_time_ms": round((time.time() - start) * 1000, 2),
+        "services": services
+    }
 
 # ========== 차량 이미지 API ==========
 
+# 이미지 캐시 (압축된 이미지 저장)
+_image_cache: Dict[str, bytes] = {}
+
+def compress_image(file_path: str, max_size: int = 400, quality: int = 85) -> bytes:
+    """이미지를 압축하여 반환 (5MB → ~50KB)"""
+    cache_key = f"{file_path}:{max_size}:{quality}"
+    
+    # 캐시 확인
+    if cache_key in _image_cache:
+        return _image_cache[cache_key]
+    
+    if PIL_AVAILABLE:
+        try:
+            with Image.open(file_path) as img:
+                # RGBA to RGB (PNG → JPEG 변환 시 필요)
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # 크기 조절
+                img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                
+                # JPEG로 압축
+                buffer = BytesIO()
+                img.save(buffer, format='JPEG', quality=quality, optimize=True)
+                compressed = buffer.getvalue()
+                
+                # 캐시 저장 (최대 100개)
+                if len(_image_cache) < 100:
+                    _image_cache[cache_key] = compressed
+                
+                logger.info(f"Image compressed: {file_path} -> {len(compressed)/1024:.1f}KB")
+                return compressed
+        except Exception as e:
+            logger.error(f"Image compression failed: {e}")
+    
+    # PIL 없거나 실패시 원본 반환
+    with open(file_path, "rb") as f:
+        return f.read()
+
 @app.get("/car-images/{filename:path}")
-async def get_car_image(filename: str):
-    """차량 이미지 제공 - 폴더에서 직접 서빙"""
+async def get_car_image(filename: str, size: int = 400, quality: int = 85):
+    """
+    차량 이미지 제공 (압축 지원)
+    - size: 최대 크기 (기본 400px)
+    - quality: JPEG 품질 (기본 85)
+    """
     # URL 디코딩 (한글 파일명 지원)
     decoded_filename = unquote(filename)
 
@@ -135,9 +294,26 @@ async def get_car_image(filename: str):
     file_path = os.path.join(CAR_IMAGES_DIR, decoded_filename)
 
     if os.path.exists(file_path):
-        return FileResponse(file_path, media_type="image/png")
+        # 이미지 압축 후 반환
+        image_data = compress_image(file_path, max_size=size, quality=quality)
+        
+        # JPEG로 변환됨
+        media_type = "image/jpeg" if PIL_AVAILABLE else "image/png"
+        
+        return Response(
+            content=image_data,
+            media_type=media_type,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Cache-Control": "public, max-age=604800",  # 7일 캐시
+                "Content-Length": str(len(image_data)),
+            }
+        )
 
-    # 파일이 없으면 404
+    # 파일이 없으면 404 (로그 추가)
+    logger.warning(f"Image not found: {decoded_filename}")
     raise HTTPException(status_code=404, detail=f"이미지를 찾을 수 없습니다: {decoded_filename}")
 
 @app.get("/api/car-images/list")
@@ -194,8 +370,8 @@ async def smart_analysis(request: SmartAnalysisRequest, user_id: str = "guest"):
     # 성능점검 등급 매핑 (별표 개수 → 등급)
     grade = request.inspection_grade or "normal"
 
-    # 디버그: 옵션 로그 출력
-    print(f"📊 [smart-analysis] model={request.model}, fuel={request.fuel}, grade={grade}, options={options}")
+    accident_free = request.is_accident_free if request.is_accident_free is not None else True
+    logger.info(f"smart-analysis: model={request.model}, fuel={request.fuel}, grade={grade}, accident_free={accident_free}")
 
     # 가격 예측 (옵션 + 연료 + 성능점검 포함)
     pred = prediction_service.predict(
@@ -204,7 +380,7 @@ async def smart_analysis(request: SmartAnalysisRequest, user_id: str = "guest"):
         year=request.year,
         mileage=request.mileage,
         options=options,
-        accident_free=request.is_accident_free or True,
+        accident_free=accident_free,
         grade=grade,  # 성능점검 등급 전달
         fuel=request.fuel
     )
@@ -212,21 +388,13 @@ async def smart_analysis(request: SmartAnalysisRequest, user_id: str = "guest"):
     # 타이밍
     timing = timing_service.analyze_timing(request.model)
 
-    # Groq AI
+    # Groq AI (네고 대본 생성만 사용)
     groq = None
     if groq_service.is_available() and request.sale_price:
         vehicle = {'brand': request.brand, 'model': request.model, 'year': request.year, 'mileage': request.mileage, 'sale_price': request.sale_price}
         prediction = {'predicted_price': pred.predicted_price}
-        timing_data = {'final_score': timing['timing_score'], 'decision': timing['decision']}
 
         groq = {}
-        try:
-            groq['signal'] = groq_service.generate_signal_report(vehicle, prediction, timing_data)
-        except: pass
-        try:
-            if request.dealer_description:
-                groq['fraud_check'] = groq_service.detect_fraud(request.dealer_description, None)
-        except: pass
         try:
             groq['negotiation'] = groq_service.generate_negotiation_script(vehicle, prediction, [])
         except: pass
@@ -323,12 +491,12 @@ async def model_deals(brand: str, model: str, limit: int = 10):
     return {"brand": brand, "model": model, "deals": deals}
 
 @app.post("/api/analyze-deal")
-async def analyze_deal(request: Request):
+async def analyze_deal(request: Request, user_id: str = "guest"):
     """
-    개별 매물 상세 분석 (자동 AI 분석 포함)
+    개별 매물 상세 분석 (규칙 기반)
     - 가격 적정성
-    - 허위매물 위험도 (자동 분석 + DB 저장)
-    - 시그널 분석 (자동 분석 + DB 저장)
+    - 허위매물 위험도 (규칙 기반)
+    - 구매 타이밍 (규칙 기반)
     - 네고 포인트
     """
     data = await request.json()
@@ -340,19 +508,20 @@ async def analyze_deal(request: Request):
     actual_price = int(data.get('actual_price', 0))
     predicted_price = int(data.get('predicted_price', 0))
     fuel = data.get('fuel', '가솔린')
-    dealer_description = data.get('dealer_description', '')
-    car_id = data.get('car_id', '')
+    
+    # user_id 정규화
+    if not user_id or user_id in ['anonymous', 'null', 'undefined']:
+        user_id = 'guest'
 
     # 예측가가 없으면 직접 예측
-    confidence = 0
     if predicted_price == 0:
         try:
             result = prediction_service.predict(brand, model, year, mileage, fuel=fuel)
-            predicted_price = result.predicted_price
-            confidence = result.confidence
+            predicted_price = int(result.predicted_price)
         except:
             predicted_price = actual_price  # 예측 실패 시 실제가 사용
 
+    # 규칙 기반 분석 (recommendation_service)
     analysis = recommendation_service.analyze_deal(
         brand=brand,
         model=model,
@@ -362,74 +531,98 @@ async def analyze_deal(request: Request):
         predicted_price=predicted_price,
         fuel=fuel
     )
-
-    # 시그널 분석 (자동 실행)
-    signal_result = None
-    if groq_service.is_available():
-        try:
-            signal_result = groq_service.analyze_signal(
-                brand=brand,
-                model=model,
-                year=year,
-                mileage=mileage,
-                predicted_price=predicted_price,
-                actual_price=actual_price
-            )
-        except:
-            pass
-
-    # 시그널 분석 결과 DB 저장
-    if signal_result:
-        db_service.save_ai_log("signal", {
-            "user_id": "guest",
-            "car_info": f"{brand} {model} {year}년",
-            "car_id": car_id,
-            "request": {
-                "brand": brand,
-                "model": model,
-                "year": year,
-                "mileage": mileage,
-                "predicted_price": predicted_price,
-                "actual_price": actual_price,
+    
+    # 타이밍 분석 (규칙 기반 - timing_service)
+    timing_result = timing_service.analyze_timing(model)
+    
+    # 규칙 기반 시그널 생성
+    price_gap = actual_price - predicted_price
+    price_gap_pct = round((price_gap / predicted_price * 100), 1) if predicted_price > 0 else 0
+    
+    if price_gap_pct <= -10:
+        signal = 'strong_buy'
+        signal_summary = f"시세 대비 {abs(price_gap_pct):.1f}% 저렴합니다. 적극 매수 추천!"
+    elif price_gap_pct <= -5:
+        signal = 'buy'
+        signal_summary = f"시세 대비 {abs(price_gap_pct):.1f}% 저렴합니다. 매수 추천."
+    elif price_gap_pct <= 5:
+        signal = 'hold'
+        signal_summary = "시세와 비슷한 적정 가격입니다."
+    else:
+        signal = 'avoid'
+        signal_summary = f"시세 대비 {price_gap_pct:.1f}% 비쌉니다. 협상 필요."
+    
+    signal_result = {
+        'signal': signal,
+        'summary': signal_summary,
+        'price_gap': price_gap,
+        'price_gap_percent': price_gap_pct
+    }
+    
+    # 분석 이력 저장 (대시보드 통계용)
+    fraud_risk = analysis.get('fraud_risk', {})
+    db_service.save_analysis({
+        'user_id': user_id,
+        'brand': brand,
+        'model': model,
+        'year': year,
+        'mileage': mileage,
+        'fuel_type': fuel,
+        'predicted_price': float(predicted_price),
+        'confidence': 85.0,
+        'timing_score': timing_result.get('timing_score') if timing_result else None,
+        'signal': signal,
+        'request': {
+            'brand': brand, 'model': model, 'year': year, 'mileage': mileage,
+            'actual_price': actual_price, 'predicted_price': predicted_price
+        },
+        'response': {
+            'timing': timing_result,
+            'signal': signal_result,
+            'fraud_risk': fraud_risk
+        }
+    })
+    
+    # AI 로그 저장 (규칙 기반)
+    db_service.save_ai_log("signal", {
+        "user_id": user_id,
+        "car_info": f"{brand} {model} {year}년",
+        "request": {
+            "brand": brand,
+            "model": model,
+            "year": year,
+            "mileage": mileage,
+            "predicted_price": predicted_price,
+            "sale_price": actual_price,
+        },
+        "response": {"signal": signal_result, "success": True},
+        "success": True,
+        "ai_model": "Rule-based"
+    })
+    
+    db_service.save_ai_log("fraud_detection", {
+        "user_id": user_id,
+        "car_info": f"{brand} {model} {year}년",
+        "request": {
+            "brand": brand,
+            "model": model,
+            "year": year,
+            "mileage": mileage,
+            "predicted_price": predicted_price,
+            "sale_price": actual_price,
+        },
+        "response": {
+            "fraud_check": {
+                "risk_level": fraud_risk.get('level', 'low'),
+                "risk_score": fraud_risk.get('score', 0),
+                "warnings": [f.get('msg', '') for f in fraud_risk.get('factors', []) if f.get('status') in ['warn', 'fail']],
+                "summary": f"규칙 기반 분석: 위험도 {fraud_risk.get('score', 0)}점"
             },
-            "response": signal_result,
-            "success": True,
-            "ai_model": "Llama 3.3 70B"
-        })
-
-    # 허위매물 탐지 (자동 실행)
-    fraud_result = None
-    if groq_service.is_available() and dealer_description:
-        try:
-            fraud_result = groq_service.detect_fraud(
-                brand=brand,
-                model=model,
-                year=year,
-                mileage=mileage,
-                price=actual_price,
-                description=dealer_description
-            )
-        except:
-            pass
-
-    # 허위매물 탐지 결과 DB 저장
-    if fraud_result:
-        db_service.save_ai_log("fraud_detection", {
-            "user_id": "guest",
-            "car_info": f"{brand} {model} {year}년",
-            "car_id": car_id,
-            "request": {
-                "brand": brand,
-                "model": model,
-                "year": year,
-                "mileage": mileage,
-                "price": actual_price,
-                "description": dealer_description[:100] if dealer_description else "",
-            },
-            "response": fraud_result,
-            "success": True,
-            "ai_model": "Llama 3.3 70B"
-        })
+            "success": True
+        },
+        "success": True,
+        "ai_model": "Rule-based"
+    })
 
     return {
         "brand": brand,
@@ -437,9 +630,9 @@ async def analyze_deal(request: Request):
         "year": year,
         "mileage": mileage,
         "fuel": fuel,
+        "timing": timing_result,
         "signal_analysis": signal_result,
-        "fraud_detection": fraud_result,
-        **analysis
+        **analysis  # price_fairness, fraud_risk, nego_points, summary
     }
 
 @app.get("/api/brands")
@@ -643,21 +836,33 @@ async def generate_negotiation(request: NegotiationRequest):
             'predicted_price': predicted_price
         }
 
-        # AI 로그 기록 (메모리 + DB 영구 저장)
+        # AI 로그 기록 (메모리 + DB 영구 저장) - 주행거리 포함
+        mileage = request.mileage or 0
         log_data = {
             "user_id": "guest",
-            "car_info": f"{brand} {model_part} {year or ''}년",
+            "car_info": f"{brand} {model_part} {year or ''}년식",
             "request": {
                 "brand": brand,
                 "model": model_part,
                 "year": year,
+                "mileage": mileage,
                 "predicted_price": predicted_price,
                 "sale_price": sale_price,
             },
             "response": {
                 "success": True,
-                "script": response.get('message_script'),
-                "target_price": response.get('target_price'),
+                "negotiation": {
+                    "script": response.get('message_script'),
+                    "phone_scripts": response.get('phone_script', []),
+                    "target_price": response.get('target_price'),
+                    "key_arguments": response.get('key_arguments', []),
+                    "tip": response.get('tip'),
+                },
+                "scripts": [
+                    {"situation": "문자 발송", "script": response.get('message_script', '')},
+                    *[{"situation": ps.split(': ')[0] if ': ' in ps else f"단계 {i+1}", "script": ps.split(': ')[1] if ': ' in ps else ps} 
+                      for i, ps in enumerate(response.get('phone_script', []))]
+                ]
             },
             "success": True,
             "ai_model": "Llama 3.3 70B" if groq_service.is_available() else "Fallback"
@@ -690,21 +895,188 @@ async def get_ai_status():
         'status': 'connected' if groq_service.is_available() else 'disconnected'
     }
 
-
 # ========== 관리자 대시보드 API ==========
+
+# Spring Boot User Service URL
+SPRING_BOOT_URL = "http://localhost:8080"
+
+@app.get("/api/admin/users", tags=["Admin"])
+async def get_admin_users():
+    """사용자 목록 조회 (Spring Boot 프록시 + 분석 이력 병합)"""
+    import httpx
+    
+    users = []
+    spring_boot_available = False
+    
+    # 1. Spring Boot User Service에서 실제 가입 사용자 조회 시도
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # 인증 없이 사용자 목록 조회 (공개 엔드포인트 필요 또는 관리자 토큰 사용)
+            response = await client.get(f"{SPRING_BOOT_URL}/api/admin/users-public")
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success') and data.get('users'):
+                    users = data['users']
+                    spring_boot_available = True
+                    logger.info(f"Spring Boot에서 {len(users)}명의 사용자 로드됨")
+    except Exception as e:
+        logger.warning(f"Spring Boot 사용자 조회 실패: {e}")
+    
+    # 2. Spring Boot 실패 시 기본 사용자 목록
+    if not spring_boot_available:
+        users = [
+            {"id": 1, "email": "admin@car-sentix.com", "username": "관리자", "phoneNumber": "010-1234-5678", "role": "ADMIN", "provider": "LOCAL", "isActive": True},
+            {"id": 3, "email": "guest", "username": "게스트", "phoneNumber": "-", "role": "GUEST", "provider": "LOCAL", "isActive": True},
+        ]
+    
+    # 3. 분석 이력 및 AI 로그에서 사용자 ID 수집하여 병합
+    analysis_users = {}
+    try:
+        # 분석 이력에서 사용자 수집
+        history = db_service.get_analysis_history(limit=1000)
+        for h in history:
+            uid = h.get('user_id', 'anonymous')
+            if uid and uid not in ['anonymous', 'guest', '']:
+                if uid not in analysis_users:
+                    analysis_users[uid] = 0
+                analysis_users[uid] += 1
+        
+        # AI 로그에서 사용자 수집
+        ai_logs = db_service.get_ai_logs(limit=1000)
+        for log in ai_logs:
+            uid = log.get('user_id', 'anonymous')
+            if uid and uid not in ['anonymous', 'guest', '']:
+                if uid not in analysis_users:
+                    analysis_users[uid] = 0
+                analysis_users[uid] += 1
+                
+        # 매물 조회 이력에서 사용자 수집
+        views = db_service.get_vehicle_views(limit=1000)
+        for v in views:
+            uid = v.get('user_id', 'anonymous')
+            if uid and uid not in ['anonymous', 'guest', '']:
+                if uid not in analysis_users:
+                    analysis_users[uid] = 0
+                analysis_users[uid] += 1
+    except Exception as e:
+        logger.warning(f"사용자 이력 수집 실패: {e}")
+    
+    # 4. 기존 사용자 목록에 없는 분석 이력 사용자 추가
+    existing_emails = {u.get('email', '') for u in users}
+    next_id = max([u.get('id', 0) for u in users] or [0]) + 1
+    
+    for uid, count in analysis_users.items():
+        if uid not in existing_emails:
+            users.append({
+                "id": next_id,
+                "email": uid,
+                "username": uid.split('@')[0] if '@' in uid else uid,
+                "phoneNumber": "-",
+                "role": "USER",
+                "provider": "LOCAL",
+                "isActive": True,
+                "analysisCount": count
+            })
+            next_id += 1
+    
+    # 5. 각 사용자의 분석 횟수 계산
+    for user in users:
+        email = user.get('email', '')
+        user['analysisCount'] = analysis_users.get(email, 0)
+    
+    return {
+        "success": True,
+        "users": users,
+        "total": len(users),
+        "source": "spring_boot" if spring_boot_available else "local",
+        "message": "Spring Boot 연동" if spring_boot_available else "로컬 데이터"
+    }
+
+@app.put("/api/admin/users/{user_id}", tags=["Admin"])
+async def update_admin_user(user_id: int, request: Request):
+    """사용자 정보 수정 (관리자 전용)"""
+    data = await request.json()
+    return {"success": True, "message": f"사용자 {user_id} 수정 완료 (목업)"}
+
+@app.delete("/api/admin/users/{user_id}", tags=["Admin"])
+async def delete_admin_user(user_id: int):
+    """사용자 삭제 (관리자 전용)"""
+    return {"success": True, "message": f"사용자 {user_id} 삭제 완료 (목업)"}
+
+@app.put("/api/admin/users/{user_id}/activate", tags=["Admin"])
+async def activate_user(user_id: int):
+    """사용자 활성화"""
+    return {"success": True, "message": f"사용자 {user_id} 활성화 완료"}
+
+@app.put("/api/admin/users/{user_id}/deactivate", tags=["Admin"])
+async def deactivate_user(user_id: int):
+    """사용자 비활성화"""
+    return {"success": True, "message": f"사용자 {user_id} 비활성화 완료"}
+
+@app.get("/api/admin/me", tags=["Admin"])
+async def get_admin_me(request: Request):
+    """현재 로그인한 관리자 정보 (토큰 검증용)"""
+    # Authorization 헤더에서 토큰 추출 (실제 구현 시 JWT 검증 필요)
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        # 토큰이 있으면 관리자 정보 반환 (목업)
+        return {
+            "id": 1,
+            "email": "admin@car-sentix.com",
+            "username": "관리자",
+            "role": "ADMIN",
+            "isActive": True
+        }
+    raise HTTPException(status_code=401, detail="인증이 필요합니다")
+
+class AdminLoginRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/admin/login", tags=["Admin"])
+async def admin_login(request: AdminLoginRequest):
+    """관리자 로그인 (목업 - User Service 연동 전)"""
+    # 기본 관리자 계정 (목업)
+    ADMIN_ACCOUNTS = {
+        "admin@carsentix.com": {"password": "admin1234!", "id": 1, "username": "관리자", "role": "ADMIN"},
+        "admin@car-sentix.com": {"password": "admin1234!", "id": 1, "username": "관리자", "role": "ADMIN"},
+    }
+    
+    email = request.email.lower().strip()
+    password = request.password
+    
+    if email in ADMIN_ACCOUNTS and ADMIN_ACCOUNTS[email]["password"] == password:
+        account = ADMIN_ACCOUNTS[email]
+        # 간단한 토큰 생성 (실제 구현 시 JWT 사용)
+        import hashlib
+        import time
+        token = hashlib.sha256(f"{email}:{time.time()}".encode()).hexdigest()
+        
+        return {
+            "success": True,
+            "token": token,
+            "user": {
+                "id": account["id"],
+                "email": email,
+                "username": account["username"],
+                "role": account["role"],
+                "isActive": True
+            },
+            "message": "로그인 성공"
+        }
+    
+    return {
+        "success": False,
+        "message": "이메일 또는 비밀번호가 올바르지 않습니다"
+    }
 
 @app.get("/api/admin/dashboard-stats", tags=["Admin"])
 async def get_dashboard_stats():
     """대시보드 통계 (오늘 조회수, 전체 조회수, 인기 모델) - DB 기반"""
-    # DB에서 실제 데이터 조회
     db_stats = db_service.get_dashboard_stats()
-
-    # DB에 데이터가 없으면 admin_service fallback
     if db_stats.get('totalCount', 0) == 0:
         return admin_service.get_dashboard_stats()
-
     return db_stats
-
 
 @app.get("/api/admin/daily-requests", tags=["Admin"])
 async def get_daily_requests(days: int = 7):
@@ -730,10 +1102,29 @@ async def get_vehicles(
     brand: str = None,
     model: str = None,
     category: str = "all",
-    limit: int = 50
+    page: int = 1,
+    limit: int = 20,
+    price_min: int = None,
+    price_max: int = None
 ):
-    """차량 목록 조회"""
-    return admin_service.get_vehicles(brand, model, category, limit)
+    """차량 목록 조회 (페이지네이션, 가격 범위 검색 지원) - 캐시 적용"""
+    # 캐시 키 생성
+    cache_key = f"vehicles:{brand}:{model}:{category}:{page}:{limit}:{price_min}:{price_max}"
+    
+    # 캐시 확인
+    cached = vehicle_cache.get(cache_key)
+    if cached:
+        return cached
+    
+    # 데이터 조회
+    result = admin_service.get_vehicles(
+        brand=brand, model=model, category=category,
+        page=page, limit=limit, price_min=price_min, price_max=price_max
+    )
+    
+    # 캐시 저장
+    vehicle_cache.set(cache_key, result)
+    return result
 
 
 @app.get("/api/admin/history", tags=["Admin"])
@@ -778,10 +1169,11 @@ async def get_ai_logs(log_type: str = None, limit: int = 50):
 async def get_analysis_history(user_id: str = None, limit: int = 50):
     """분석 이력 조회 (예측 결과 포함) - DB 기반"""
     history = db_service.get_analysis_history(user_id, limit)
+    total_count = db_service.get_total_analysis_count(user_id)
     return {
         "success": True,
         "history": history,
-        "total": len(history)
+        "total": total_count  # DB 전체 레코드 수
     }
 
 
@@ -792,9 +1184,117 @@ async def get_car_image(brand: str, model: str):
     return CarImageService.get_image_with_fallback(brand, model)
 
 
+# ========== 알림 시스템 API ==========
+
+@app.get("/api/notifications", tags=["Notifications"])
+async def get_notifications(user_id: str = "guest", limit: int = 50, unread_only: bool = False):
+    """알림 내역 조회"""
+    notifications = db_service.get_notifications(user_id, limit, unread_only)
+    unread_count = db_service.get_unread_notification_count(user_id)
+    return {
+        "success": True,
+        "notifications": notifications,
+        "unread_count": unread_count,
+        "total": len(notifications)
+    }
+
+@app.post("/api/notifications", tags=["Notifications"])
+async def add_notification(request: Request):
+    """알림 추가 (허위매물 고위험 등)"""
+    data = await request.json()
+    notification_id = db_service.add_notification(data)
+    return {"success": True, "id": notification_id}
+
+@app.put("/api/notifications/{notification_id}/read", tags=["Notifications"])
+async def mark_notification_read(notification_id: int):
+    """알림 읽음 처리"""
+    success = db_service.mark_notification_read(notification_id)
+    return {"success": success}
+
+@app.get("/api/notifications/unread-count", tags=["Notifications"])
+async def get_unread_count(user_id: str = "guest"):
+    """읽지 않은 알림 개수"""
+    count = db_service.get_unread_notification_count(user_id)
+    return {"count": count}
+
+
+# ========== 매물 조회 기록 API (추천탭 등) ==========
+
+@app.post("/api/vehicle-views", tags=["Analytics"])
+async def add_vehicle_view(request: Request):
+    """개별 매물 조회 기록 (추천탭에서 클릭 시)"""
+    data = await request.json()
+    view_id = db_service.add_vehicle_view(data)
+    
+    # 허위매물 고위험인 경우 자동 알림 생성
+    risk_level = data.get('risk_level', '')
+    risk_score = data.get('risk_score', 0)
+    
+    if risk_level == 'high' or risk_score >= 70:
+        notification_data = {
+            "user_id": data.get('user_id', 'guest'),
+            "notification_type": "fraud_alert",
+            "title": "⚠️ 허위매물 고위험 경고",
+            "message": f"{data.get('brand', '')} {data.get('model', '')} 매물이 허위매물 위험도가 높습니다. 주의가 필요합니다.",
+            "car_id": data.get('car_id', ''),
+            "car_info": {
+                "brand": data.get('brand'),
+                "model": data.get('model'),
+                "year": data.get('year'),
+                "price": data.get('price'),
+            },
+            "risk_level": risk_level,
+            "risk_score": risk_score
+        }
+        db_service.add_notification(notification_data)
+    
+    return {"success": True, "id": view_id}
+
+@app.get("/api/vehicle-views", tags=["Analytics"])
+async def get_vehicle_views(user_id: str = None, limit: int = 50):
+    """매물 조회 이력"""
+    views = db_service.get_vehicle_views(user_id, limit)
+    return {"success": True, "views": views, "total": len(views)}
+
+@app.get("/api/admin/total-views", tags=["Admin"])
+async def get_total_views():
+    """전체 조회 통계 (시세 예측 + 개별 매물 조회)"""
+    stats = db_service.get_total_views_count()
+    return {"success": True, **stats}
+
+
+# ========== 대시보드 통계 확장 (매물 조회 포함) ==========
+
+@app.get("/api/admin/dashboard-stats-extended", tags=["Admin"])
+async def get_dashboard_stats_extended():
+    """대시보드 통계 확장 (시세 예측 + 매물 조회 포함)"""
+    db_stats = db_service.get_dashboard_stats()
+    view_stats = db_service.get_total_views_count()
+    ai_stats = db_service.get_ai_stats()
+    
+    return {
+        "success": True,
+        # 기본 통계 (시세 예측)
+        "todayPredictions": db_stats.get('todayCount', 0),
+        "totalPredictions": db_stats.get('totalCount', 0),
+        # 매물 조회 통계
+        "todayViews": view_stats.get('today_views', 0),
+        "totalViews": view_stats.get('total_views', 0),
+        # 합계
+        "todayTotal": view_stats.get('today_total', db_stats.get('todayCount', 0)),
+        "totalCount": view_stats.get('total', db_stats.get('totalCount', 0)),
+        # 기존 통계
+        "avgConfidence": db_stats.get('avgConfidence', 0),
+        "popularModels": db_stats.get('popularModels', []),
+        # AI 통계
+        "aiStats": ai_stats
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
-    print("\n🚀 Car-Sentix API 서버 시작...")
-    print("📍 http://localhost:8000")
-    print("📖 API 문서: http://localhost:8000/docs\n")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("ML_SERVICE_PORT", 8000))
+    print(f"\n[Car-Sentix API Server Starting...]")
+    print(f"URL: http://localhost:{port}")
+    print(f"Docs: http://localhost:{port}/docs\n")
+    uvicorn.run(app, host="0.0.0.0", port=port)

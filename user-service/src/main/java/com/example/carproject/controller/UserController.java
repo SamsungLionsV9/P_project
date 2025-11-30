@@ -1,5 +1,6 @@
 package com.example.carproject.controller;
 
+import com.example.carproject.dto.OAuthSignupDto;
 import com.example.carproject.dto.UserLoginDto;
 import com.example.carproject.dto.UserResponseDto;
 import com.example.carproject.dto.UserSignupDto;
@@ -24,7 +25,7 @@ public class UserController {
     private final UserService userService;
     private final EmailVerificationService emailVerificationService;
     
-    /**
+    /**k 
      * 헬스체크
      * GET /api/health
      */
@@ -63,6 +64,34 @@ public class UserController {
     }
     
     /**
+     * OAuth 회원가입 (이메일 인증 불필요)
+     * POST /api/auth/oauth/signup
+     */
+    @PostMapping("/oauth/signup")
+    public ResponseEntity<?> oauthSignup(@Valid @RequestBody OAuthSignupDto dto) {
+        try {
+            UserResponseDto user = userService.oauthSignup(dto);
+            
+            // JWT 토큰 생성
+            String token = userService.generateTokenForUser(user.getEmail());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "회원가입이 완료되었습니다");
+            response.put("user", user);
+            response.put("token", token);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
      * 로그인
      * POST /api/auth/login
      */
@@ -70,11 +99,13 @@ public class UserController {
     public ResponseEntity<?> login(@Valid @RequestBody UserLoginDto dto) {
         try {
             String token = userService.login(dto);
+            UserResponseDto user = userService.getUserInfo(dto.getEmail());  // 사용자 정보 조회
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "로그인 성공");
             response.put("token", token);
+            response.put("user", user);  // 사용자 정보 추가
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -199,6 +230,118 @@ public class UserController {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "인증 실패: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * 비밀번호 찾기 - 이메일 인증 코드 발송
+     * POST /api/auth/password/forgot
+     */
+    @PostMapping("/password/forgot")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            if (email == null || email.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "이메일을 입력해주세요");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // 사용자 존재 여부 확인 (일반 사용자만, 소셜 로그인 제외)
+            if (!userService.existsByEmail(email)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "등록되지 않은 이메일이거나 소셜 로그인 계정입니다");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // 인증 코드 발송
+            emailVerificationService.sendVerificationCode(email);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "인증 코드가 발송되었습니다");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "인증 코드 발송 실패: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    
+    /**
+     * 비밀번호 재설정
+     * POST /api/auth/password/reset
+     */
+    @PostMapping("/password/reset")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String code = request.get("code");
+            String newPassword = request.get("newPassword");
+            
+            if (email == null || email.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "이메일을 입력해주세요");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            if (code == null || code.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "인증 코드를 입력해주세요");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            if (newPassword == null || newPassword.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "새 비밀번호를 입력해주세요");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // 비밀번호 길이 검증
+            if (newPassword.length() < 8) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "비밀번호는 8자 이상이어야 합니다");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // 인증 코드 확인
+            boolean verified = emailVerificationService.verifyCode(email, code);
+            if (!verified) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "인증 코드가 올바르지 않거나 만료되었습니다");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // 비밀번호 재설정
+            userService.resetPassword(email, newPassword);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "비밀번호가 재설정되었습니다");
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "비밀번호 재설정 실패: " + e.getMessage());
             
             return ResponseEntity.badRequest().body(response);
         }

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
-import { Settings, Bell, LogOut } from "lucide-react";
+import { Settings, Bell, LogOut, AlertTriangle, X } from "lucide-react";
 
 // 컴포넌트 임포트
 import { Sidebar, PlaceholderPage } from "./components";
@@ -17,8 +17,59 @@ const pageTitleMap = {
   settings: "설정",
 };
 
+const API_BASE = "http://localhost:8000";
+
 function App({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState("dashboard");
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notifRef = useRef(null);
+
+  // 알림 조회
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/notifications?limit=20&unread_only=false`);
+      const data = await res.json();
+      if (data.success) {
+        // 허위매물 고위험 알림만 필터링
+        const fraudAlerts = (data.notifications || []).filter(
+          n => n.type === 'fraud_alert' && n.data?.risk_level === 'high'
+        );
+        setNotifications(fraudAlerts);
+        setUnreadCount(fraudAlerts.filter(n => !n.is_read).length);
+      }
+    } catch (e) {
+      console.error('알림 조회 실패:', e);
+    }
+  };
+
+  // 알림 읽음 처리
+  const markAsRead = async (notifId) => {
+    try {
+      await fetch(`${API_BASE}/api/notifications/${notifId}/read`, { method: 'PUT' });
+      fetchNotifications();
+    } catch (e) {
+      console.error('읽음 처리 실패:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // 30초마다 갱신
+    return () => clearInterval(interval);
+  }, []);
+
+  // 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
     if (window.confirm("로그아웃 하시겠습니까?")) {
@@ -61,9 +112,49 @@ function App({ user, onLogout }) {
             <button className="top-icon-btn" title="설정">
               <Settings size={18} />
             </button>
-            <button className="top-icon-btn" title="알림">
-              <Bell size={18} />
-            </button>
+            <div className="notification-wrapper" ref={notifRef}>
+              <button 
+                className={`top-icon-btn ${unreadCount > 0 ? 'has-notif' : ''}`} 
+                title="알림"
+                onClick={() => setShowNotifications(!showNotifications)}
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+              </button>
+              
+              {showNotifications && (
+                <div className="notification-dropdown">
+                  <div className="notif-header">
+                    <span>🚨 허위매물 고위험 알림</span>
+                    <button onClick={() => setShowNotifications(false)}><X size={14} /></button>
+                  </div>
+                  <div className="notif-list">
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">허위매물 고위험 알림이 없습니다</div>
+                    ) : (
+                      notifications.map(n => (
+                        <div 
+                          key={n.id} 
+                          className={`notif-item ${n.is_read ? 'read' : 'unread'}`}
+                          onClick={() => markAsRead(n.id)}
+                        >
+                          <div className="notif-icon"><AlertTriangle size={16} color="#dc2626" /></div>
+                          <div className="notif-content">
+                            <div className="notif-title">{n.title}</div>
+                            <div className="notif-desc">{n.message}</div>
+                            <div className="notif-meta">
+                              <span>{n.data?.car_info}</span>
+                              <span>{new Date(n.created_at).toLocaleString('ko-KR')}</span>
+                            </div>
+                          </div>
+                          {!n.is_read && <span className="notif-dot"></span>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               className="top-avatar logout-btn"
               onClick={handleLogout}

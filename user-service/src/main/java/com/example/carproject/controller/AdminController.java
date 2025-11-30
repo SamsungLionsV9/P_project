@@ -99,6 +99,26 @@ public class AdminController {
     }
 
     /**
+     * 전체 사용자 목록 조회 (공개 - admin-dashboard용)
+     * GET /api/admin/users-public
+     */
+    @GetMapping("/users-public")
+    public ResponseEntity<?> getAllUsersPublic() {
+        List<User> users = userRepository.findAll();
+        
+        List<Map<String, Object>> userList = users.stream()
+                .map(this::convertUserToMap)
+                .collect(Collectors.toList());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("users", userList);
+        response.put("total", userList.size());
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
      * 전체 사용자 목록 조회
      * GET /api/admin/users
      */

@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 import '../models/car.dart';  // RecommendedCar 타입 참조용
+import '../config/environment.dart';  // 환경 설정
 
 // 모델 클래스 re-export (하위 호환성 유지)
 // 이제 모델들은 lib/models/ 디렉토리에서 관리됩니다.
@@ -17,34 +16,20 @@ export '../models/ai.dart';
 /// Car-Sentix API Service
 /// ML 서비스와 통신하는 클라이언트
 ///
-/// 고도화 버전 v2.2
-/// - 에뮬레이터 자동 감지 (Android: 10.0.2.2)
-/// - 타임아웃 설정 (15초)
+/// 고도화 버전 v2.3
+/// - 환경별 URL 설정 (Environment)
+/// - 타임아웃 설정 (환경별)
 /// - 에러 핸들링 강화
 /// - JWT 인증 헤더 지원
-/// - 포트 수정: 8001 → 8000 (ML Service 실제 포트)
 class ApiService {
-  // 서버 포트 (ML Service: 8000)
-  static const int _port = 8000;
-  
-  // 타임아웃 설정
-  static const Duration _timeout = Duration(seconds: 15);
+  // 타임아웃 설정 (환경별)
+  static Duration get _timeout => Environment.apiTimeout;
   
   // AuthService 참조
   final AuthService _authService = AuthService();
   
-  // 베이스 URL (플랫폼에 따라 자동 설정)
-  static String get _baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:$_port/api';
-    }
-    // Android 에뮬레이터에서는 10.0.2.2가 호스트 머신의 localhost
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:$_port/api';
-    }
-    // iOS 시뮬레이터, Windows, macOS 등
-    return 'http://localhost:$_port/api';
-  }
+  // 베이스 URL (환경 설정에서 가져옴)
+  static String get _baseUrl => '${Environment.mlServiceUrl}/api';
   
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -62,8 +47,8 @@ class ApiService {
     return headers;
   }
   
-  /// 사용자 ID (로그인 시) 또는 guest
-  String get _userId => _authService.userId ?? 'guest';
+  /// 사용자 ID (로그인 시 이메일 사용) 또는 guest
+  String get _userId => _authService.userEmail ?? 'guest';
 
   /// 가격 예측
   Future<PredictionResult> predict({
@@ -220,58 +205,90 @@ class ApiService {
     String category = 'all',
     int limit = 5,
   }) async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/popular?category=$category&limit=$limit'),
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/popular?category=$category&limit=$limit'),
+      ).timeout(_timeout);
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['models'] as List)
-          .map((e) => PopularCar.fromJson(e))
-          .toList();
-    } else {
-      throw ApiException('인기 차량 조회 실패');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final models = data['models'];
+        if (models is List) {
+          return models.map((e) => PopularCar.fromJson(e as Map<String, dynamic>)).toList();
+        }
+        return [];
+      } else {
+        throw ApiException('인기 차량 조회 실패');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('인기 차량 조회 오류: $e');
     }
   }
 
   /// 브랜드 목록
   Future<List<String>> getBrands() async {
-    final response = await http.get(Uri.parse('$_baseUrl/brands'));
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/brands')).timeout(_timeout);
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return List<String>.from(data['brands']);
-    } else {
-      throw ApiException('브랜드 목록 조회 실패');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final brands = data['brands'];
+        if (brands is List) {
+          return brands.map((e) => e.toString()).toList();
+        }
+        return [];
+      } else {
+        throw ApiException('브랜드 목록 조회 실패');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('브랜드 목록 조회 오류: $e');
     }
   }
 
   /// 모델 목록
   Future<List<String>> getModels(String brand) async {
-    final response = await http.get(Uri.parse('$_baseUrl/models/$brand'));
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/models/$brand')).timeout(_timeout);
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return List<String>.from(data['models']);
-    } else {
-      throw ApiException('모델 목록 조회 실패');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final models = data['models'];
+        if (models is List) {
+          return models.map((e) => e.toString()).toList();
+        }
+        return [];
+      } else {
+        throw ApiException('모델 목록 조회 실패');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('모델 목록 조회 오류: $e');
     }
   }
 
   /// 검색 이력
   Future<List<SearchHistory>> getHistory({int limit = 10}) async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/history?user_id=$_userId&limit=$limit'),
-      headers: _headers,
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/history?user_id=$_userId&limit=$limit'),
+        headers: _headers,
+      ).timeout(_timeout);
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['history'] as List)
-          .map((e) => SearchHistory.fromJson(e))
-          .toList();
-    } else {
-      throw ApiException('검색 이력 조회 실패');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final history = data['history'];
+        if (history is List) {
+          return history.map((e) => SearchHistory.fromJson(e as Map<String, dynamic>)).toList();
+        }
+        return [];
+      } else {
+        throw ApiException('검색 이력 조회 실패');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('검색 이력 조회 오류: $e');
     }
   }
 
@@ -396,24 +413,60 @@ class ApiService {
     int? predictedPrice,
     String fuel = '가솔린',
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/analyze-deal'),
-      headers: _headers,
-      body: jsonEncode({
-        'brand': brand,
-        'model': model,
-        'year': year,
-        'mileage': mileage,
-        'actual_price': actualPrice,
-        'predicted_price': predictedPrice ?? 0,
-        'fuel': fuel,
-      }),
-    ).timeout(const Duration(seconds: 20));
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/analyze-deal?user_id=$_userId'),
+        headers: _headers,
+        body: jsonEncode({
+          'brand': brand,
+          'model': model,
+          'year': year,
+          'mileage': mileage,
+          'actual_price': actualPrice,
+          'predicted_price': predictedPrice ?? 0,
+          'fuel': fuel,
+        }),
+      ).timeout(const Duration(seconds: 20));
 
-    if (response.statusCode == 200) {
-      return DealAnalysis.fromJson(jsonDecode(response.body));
-    } else {
-      throw ApiException('매물 분석 실패');
+      if (response.statusCode == 200) {
+        return DealAnalysis.fromJson(jsonDecode(response.body));
+      } else {
+        throw ApiException('매물 분석 실패');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('매물 분석 오류: $e');
+    }
+  }
+
+  /// 매물 조회 기록 (통계용)
+  Future<void> recordVehicleView({
+    required String brand,
+    required String model,
+    required int year,
+    required int mileage,
+    required int price,
+    String? carId,
+    String viewSource = 'recommendation',
+  }) async {
+    try {
+      await http.post(
+        Uri.parse('$_baseUrl/vehicle-views'),
+        headers: _headers,
+        body: jsonEncode({
+          'user_id': _userId,
+          'brand': brand,
+          'model': model,
+          'year': year,
+          'mileage': mileage,
+          'price': price,
+          'car_id': carId ?? '',
+          'view_source': viewSource,
+        }),
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      // 통계 기록 실패해도 무시
+      debugPrint('Vehicle view record failed: $e');
     }
   }
 
@@ -1016,6 +1069,7 @@ class DealAnalysis {
   final FraudRisk fraudRisk;
   final List<String> negoPoints;
   final DealSummary summary;
+  final TimingIndicator? timing;
 
   DealAnalysis({
     required this.brand,
@@ -1027,6 +1081,7 @@ class DealAnalysis {
     required this.fraudRisk,
     required this.negoPoints,
     required this.summary,
+    this.timing,
   });
 
   factory DealAnalysis.fromJson(Map<String, dynamic> json) {
@@ -1040,6 +1095,62 @@ class DealAnalysis {
       fraudRisk: FraudRisk.fromJson(json['fraud_risk'] ?? {}),
       negoPoints: List<String>.from(json['nego_points'] ?? []),
       summary: DealSummary.fromJson(json['summary'] ?? {}),
+      timing: json['timing'] != null ? TimingIndicator.fromJson(json['timing']) : null,
+    );
+  }
+}
+
+/// 타이밍 지표
+class TimingIndicator {
+  final int timingScore;
+  final String decision;
+  final String label;
+  final List<TimingFactor> factors;
+
+  TimingIndicator({
+    required this.timingScore,
+    required this.decision,
+    required this.label,
+    required this.factors,
+  });
+
+  factory TimingIndicator.fromJson(Map<String, dynamic> json) {
+    return TimingIndicator(
+      timingScore: (json['timing_score'] as num?)?.toInt() ?? 50,
+      decision: json['decision']?.toString() ?? 'hold',
+      label: json['label']?.toString() ?? '보통',
+      factors: (json['factors'] as List? ?? [])
+          .map((e) => TimingFactor.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+  
+  Color get decisionColor {
+    switch (decision) {
+      case 'buy': return const Color(0xFF66BB6A);
+      case 'wait': return const Color(0xFFFFA726);
+      default: return const Color(0xFF42A5F5);
+    }
+  }
+}
+
+/// 타이밍 요소
+class TimingFactor {
+  final String factor;
+  final String status;
+  final String description;
+
+  TimingFactor({
+    required this.factor,
+    required this.status,
+    required this.description,
+  });
+
+  factory TimingFactor.fromJson(Map<String, dynamic> json) {
+    return TimingFactor(
+      factor: json['factor'] ?? '',
+      status: json['status'] ?? 'neutral',
+      description: json['description'] ?? '',
     );
   }
 }
@@ -1060,10 +1171,10 @@ class PriceFairness {
 
   factory PriceFairness.fromJson(Map<String, dynamic> json) {
     return PriceFairness(
-      score: json['score'] ?? 50,
-      label: json['label'] ?? '판단불가',
-      percentile: json['percentile'] ?? 50,
-      description: json['description'] ?? '',
+      score: (json['score'] as num?)?.toInt() ?? 50,
+      label: json['label']?.toString() ?? '판단불가',
+      percentile: (json['percentile'] as num?)?.toInt() ?? 50,
+      description: json['description']?.toString() ?? '',
     );
   }
 }
@@ -1082,10 +1193,10 @@ class FraudRisk {
 
   factory FraudRisk.fromJson(Map<String, dynamic> json) {
     return FraudRisk(
-      score: json['score'] ?? 0,
-      level: json['level'] ?? 'low',
+      score: (json['score'] as num?)?.toInt() ?? 0,
+      level: json['level']?.toString() ?? 'low',
       factors: (json['factors'] as List? ?? [])
-          .map((e) => FraudFactor.fromJson(e))
+          .map((e) => FraudFactor.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }

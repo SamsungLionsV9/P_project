@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
+import 'services/auth_service.dart';
 import 'providers/comparison_provider.dart';
 import 'providers/recent_views_provider.dart';
 import 'models/car_data.dart';
 import 'comparison_page.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/common/option_badges.dart';
+import 'utils/car_image_mapper.dart';
 
 /// 마이페이지 - 백엔드 연동 버전
 /// 찜한 차량, 최근 분석, 가격 알림 모두 DB에서 관리
@@ -17,8 +19,9 @@ class MyPage extends StatefulWidget {
   State<MyPage> createState() => _MyPageState();
 }
 
-class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
+class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final ApiService _api = ApiService();
+  final AuthService _auth = AuthService();
   late TabController _tabController;
 
   // 데이터 상태
@@ -28,18 +31,65 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   
   bool _isLoading = true;
   String? _error;
+  bool _lastLoggedInState = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadData();
+    _lastLoggedInState = _auth.isLoggedIn;
+    WidgetsBinding.instance.addObserver(this);
+    // 로그인 상태일 때만 데이터 로드
+    if (_auth.isLoggedIn) {
+      _loadData();
+    } else {
+      // 비로그인 상태면 데이터 초기화
+      _favorites = [];
+      _history = [];
+      _alerts = [];
+      _isLoading = false;
+    }
   }
-
+  
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 앱이 포그라운드로 돌아올 때 로그인 상태 확인
+    if (state == AppLifecycleState.resumed) {
+      _checkLoginState();
+    }
+  }
+  
+  void _checkLoginState() {
+    final currentLoggedIn = _auth.isLoggedIn;
+    if (currentLoggedIn != _lastLoggedInState) {
+      _lastLoggedInState = currentLoggedIn;
+      setState(() {
+        if (currentLoggedIn) {
+          // 로그인 상태로 변경됨
+          _loadData();
+        } else {
+          // 로그아웃 상태로 변경됨
+          _favorites = [];
+          _history = [];
+          _alerts = [];
+          _isLoading = false;
+        }
+      });
+    }
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 로그인 상태 변경 감지
+    _checkLoginState();
   }
 
   Future<void> _loadData() async {
@@ -195,6 +245,92 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
+    // 로그인 상태 변경 감지 (build 메서드에서 매번 체크)
+    final currentLoggedIn = _auth.isLoggedIn;
+    if (currentLoggedIn != _lastLoggedInState) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkLoginState();
+      });
+    }
+
+    // 로그인 상태가 아니면 로그인 유도 화면 표시
+    if (!_auth.isLoggedIn) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          elevation: 0,
+          title: Text(
+            "마이 페이지",
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lock_outline,
+                  size: 80,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  '로그인이 필요합니다',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '찜한 차량과 분석 이력을 확인하려면\n로그인해 주세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () {
+                    // 홈 탭(로그인 화면)으로 이동
+                    // MainPage의 _onNavTap(0) 호출 필요 - 부모에게 알림
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('홈 탭에서 로그인해 주세요.'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0066FF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    '로그인하기',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -626,7 +762,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
       ),
       child: Row(
         children: [
-          // 차량 아이콘
+          // 차량 이미지
           Container(
             width: 100,
             height: 80,
@@ -634,7 +770,10 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
               color: const Color(0xFF0066FF).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.directions_car, color: Color(0xFF0066FF), size: 40),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: _buildCarImage(fav.brand, fav.model),
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -816,6 +955,40 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
           ),
         ],
       ),
+    );
+  }
+
+  /// 차량 이미지 위젯 빌드
+  Widget _buildCarImage(String brand, String model) {
+    final imageUrl = CarImageMapper.getImageUrlByBrandModel(brand, model);
+    
+    if (imageUrl != null) {
+      return Image.network(
+        imageUrl,
+        width: 100,
+        height: 80,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Icon(Icons.directions_car, color: Color(0xFF0066FF), size: 40),
+          );
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          );
+        },
+      );
+    }
+    
+    return const Center(
+      child: Icon(Icons.directions_car, color: Color(0xFF0066FF), size: 40),
     );
   }
 }

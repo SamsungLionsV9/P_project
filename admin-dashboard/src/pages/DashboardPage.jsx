@@ -5,8 +5,13 @@ function DashboardPage() {
   const [stats, setStats] = useState({
     todayCount: 0,
     totalCount: 0,
-    avgConfidence: 85,
+    todayPredictions: 0,
+    todayViews: 0,
+    totalPredictions: 0,
+    totalViews: 0,
+    avgConfidence: 0,  // 실제 DB 값 사용 (더미 제거)
     popularModels: [],
+    aiStats: {},
   });
   const [dailyData, setDailyData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,17 +21,23 @@ function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const statsRes = await fetch("/api/admin/dashboard-stats");
+      // 확장된 통계 API 사용 (시세 예측 + 매물 조회 포함)
+      const statsRes = await fetch("/api/admin/dashboard-stats-extended");
       if (!statsRes.ok) {
         throw new Error(`서버 오류: ${statsRes.status}`);
       }
       const statsData = await statsRes.json();
       if (statsData.success) {
         setStats({
-          todayCount: statsData.todayCount || 0,
+          todayCount: statsData.todayTotal || statsData.todayCount || 0,
           totalCount: statsData.totalCount || 0,
-          avgConfidence: statsData.avgConfidence || 85,
+          todayPredictions: statsData.todayPredictions || 0,
+          todayViews: statsData.todayViews || 0,
+          totalPredictions: statsData.totalPredictions || 0,
+          totalViews: statsData.totalViews || 0,
+          avgConfidence: statsData.avgConfidence || 0,  // 실제 DB 값만 사용
           popularModels: statsData.popularModels || [],
+          aiStats: statsData.aiStats || {},
         });
       }
 
@@ -91,15 +102,18 @@ function DashboardPage() {
 
   return (
     <>
-      {/* 카드 3개 */}
+      {/* 통계 카드 3개 */}
       <section className="stat-cards">
         <div className="stat-card">
           <div className="stat-card-header">
             <div className="stat-icon stat-icon-green"><Eye size={20} /></div>
-            <span className="stat-label">오늘 시세 조회</span>
+            <span className="stat-label">오늘 전체 조회</span>
           </div>
           <div className="stat-value">
             {stats.todayCount > 0 ? `${stats.todayCount.toLocaleString()}건` : "0건"}
+          </div>
+          <div className="stat-detail" style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+            시세예측 {stats.todayPredictions || 0}건 / 매물조회 {stats.todayViews || 0}건
           </div>
         </div>
 
@@ -110,6 +124,9 @@ function DashboardPage() {
           </div>
           <div className="stat-value">
             {stats.totalCount > 0 ? `${stats.totalCount.toLocaleString()}건` : "0건"}
+          </div>
+          <div className="stat-detail" style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+            예측 {stats.totalPredictions || 0} / 조회 {stats.totalViews || 0}
           </div>
         </div>
 
@@ -138,11 +155,14 @@ function DashboardPage() {
                 <div key={m.name || idx} className="bar-item">
                   <div
                     className="bar"
+                    data-value={m.value || 0}
                     style={{
-                      height: `${(m.value / maxModelValue) * 100}%`,
+                      height: `${Math.max((m.value / maxModelValue) * 100, 5)}%`,
                     }}
                   />
-                  <span className="bar-label">{m.name || "기타"}</span>
+                  <span className="bar-label" title={m.name || "기타"}>
+                    {m.name || "기타"}
+                  </span>
                 </div>
               ))}
             </div>

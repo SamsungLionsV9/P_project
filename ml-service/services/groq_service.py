@@ -21,7 +21,7 @@ if str(src_path) not in sys.path:
 try:
     from groq_advisor import GroqCarAdvisor
 except ImportError as e:
-    print(f"⚠️ Groq 모듈 import 실패: {e}")
+    print(f"[WARN] Groq module import failed: {e}")
     GroqCarAdvisor = None
 
 
@@ -40,7 +40,7 @@ class GroqService:
             try:
                 self.advisor = GroqCarAdvisor(api_key=self.api_key)
             except Exception as e:
-                print(f"⚠️ Groq Advisor 초기화 실패: {e}")
+                print(f"[WARN] Groq Advisor init failed: {e}")
     
     def is_available(self) -> bool:
         """Groq 서비스 사용 가능 여부"""
@@ -70,7 +70,7 @@ class GroqService:
             )
             return result
         except Exception as e:
-            print(f"⚠️ Groq 신호 분석 실패: {e}")
+            print(f"[WARN] Groq signal analysis failed: {e}")
             return self._fallback_signal_report(vehicle_data, prediction_data, timing_data)
     
     def detect_fraud(self, dealer_description: str, 

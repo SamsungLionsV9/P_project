@@ -47,11 +47,20 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
-      // User Service API (포트 8080)
-      '/api/admin/users': {  // 사용자 관리
-        target: 'http://localhost:8080',
+      // 사용자 관리 API (ML Service에서 목업 제공 - User Service 연동 전)
+      '/api/admin/users': {
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/api/admin/me': {  // 관리자 정보 (토큰 검증용)
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/api/admin/login': {  // 관리자 로그인 (ML Service 목업)
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      // User Service API (포트 8080) - 실제 인증 연동 시 사용
       '/api/auth': {
         target: 'http://localhost:8080',
         changeOrigin: true,

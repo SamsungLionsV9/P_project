@@ -12,14 +12,31 @@ import pandas as pd
 from datetime import datetime, timedelta
 import json
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 # .env 파일에서 환경변수 로드
 load_dotenv()
 
-from data_collectors_real import RealMacroEconomicCollector
-from data_collectors import NewCarScheduleManager
-from data_collectors_complete import NaverTrendAPI
+# src 폴더 경로 추가
+src_path = Path(__file__).parent.parent.parent / 'src'
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+# Import with fallback
+_imports_available = False
+RealMacroEconomicCollector = None
+NewCarScheduleManager = None
+NaverTrendAPI = None
+
+try:
+    from data_collectors_real import RealMacroEconomicCollector
+    from data_collectors import NewCarScheduleManager
+    from data_collectors_complete import NaverTrendAPI
+    _imports_available = True
+except ImportError as e:
+    print(f"[data_collectors] Import warning: {e}")
 
 
 def collect_real_data_only(car_model):
@@ -36,42 +53,59 @@ def collect_real_data_only(car_model):
             'schedule': {...}    # 신차 일정
         }
     """
+    # Import가 없으면 기본값 반환
+    if not _imports_available:
+        return {
+            'macro': {'interest_rate': 3.5, 'exchange_rate': 1350, 'oil_price': 75, 'oil_trend': 'stable'},
+            'trend': {'trend_change': 0, 'current_index': 50},
+            'schedule': {'upcoming_releases': []},
+            'car_model': car_model,
+            'collection_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'data_sources': {'macro': 'fallback', 'trend': 'fallback', 'schedule': 'fallback'}
+        }
+    
     print("=" * 80)
-    print(f"🎯 실제 데이터 수집 중: {car_model}")
+    print(f"[DATA] Collecting real data for: {car_model}")
     print("=" * 80)
-    print()
     
     # API 키
     bok_key = os.getenv('BOK_API_KEY')
     naver_id = os.getenv('NAVER_CLIENT_ID')
     naver_secret = os.getenv('NAVER_CLIENT_SECRET')
     
+    macro_data = {'interest_rate': 3.5, 'exchange_rate': 1350, 'oil_price': 75, 'oil_trend': 'stable'}
+    trend_data = {'trend_change': 0, 'current_index': 50}
+    schedule_data = {'upcoming_releases': []}
+    
     # 1. 거시경제 데이터 (금리, 환율, 유가)
-    print("📊 거시경제 데이터 수집 중...")
-    macro = RealMacroEconomicCollector(bok_key)
-    indicators = macro.get_all_indicators()
-    
-    # 타이밍 엔진용 포맷으로 변환
-    macro_data = {
-        'interest_rate': indicators['interest_rate']['rate'],
-        'exchange_rate': indicators['exchange_rate']['rate'],
-        'oil_price': indicators['oil_price']['price'],
-        'oil_trend': indicators['oil_price']['trend']
-    }
-    
-    print()
+    try:
+        if RealMacroEconomicCollector:
+            macro = RealMacroEconomicCollector(bok_key)
+            indicators = macro.get_all_indicators()
+            macro_data = {
+                'interest_rate': indicators['interest_rate']['rate'],
+                'exchange_rate': indicators['exchange_rate']['rate'],
+                'oil_price': indicators['oil_price']['price'],
+                'oil_trend': indicators['oil_price']['trend']
+            }
+    except Exception as e:
+        print(f"[WARN] Macro data collection failed: {e}")
     
     # 2. 검색 트렌드 (네이버 데이터랩)
-    print("🔍 검색 트렌드 수집 중...")
-    trend_api = NaverTrendAPI(naver_id, naver_secret)
-    trend_data = trend_api.get_search_trend(car_model)
-    
-    print()
+    try:
+        if NaverTrendAPI and naver_id and naver_secret:
+            trend_api = NaverTrendAPI(naver_id, naver_secret)
+            trend_data = trend_api.get_search_trend(car_model)
+    except Exception as e:
+        print(f"[WARN] Trend data collection failed: {e}")
     
     # 3. 신차 일정
-    print("🚗 신차 출시 일정 확인 중...")
-    schedule = NewCarScheduleManager()
-    schedule_data = schedule.check_upcoming_release(car_model)
+    try:
+        if NewCarScheduleManager:
+            schedule = NewCarScheduleManager()
+            schedule_data = schedule.check_upcoming_release(car_model)
+    except Exception as e:
+        print(f"[WARN] Schedule data collection failed: {e}")
     
     print()
     print("=" * 80)

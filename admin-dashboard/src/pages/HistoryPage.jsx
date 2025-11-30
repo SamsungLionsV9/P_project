@@ -47,9 +47,11 @@ function HistoryPage() {
         modelFilter.trim() === "" ||
         (row.model &&
           row.model.toLowerCase().includes(modelFilter.toLowerCase()));
+      // created_at 또는 searched_at 필드 모두 지원
+      const dateField = row.created_at || row.searched_at;
       const matchDate =
         dateFilter.trim() === "" ||
-        (row.searched_at && row.searched_at.includes(dateFilter.trim()));
+        (dateField && dateField.includes(dateFilter.trim()));
 
       return matchUser && matchModel && matchDate;
     });
@@ -168,13 +170,13 @@ function HistoryPage() {
               <tbody>
                 {displayedHistory.map((row, i) => (
                   <tr key={row.id || i}>
-                    <td>{formatDate(row.searched_at)}</td>
+                    <td>{formatDate(row.created_at || row.searched_at)}</td>
                     <td>{row.user_id || "-"}</td>
                     <td>{row.brand || "-"}</td>
                     <td>{row.model || "-"}</td>
                     <td>{row.year || "-"}</td>
                     <td>{formatMileage(row.mileage)}</td>
-                    <td>{row.fuel || "-"}</td>
+                    <td>{row.fuel_type || row.fuel || "-"}</td>
                     <td className="strong-text">
                       {formatPrice(row.predicted_price)}
                     </td>

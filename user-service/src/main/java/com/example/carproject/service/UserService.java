@@ -1,5 +1,6 @@
 package com.example.carproject.service;
 
+import com.example.carproject.dto.OAuthSignupDto;
 import com.example.carproject.dto.UserLoginDto;
 import com.example.carproject.dto.UserResponseDto;
 import com.example.carproject.dto.UserSignupDto;
@@ -16,7 +17,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService implements UserDetailsService {
@@ -61,11 +66,7 @@ public class UserService implements UserDetailsService {
             }
         }
         
-        // 사용자명 중복 체크 (활성 사용자만)
-        Optional<User> existingUserByUsername = userRepository.findByUsername(dto.getUsername());
-        if (existingUserByUsername.isPresent() && existingUserByUsername.get().getIsActive()) {
-            throw new IllegalArgumentException("이미 사용 중인 사용자명입니다");
-        }
+        // 참고: 사용자명(이름)은 중복 허용, 이메일만 고유해야 함
         
         // 사용자 생성
         User user = User.builder()
@@ -80,6 +81,66 @@ public class UserService implements UserDetailsService {
         User savedUser = userRepository.save(user);
         
         return UserResponseDto.from(savedUser);
+    }
+    
+    /**
+     * OAuth 회원가입 (이메일 인증 불필요)
+     */
+    @Transactional
+    public UserResponseDto oauthSignup(OAuthSignupDto dto) {
+        // Provider 검증
+        User.Provider provider;
+        try {
+            provider = User.Provider.valueOf(dto.getProvider().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("지원하지 않는 OAuth 제공자입니다: " + dto.getProvider());
+        }
+        
+        // 기존 사용자 확인 (비활성화된 사용자 포함)
+        Optional<User> existingUserByEmail = userRepository.findByEmail(dto.getEmail());
+        if (existingUserByEmail.isPresent()) {
+            User existingUser = existingUserByEmail.get();
+            if (existingUser.getIsActive()) {
+                throw new IllegalArgumentException("이미 사용 중인 이메일입니다");
+            } else {
+                // 비활성화된 사용자가 있으면 삭제
+                userRepository.delete(existingUser);
+            }
+        }
+        
+        // 참고: 사용자명(이름)은 중복 허용, 이메일만 고유해야 함
+        
+        // Provider ID 중복 체크
+        Optional<User> existingUserByProviderId = userRepository.findByProviderAndProviderId(provider, dto.getProviderId());
+        if (existingUserByProviderId.isPresent() && existingUserByProviderId.get().getIsActive()) {
+            throw new IllegalArgumentException("이미 가입된 소셜 계정입니다");
+        }
+        
+        // 사용자 생성 (비밀번호 없음)
+        User user = User.builder()
+                .username(dto.getUsername())
+                .email(dto.getEmail())
+                .password(null)  // OAuth 사용자는 비밀번호 없음
+                .phoneNumber(dto.getPhoneNumber())
+                .provider(provider)
+                .providerId(dto.getProviderId())
+                .profileImageUrl(dto.getProfileImageUrl())
+                .role(User.Role.USER)
+                .isActive(true)
+                .build();
+        
+        User savedUser = userRepository.save(user);
+        
+        return UserResponseDto.from(savedUser);
+    }
+    
+    /**
+     * 사용자 이메일로 JWT 토큰 생성 (OAuth 회원가입 후 사용)
+     */
+    public String generateTokenForUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
+        return jwtService.generateToken(user);
     }
     
     /**
@@ -127,6 +188,163 @@ public class UserService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
+    }
+    
+    // ========== 관리자 전용 메서드 ==========
+    
+    /**
+     * 전체 사용자 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public List<UserResponseDto> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(UserResponseDto::from)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * 사용자 역할 변경
+     */
+    @Transactional
+    public void updateUserRole(Long userId, User.Role newRole) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        user.setRole(newRole);
+        userRepository.save(user);
+    }
+    
+    /**
+     * 사용자 비활성화
+     */
+    @Transactional
+    public void deactivateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        user.setIsActive(false);
+        userRepository.save(user);
+    }
+    
+    /**
+     * 사용자 활성화
+     */
+    @Transactional
+    public void activateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        user.setIsActive(true);
+        userRepository.save(user);
+    }
+    
+    /**
+     * 대시보드 통계
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDashboardStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        long totalUsers = userRepository.count();
+        long activeUsers = userRepository.countByIsActive(true);
+        long adminCount = userRepository.countByRole(User.Role.ADMIN);
+        
+        stats.put("totalUsers", totalUsers);
+        stats.put("activeUsers", activeUsers);
+        stats.put("inactiveUsers", totalUsers - activeUsers);
+        stats.put("adminCount", adminCount);
+        stats.put("userCount", totalUsers - adminCount);
+        
+        return stats;
+    }
+    
+    /**
+     * 관리자용 사용자 정보 수정
+     */
+    @Transactional
+    public UserResponseDto updateUserByAdmin(Long userId, String username, String phoneNumber, String role) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        // 사용자명(닉네임) 변경 (중복 허용)
+        if (username != null && !username.trim().isEmpty() && !username.equals(user.getDisplayName())) {
+            user.setDisplayName(username);
+        }
+        
+        // 전화번호 변경
+        if (phoneNumber != null) {
+            user.setPhoneNumber(phoneNumber.trim().isEmpty() ? null : phoneNumber);
+        }
+        
+        // 역할 변경
+        if (role != null && !role.trim().isEmpty()) {
+            try {
+                user.setRole(User.Role.valueOf(role));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("유효하지 않은 역할입니다: " + role);
+            }
+        }
+        
+        User savedUser = userRepository.save(user);
+        return UserResponseDto.from(savedUser);
+    }
+    
+    /**
+     * 관리자용 사용자 삭제 (완전 삭제)
+     */
+    @Transactional
+    public void deleteUserByAdmin(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        userRepository.delete(user);
+    }
+    
+    /**
+     * ID로 사용자 조회
+     */
+    @Transactional(readOnly = true)
+    public UserResponseDto getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
+        
+        return UserResponseDto.from(user);
+    }
+    
+    /**
+     * 비밀번호 재설정 (이메일 인증 후)
+     */
+    @Transactional
+    public void resetPassword(String email, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
+        
+        // 소셜 로그인 사용자는 비밀번호 재설정 불가
+        // 일반 회원가입 사용자는 provider = LOCAL
+        if (user.getProvider() != null && user.getProvider() != User.Provider.LOCAL) {
+            throw new IllegalArgumentException("소셜 로그인 계정은 비밀번호 재설정이 불가능합니다");
+        }
+        
+        // 새 비밀번호 암호화하여 저장
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+    
+    /**
+     * 이메일로 사용자 존재 여부 확인 (비밀번호 재설정 가능한 사용자)
+     */
+    @Transactional(readOnly = true)
+    public boolean existsByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(user -> {
+                    // 활성화된 사용자이고
+                    if (!user.getIsActive()) {
+                        return false;
+                    }
+                    // 일반 회원가입 사용자 (LOCAL)이거나 비밀번호가 있는 사용자
+                    return user.getProvider() == User.Provider.LOCAL || user.getPassword() != null;
+                })
+                .orElse(false);
     }
 }
 

@@ -364,51 +364,39 @@ class RealMacroEconomicCollector:
             }
         
         try:
-            # 한국은행 Open API
-            # 통계코드: 722Y001 (기준금리)
-            url = f"https://ecos.bok.or.kr/api/StatisticSearch/{self.bok_api_key}/json/kr/1/10/722Y001/D"
-            
-            # 최근 30일
-            end_date = datetime.now().strftime('%Y%m%d')
-            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y%m%d')
-            url += f"/{start_date}/{end_date}/0101000"
+            # 한국은행 Open API - KeyStatisticList 사용 (더 안정적)
+            url = f"https://ecos.bok.or.kr/api/KeyStatisticList/{self.bok_api_key}/json/kr/1/100"
             
             response = requests.get(url, timeout=10)
             data = response.json()
             
-            if 'StatisticSearch' in data and 'row' in data['StatisticSearch']:
-                rows = data['StatisticSearch']['row']
+            if 'KeyStatisticList' in data and 'row' in data['KeyStatisticList']:
+                rows = data['KeyStatisticList']['row']
                 
-                # 최신 금리
-                latest = rows[0]
-                current_rate = float(latest['DATA_VALUE'])
+                # 기준금리 찾기
+                rate_data = None
+                for row in rows:
+                    if '기준금리' in row.get('KEYSTAT_NAME', ''):
+                        rate_data = row
+                        break
                 
-                # 추세 계산 (첫 데이터와 비교)
-                if len(rows) > 1:
-                    previous_rate = float(rows[-1]['DATA_VALUE'])
-                    if current_rate > previous_rate:
-                        trend = 'up'
-                    elif current_rate < previous_rate:
-                        trend = 'down'
-                    else:
-                        trend = 'stable'
+                if rate_data:
+                    current_rate = float(rate_data['DATA_VALUE'])
+                    
+                    result = {
+                        'rate': current_rate,
+                        'date': rate_data.get('CYCLE', ''),
+                        'trend': 'stable',  # KeyStatisticList는 최신값만 제공
+                        'previous_rate': current_rate,
+                        'change': 0,
+                        'source': '한국은행 Open API (KeyStatisticList)'
+                    }
+                    
+                    print(f"  ✓ 현재 기준금리: {current_rate}%")
+                    
+                    return result
                 else:
-                    trend = 'stable'
-                    previous_rate = current_rate
-                
-                result = {
-                    'rate': current_rate,
-                    'date': latest['TIME'],
-                    'trend': trend,
-                    'previous_rate': previous_rate,
-                    'change': current_rate - previous_rate,
-                    'source': '한국은행 Open API'
-                }
-                
-                print(f"  ✓ 현재 금리: {current_rate}%")
-                print(f"  ✓ 추세: {trend}")
-                
-                return result
+                    raise ValueError("기준금리 데이터 없음")
             else:
                 raise ValueError("API 응답 형식 오류")
                 

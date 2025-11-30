@@ -139,6 +139,39 @@ class DatabaseService:
             )
         ''')
         
+        # 알림 내역 테이블 (허위매물 고위험 등)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT DEFAULT 'guest',
+                notification_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT,
+                car_id TEXT,
+                car_info TEXT,
+                risk_level TEXT,
+                risk_score INTEGER,
+                is_read INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # 개별 매물 조회 이력 (추천탭에서 클릭)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS vehicle_views (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT DEFAULT 'guest',
+                car_id TEXT,
+                brand TEXT,
+                model TEXT,
+                year INTEGER,
+                mileage INTEGER,
+                price INTEGER,
+                view_source TEXT DEFAULT 'recommendation',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         conn.commit()
         conn.close()
 
@@ -149,57 +182,66 @@ class DatabaseService:
         conn = self._get_conn()
         cursor = conn.cursor()
 
-        today = datetime.now().strftime("%Y-%m-%d")
-        confidence = data.get('confidence', 85)
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            confidence = data.get('confidence', 85)
+            # user_id 정규화 (anonymous -> guest)
+            user_id = data.get('user_id', 'guest')
+            if user_id in ['anonymous', '', None]:
+                user_id = 'guest'
 
-        cursor.execute('''
-            INSERT INTO analysis_history
-            (user_id, brand, model, year, mileage, fuel_type, predicted_price,
-             confidence, timing_score, signal, detail_url, request_data, response_data)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('user_id', 'anonymous'),
-            data.get('brand', ''),
-            data.get('model', ''),
-            data.get('year'),
-            data.get('mileage'),
-            data.get('fuel_type', ''),
-            data.get('predicted_price'),
-            confidence,
-            data.get('timing_score'),
-            data.get('signal'),
-            data.get('detail_url'),
-            json.dumps(data.get('request', {}), ensure_ascii=False),
-            json.dumps(data.get('response', {}), ensure_ascii=False)
-        ))
-
-        # 일별 통계 업데이트
-        cursor.execute('''
-            INSERT INTO daily_stats (date, request_count, avg_confidence, total_confidence, confidence_count)
-            VALUES (?, 1, ?, ?, 1)
-            ON CONFLICT(date) DO UPDATE SET
-                request_count = request_count + 1,
-                total_confidence = total_confidence + ?,
-                confidence_count = confidence_count + 1,
-                avg_confidence = (total_confidence + ?) / (confidence_count + 1),
-                updated_at = CURRENT_TIMESTAMP
-        ''', (today, confidence, confidence, confidence, confidence))
-
-        # 모델별 통계 업데이트
-        model_name = data.get('model', '')
-        if model_name:
             cursor.execute('''
-                INSERT INTO model_stats (model_name, view_count)
-                VALUES (?, 1)
-                ON CONFLICT(model_name) DO UPDATE SET
-                    view_count = view_count + 1,
-                    updated_at = CURRENT_TIMESTAMP
-            ''', (model_name,))
+                INSERT INTO analysis_history
+                (user_id, brand, model, year, mileage, fuel_type, predicted_price,
+                 confidence, timing_score, signal, detail_url, request_data, response_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user_id,
+                data.get('brand', ''),
+                data.get('model', ''),
+                data.get('year'),
+                data.get('mileage'),
+                data.get('fuel_type', ''),
+                data.get('predicted_price'),
+                confidence,
+                data.get('timing_score'),
+                data.get('signal'),
+                data.get('detail_url'),
+                json.dumps(data.get('request', {}), ensure_ascii=False),
+                json.dumps(data.get('response', {}), ensure_ascii=False)
+            ))
 
-        conn.commit()
-        last_id = cursor.lastrowid
-        conn.close()
-        return last_id
+            # 일별 통계 업데이트
+            cursor.execute('''
+                INSERT INTO daily_stats (date, request_count, avg_confidence, total_confidence, confidence_count)
+                VALUES (?, 1, ?, ?, 1)
+                ON CONFLICT(date) DO UPDATE SET
+                    request_count = request_count + 1,
+                    total_confidence = total_confidence + ?,
+                    confidence_count = confidence_count + 1,
+                    avg_confidence = (total_confidence + ?) / (confidence_count + 1),
+                    updated_at = CURRENT_TIMESTAMP
+            ''', (today, confidence, confidence, confidence, confidence))
+
+            # 모델별 통계 업데이트
+            model_name = data.get('model', '')
+            if model_name:
+                cursor.execute('''
+                    INSERT INTO model_stats (model_name, view_count)
+                    VALUES (?, 1)
+                    ON CONFLICT(model_name) DO UPDATE SET
+                        view_count = view_count + 1,
+                        updated_at = CURRENT_TIMESTAMP
+                ''', (model_name,))
+
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"분석 저장 오류: {e}")
+            conn.rollback()
+            return -1
+        finally:
+            conn.close()
 
     def get_analysis_history(self, user_id: str = None, limit: int = 50) -> List[Dict]:
         """분석 이력 조회"""
@@ -223,6 +265,25 @@ class DatabaseService:
 
         return [dict(row) for row in rows]
 
+    def get_total_analysis_count(self, user_id: str = None) -> int:
+        """분석 이력 전체 건수 조회"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+
+        try:
+            if user_id and user_id not in ['anonymous', 'guest', '']:
+                cursor.execute('SELECT COUNT(*) as cnt FROM analysis_history WHERE user_id = ?', (user_id,))
+            else:
+                cursor.execute('SELECT COUNT(*) as cnt FROM analysis_history')
+            
+            row = cursor.fetchone()
+            return row['cnt'] if row else 0
+        except Exception as e:
+            print(f"분석 건수 조회 오류: {e}")
+            return 0
+        finally:
+            conn.close()
+
     # ========== AI 로그 ==========
 
     def save_ai_log(self, log_type: str, data: Dict) -> int:
@@ -230,24 +291,34 @@ class DatabaseService:
         conn = self._get_conn()
         cursor = conn.cursor()
 
-        cursor.execute('''
-            INSERT INTO ai_logs
-            (user_id, log_type, car_info, request_data, response_data, success, ai_model)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('user_id', 'anonymous'),
-            log_type,
-            data.get('car_info', ''),
-            json.dumps(data.get('request', {}), ensure_ascii=False),
-            json.dumps(data.get('response', {}), ensure_ascii=False),
-            1 if data.get('success', True) else 0,
-            data.get('ai_model', 'llama-3.3-70b')
-        ))
+        try:
+            # user_id 정규화
+            user_id = data.get('user_id', 'guest')
+            if user_id in ['anonymous', '', None]:
+                user_id = 'guest'
+                
+            cursor.execute('''
+                INSERT INTO ai_logs
+                (user_id, log_type, car_info, request_data, response_data, success, ai_model)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user_id,
+                log_type,
+                data.get('car_info', ''),
+                json.dumps(data.get('request', {}), ensure_ascii=False),
+                json.dumps(data.get('response', {}), ensure_ascii=False),
+                1 if data.get('success', True) else 0,
+                data.get('ai_model', 'Rule-based')
+            ))
 
-        conn.commit()
-        last_id = cursor.lastrowid
-        conn.close()
-        return last_id
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"AI 로그 저장 오류: {e}")
+            conn.rollback()
+            return -1
+        finally:
+            conn.close()
 
     def get_ai_logs(self, log_type: str = None, limit: int = 100) -> List[Dict]:
         """AI 로그 조회"""
@@ -429,6 +500,191 @@ class DatabaseService:
         deleted = cursor.rowcount > 0
         conn.close()
         return deleted
+
+    # ========== 알림 시스템 ==========
+
+    def add_notification(self, data: Dict) -> int:
+        """알림 추가 (허위매물 고위험 등)"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO notifications
+            (user_id, notification_type, title, message, car_id, car_info, risk_level, risk_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('user_id', 'guest'),
+            data.get('notification_type', 'fraud_alert'),
+            data.get('title', ''),
+            data.get('message', ''),
+            data.get('car_id', ''),
+            json.dumps(data.get('car_info', {}), ensure_ascii=False),
+            data.get('risk_level', ''),
+            data.get('risk_score', 0)
+        ))
+        
+        conn.commit()
+        last_id = cursor.lastrowid
+        conn.close()
+        return last_id
+
+    def get_notifications(self, user_id: str = 'guest', limit: int = 50, unread_only: bool = False) -> List[Dict]:
+        """알림 조회"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        
+        if unread_only:
+            cursor.execute('''
+                SELECT * FROM notifications
+                WHERE user_id = ? AND is_read = 0
+                ORDER BY created_at DESC LIMIT ?
+            ''', (user_id, limit))
+        else:
+            cursor.execute('''
+                SELECT * FROM notifications
+                WHERE user_id = ?
+                ORDER BY created_at DESC LIMIT ?
+            ''', (user_id, limit))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item['car_info'] = json.loads(item['car_info']) if item['car_info'] else {}
+            except:
+                pass
+            result.append(item)
+        return result
+
+    def mark_notification_read(self, notification_id: int) -> bool:
+        """알림 읽음 처리"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE notifications SET is_read = 1 WHERE id = ?', (notification_id,))
+        conn.commit()
+        updated = cursor.rowcount > 0
+        conn.close()
+        return updated
+
+    def get_unread_notification_count(self, user_id: str = 'guest') -> int:
+        """읽지 않은 알림 개수"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ? AND is_read = 0', (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row['cnt'] if row else 0
+
+    # ========== 매물 조회 이력 ==========
+
+    def add_vehicle_view(self, data: Dict) -> int:
+        """개별 매물 조회 기록 (추천탭 등에서)"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        cursor.execute('''
+            INSERT INTO vehicle_views
+            (user_id, car_id, brand, model, year, mileage, price, view_source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('user_id', 'guest'),
+            data.get('car_id', ''),
+            data.get('brand', ''),
+            data.get('model', ''),
+            data.get('year'),
+            data.get('mileage'),
+            data.get('price'),
+            data.get('view_source', 'recommendation')
+        ))
+        
+        # 일별 통계 업데이트 (조회수 증가)
+        cursor.execute('''
+            INSERT INTO daily_stats (date, request_count)
+            VALUES (?, 1)
+            ON CONFLICT(date) DO UPDATE SET
+                request_count = request_count + 1,
+                updated_at = CURRENT_TIMESTAMP
+        ''', (today,))
+        
+        # 모델별 통계 업데이트
+        model_name = data.get('model', '')
+        if model_name:
+            cursor.execute('''
+                INSERT INTO model_stats (model_name, view_count)
+                VALUES (?, 1)
+                ON CONFLICT(model_name) DO UPDATE SET
+                    view_count = view_count + 1,
+                    updated_at = CURRENT_TIMESTAMP
+            ''', (model_name,))
+        
+        conn.commit()
+        last_id = cursor.lastrowid
+        conn.close()
+        return last_id
+
+    def get_vehicle_views(self, user_id: str = None, limit: int = 50) -> List[Dict]:
+        """매물 조회 이력 조회"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        
+        if user_id:
+            cursor.execute('''
+                SELECT * FROM vehicle_views
+                WHERE user_id = ?
+                ORDER BY created_at DESC LIMIT ?
+            ''', (user_id, limit))
+        else:
+            cursor.execute('''
+                SELECT * FROM vehicle_views
+                ORDER BY created_at DESC LIMIT ?
+            ''', (limit,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def get_total_views_count(self) -> Dict:
+        """전체 조회 통계 (시세 예측 + 매물 조회)"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        # 오늘 시세 예측 수
+        cursor.execute('SELECT request_count FROM daily_stats WHERE date = ?', (today,))
+        row = cursor.fetchone()
+        today_predictions = row['request_count'] if row else 0
+        
+        # 오늘 매물 조회 수
+        cursor.execute('SELECT COUNT(*) as cnt FROM vehicle_views WHERE date(created_at) = ?', (today,))
+        row = cursor.fetchone()
+        today_views = row['cnt'] if row else 0
+        
+        # 전체 시세 예측 수
+        cursor.execute('SELECT SUM(request_count) as total FROM daily_stats')
+        row = cursor.fetchone()
+        total_predictions = row['total'] if row and row['total'] else 0
+        
+        # 전체 매물 조회 수
+        cursor.execute('SELECT COUNT(*) as cnt FROM vehicle_views')
+        row = cursor.fetchone()
+        total_views = row['cnt'] if row else 0
+        
+        conn.close()
+        
+        return {
+            "today_predictions": today_predictions,
+            "today_views": today_views,
+            "today_total": today_predictions + today_views,
+            "total_predictions": total_predictions,
+            "total_views": total_views,
+            "total": total_predictions + total_views
+        }
 
 
 # 싱글톤 인스턴스 제공
