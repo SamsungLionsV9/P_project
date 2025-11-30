@@ -8,20 +8,26 @@ function HistoryPage() {
   const [historyData, setHistoryData] = useState([]);
   const [displayedHistory, setDisplayedHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const loadHistory = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch(
-        "http://localhost:8001/api/admin/history?limit=100"
-      );
+      const response = await fetch("/api/admin/analysis-history?limit=100");
+      if (!response.ok) {
+        throw new Error(`서버 오류: ${response.status}`);
+      }
       const data = await response.json();
       if (data.success) {
         setHistoryData(data.history);
         setDisplayedHistory(data.history);
+      } else {
+        throw new Error(data.message || "데이터 로드 실패");
       }
-    } catch (error) {
-      console.error("Failed to load history:", error);
+    } catch (err) {
+      console.error("Failed to load history:", err);
+      setError(err.message || "분석 이력을 불러오는데 실패했습니다");
     } finally {
       setLoading(false);
     }
@@ -133,6 +139,13 @@ function HistoryPage() {
           {loading ? (
             <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
               로딩 중...
+            </div>
+          ) : error ? (
+            <div style={{ padding: "40px", textAlign: "center", color: "#e74c3c" }}>
+              <div style={{ marginBottom: "10px" }}>⚠️ {error}</div>
+              <button className="btn-primary" onClick={loadHistory}>
+                다시 시도
+              </button>
             </div>
           ) : displayedHistory.length === 0 ? (
             <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
