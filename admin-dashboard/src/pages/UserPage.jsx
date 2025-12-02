@@ -14,18 +14,27 @@ function UserPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
   const [editForm, setEditForm] = useState({
     username: "",
     phoneNumber: "",
     role: "USER",
   });
 
-  const loadUsers = async () => {
+  const loadUsers = async (page = currentPage) => {
     setLoading(true);
     setError(null);
     try {
       const token = localStorage.getItem("adminToken");
-      const response = await fetch("/api/admin/users", {
+      const params = new URLSearchParams();
+      params.append("page", String(page));
+      params.append("limit", String(PAGE_SIZE));
+
+      const response = await fetch(`/api/admin/users?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -40,6 +49,9 @@ function UserPage() {
       if (data.success) {
         setUsers(data.users);
         setDisplayedUsers(data.users);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.total || 0);
+        setCurrentPage(data.page || 1);
       } else {
         throw new Error(data.message || "사용자 목록 로드 실패");
       }
@@ -51,8 +63,15 @@ function UserPage() {
     }
   };
 
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      loadUsers(page);
+    }
+  };
+
   useEffect(() => {
-    loadUsers();
+    loadUsers(1);
   }, []);
 
   const handleChange = (key, value) => {
@@ -79,7 +98,8 @@ function UserPage() {
 
   const handleReset = () => {
     setFilters({ email: "", username: "", phone: "", role: "all" });
-    setDisplayedUsers(users);
+    setCurrentPage(1);
+    loadUsers(1);
   };
 
   const handleEdit = (user) => {
@@ -234,9 +254,12 @@ function UserPage() {
             <button className="btn-ghost" onClick={handleReset}>
               초기화
             </button>
-            <button className="btn-ghost" onClick={loadUsers}>
+            <button className="btn-ghost" onClick={() => loadUsers(currentPage)}>
               새로고침
             </button>
+            <span style={{ marginLeft: 'auto', color: '#666', fontSize: '14px' }}>
+              총 {totalCount.toLocaleString()}명
+            </span>
           </div>
         </div>
         <div className="filter-underline" />
@@ -245,7 +268,7 @@ function UserPage() {
       <section className="table-section">
         <div className="table-header-row">
           <div className="table-header-left">
-            사용자 관리 ({displayedUsers.length}명)
+            사용자 관리 ({currentPage} / {totalPages} 페이지)
           </div>
         </div>
 
@@ -323,7 +346,13 @@ function UserPage() {
             </table>
           )}
 
-          <Pagination />
+          {!loading && displayedUsers.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          )}
         </div>
       </section>
 

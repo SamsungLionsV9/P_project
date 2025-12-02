@@ -172,6 +172,16 @@ class DatabaseService:
             )
         ''')
         
+        # 페이지네이션 쿼리 최적화를 위한 인덱스 생성
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_history_created_at ON analysis_history(created_at DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_analysis_history_user_id ON analysis_history(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_ai_logs_created_at ON ai_logs(created_at DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_ai_logs_log_type ON ai_logs(log_type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_vehicle_views_created_at ON vehicle_views(created_at DESC)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_vehicle_views_user_id ON vehicle_views(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC)')
+        
         conn.commit()
         conn.close()
 
@@ -243,22 +253,22 @@ class DatabaseService:
         finally:
             conn.close()
 
-    def get_analysis_history(self, user_id: str = None, limit: int = 50) -> List[Dict]:
-        """분석 이력 조회"""
+    def get_analysis_history(self, user_id: str = None, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """분석 이력 조회 (페이지네이션 지원)"""
         conn = self._get_conn()
         cursor = conn.cursor()
 
-        if user_id and user_id != 'anonymous':
+        if user_id and user_id not in ['anonymous', 'guest', '']:
             cursor.execute('''
                 SELECT * FROM analysis_history
                 WHERE user_id = ?
-                ORDER BY created_at DESC LIMIT ?
-            ''', (user_id, limit))
+                ORDER BY created_at DESC LIMIT ? OFFSET ?
+            ''', (user_id, limit, offset))
         else:
             cursor.execute('''
                 SELECT * FROM analysis_history
-                ORDER BY created_at DESC LIMIT ?
-            ''', (limit,))
+                ORDER BY created_at DESC LIMIT ? OFFSET ?
+            ''', (limit, offset))
 
         rows = cursor.fetchall()
         conn.close()
@@ -320,8 +330,8 @@ class DatabaseService:
         finally:
             conn.close()
 
-    def get_ai_logs(self, log_type: str = None, limit: int = 100) -> List[Dict]:
-        """AI 로그 조회"""
+    def get_ai_logs(self, log_type: str = None, limit: int = 100, offset: int = 0) -> List[Dict]:
+        """AI 로그 조회 (페이지네이션 지원)"""
         conn = self._get_conn()
         cursor = conn.cursor()
 
@@ -329,13 +339,13 @@ class DatabaseService:
             cursor.execute('''
                 SELECT * FROM ai_logs
                 WHERE log_type = ?
-                ORDER BY created_at DESC LIMIT ?
-            ''', (log_type, limit))
+                ORDER BY created_at DESC LIMIT ? OFFSET ?
+            ''', (log_type, limit, offset))
         else:
             cursor.execute('''
                 SELECT * FROM ai_logs
-                ORDER BY created_at DESC LIMIT ?
-            ''', (limit,))
+                ORDER BY created_at DESC LIMIT ? OFFSET ?
+            ''', (limit, offset))
 
         rows = cursor.fetchall()
         conn.close()
@@ -351,6 +361,25 @@ class DatabaseService:
             result.append(item)
 
         return result
+
+    def get_total_ai_logs_count(self, log_type: str = None) -> int:
+        """AI 로그 전체 건수 조회"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+
+        try:
+            if log_type:
+                cursor.execute('SELECT COUNT(*) as cnt FROM ai_logs WHERE log_type = ?', (log_type,))
+            else:
+                cursor.execute('SELECT COUNT(*) as cnt FROM ai_logs')
+            
+            row = cursor.fetchone()
+            return row['cnt'] if row else 0
+        except Exception as e:
+            print(f"AI 로그 건수 조회 오류: {e}")
+            return 0
+        finally:
+            conn.close()
 
     def get_ai_stats(self) -> Dict:
         """AI 사용 통계"""

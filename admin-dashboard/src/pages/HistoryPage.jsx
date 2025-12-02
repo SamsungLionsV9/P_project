@@ -9,12 +9,22 @@ function HistoryPage() {
   const [displayedHistory, setDisplayedHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
-  const loadHistory = async () => {
+  const loadHistory = async (page = currentPage) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/analysis-history?limit=100");
+      const params = new URLSearchParams();
+      params.append("page", String(page));
+      params.append("limit", String(PAGE_SIZE));
+      if (userIdFilter) params.append("user_id", userIdFilter);
+
+      const response = await fetch(`/api/admin/analysis-history?${params}`);
       if (!response.ok) {
         throw new Error(`서버 오류: ${response.status}`);
       }
@@ -22,6 +32,9 @@ function HistoryPage() {
       if (data.success) {
         setHistoryData(data.history);
         setDisplayedHistory(data.history);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.total || 0);
+        setCurrentPage(data.page || 1);
       } else {
         throw new Error(data.message || "데이터 로드 실패");
       }
@@ -33,8 +46,15 @@ function HistoryPage() {
     }
   };
 
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      loadHistory(page);
+    }
+  };
+
   useEffect(() => {
-    loadHistory();
+    loadHistory(1);
   }, []);
 
   const handleSearch = () => {
@@ -62,7 +82,8 @@ function HistoryPage() {
     setUserIdFilter("");
     setModelFilter("");
     setDateFilter("");
-    setDisplayedHistory(historyData);
+    setCurrentPage(1);
+    loadHistory(1);
   };
 
   const formatPrice = (price) => {
@@ -122,9 +143,12 @@ function HistoryPage() {
             <button className="btn-ghost" onClick={handleReset}>
               초기화
             </button>
-            <button className="btn-ghost" onClick={loadHistory}>
+            <button className="btn-ghost" onClick={() => loadHistory(currentPage)}>
               새로고침
             </button>
+            <span style={{ marginLeft: 'auto', color: '#666', fontSize: '14px' }}>
+              총 {totalCount.toLocaleString()}건
+            </span>
           </div>
         </div>
         <div className="filter-underline" />
@@ -133,7 +157,7 @@ function HistoryPage() {
       <section className="table-section">
         <div className="table-header-row">
           <div className="table-header-left">
-            분석 이력 ({displayedHistory.length}건)
+            분석 이력 ({currentPage} / {totalPages} 페이지)
           </div>
         </div>
 
@@ -186,7 +210,13 @@ function HistoryPage() {
             </table>
           )}
 
-          <Pagination />
+          {!loading && displayedHistory.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          )}
         </div>
       </section>
     </div>

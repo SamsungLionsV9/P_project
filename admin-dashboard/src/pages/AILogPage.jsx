@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Bot, RefreshCw, CheckCircle, XCircle, MessageSquare, AlertTriangle, Activity, ChevronDown, ChevronUp, TrendingUp, Shield, FileText } from "lucide-react";
+import Pagination from "../components/Pagination";
 
 function AILogPage() {
   const [logs, setLogs] = useState([]);
@@ -7,15 +8,21 @@ function AILogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterType, setFilterType] = useState("");
-  const [expandedLogId, setExpandedLogId] = useState(null); // 확장된 로그 ID
+  const [expandedLogId, setExpandedLogId] = useState(null);
+  // 페이지네이션 상태
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
-  const loadLogs = async () => {
+  const loadLogs = async (page = currentPage) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
       if (filterType) params.append("log_type", filterType);
-      params.append("limit", "50");
+      params.append("page", String(page));
+      params.append("limit", String(PAGE_SIZE));
 
       const response = await fetch(`/api/admin/ai-logs?${params}`);
       if (!response.ok) {
@@ -25,6 +32,9 @@ function AILogPage() {
       if (data.success) {
         setLogs(data.logs || []);
         setStats(data.stats || {});
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.total || 0);
+        setCurrentPage(data.page || 1);
       } else {
         throw new Error(data.message || "데이터 로드 실패");
       }
@@ -36,8 +46,16 @@ function AILogPage() {
     }
   };
 
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      loadLogs(page);
+    }
+  };
+
   useEffect(() => {
-    loadLogs();
+    setCurrentPage(1);
+    loadLogs(1);
   }, [filterType]);
 
   const formatDate = (dateString) => {
@@ -278,20 +296,44 @@ function AILogPage() {
         </div>
       </section>
 
-      {/* 필터 */}
-      <section className="filter-section">
-        <div className="filter-row">
+      {/* 필터 - 가로 배열 */}
+      <section style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="filter-select"
+            style={{ 
+              padding: '10px 16px', 
+              borderRadius: '8px', 
+              border: '1px solid #ddd',
+              fontSize: '14px',
+              minWidth: '120px'
+            }}
           >
             <option value="">전체 유형</option>
             <option value="negotiation">네고 대본</option>
             <option value="signal">시그널 분석</option>
             <option value="fraud_detection">허위매물 탐지</option>
           </select>
-          <button className="btn-primary" onClick={loadLogs} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: '#666', fontSize: '14px' }}>
+            총 {totalCount.toLocaleString()}건
+          </span>
+          <button 
+            onClick={() => loadLogs(currentPage)} 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              padding: '10px 20px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
             <RefreshCw size={16} />
             새로고침
           </button>
@@ -366,6 +408,13 @@ function AILogPage() {
             </table>
           )}
         </div>
+        {!loading && logs.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        )}
       </section>
     </div>
   );

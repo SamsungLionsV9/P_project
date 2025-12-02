@@ -83,7 +83,8 @@ app = FastAPI(
 )
 
 # 차량 이미지 폴더 경로
-CAR_IMAGES_DIR = os.path.join(os.path.dirname(__file__), "차량 이미지", "차량 이미지")
+CAR_IMAGES_DIR = os.path.join(os.path.dirname(__file__), "차량 이미지", "차량 이미지")  # 국산차
+CAR_IMAGES_IMPORTED_DIR = os.path.join(os.path.dirname(__file__), "차량 이미지", "외제차 이미지")  # 외제차
 
 # CORS
 app.add_middleware(
@@ -280,20 +281,33 @@ def compress_image(file_path: str, max_size: int = 400, quality: int = 85) -> by
 @app.get("/car-images/{filename:path}")
 async def get_car_image(filename: str, size: int = 400, quality: int = 85):
     """
-    차량 이미지 제공 (압축 지원)
+    차량 이미지 제공 (압축 지원) - 국산차 + 외제차
     - size: 최대 크기 (기본 400px)
     - quality: JPEG 품질 (기본 85)
     """
     # URL 디코딩 (한글 파일명 지원)
     decoded_filename = unquote(filename)
+    
+    # 확장자 제거 (나중에 여러 확장자 시도)
+    base_name = decoded_filename
+    if decoded_filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+        base_name = os.path.splitext(decoded_filename)[0]
+    
+    # 검색할 폴더와 확장자 조합
+    search_dirs = [CAR_IMAGES_DIR, CAR_IMAGES_IMPORTED_DIR]
+    extensions = ['.png', '.jpg', '.jpeg']
+    
+    file_path = None
+    for search_dir in search_dirs:
+        for ext in extensions:
+            candidate = os.path.join(search_dir, base_name + ext)
+            if os.path.exists(candidate):
+                file_path = candidate
+                break
+        if file_path:
+            break
 
-    # .png 확장자가 없으면 추가
-    if not decoded_filename.lower().endswith('.png'):
-        decoded_filename += '.png'
-
-    file_path = os.path.join(CAR_IMAGES_DIR, decoded_filename)
-
-    if os.path.exists(file_path):
+    if file_path:
         # 이미지 압축 후 반환
         image_data = compress_image(file_path, max_size=size, quality=quality)
         
@@ -313,16 +327,33 @@ async def get_car_image(filename: str, size: int = 400, quality: int = 85):
         )
 
     # 파일이 없으면 404 (로그 추가)
-    logger.warning(f"Image not found: {decoded_filename}")
-    raise HTTPException(status_code=404, detail=f"이미지를 찾을 수 없습니다: {decoded_filename}")
+    logger.warning(f"Image not found: {base_name} (searched in domestic & imported)")
+    raise HTTPException(status_code=404, detail=f"이미지를 찾을 수 없습니다: {base_name}")
 
 @app.get("/api/car-images/list")
 async def list_car_images():
-    """사용 가능한 차량 이미지 목록"""
+    """사용 가능한 차량 이미지 목록 (국산차 + 외제차)"""
+    images = []
+    
+    # 국산차 이미지
     if os.path.exists(CAR_IMAGES_DIR):
-        images = [f.replace('.png', '') for f in os.listdir(CAR_IMAGES_DIR) if f.endswith('.png')]
-        return {"success": True, "images": sorted(images), "count": len(images)}
-    return {"success": False, "images": [], "count": 0}
+        for f in os.listdir(CAR_IMAGES_DIR):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg')):
+                images.append({"name": os.path.splitext(f)[0], "category": "domestic"})
+    
+    # 외제차 이미지
+    if os.path.exists(CAR_IMAGES_IMPORTED_DIR):
+        for f in os.listdir(CAR_IMAGES_IMPORTED_DIR):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg')):
+                images.append({"name": os.path.splitext(f)[0], "category": "imported"})
+    
+    return {
+        "success": True, 
+        "images": sorted(images, key=lambda x: x["name"]), 
+        "count": len(images),
+        "domestic_count": len([i for i in images if i["category"] == "domestic"]),
+        "imported_count": len([i for i in images if i["category"] == "imported"])
+    }
 
 @app.post("/api/predict")
 async def predict(request: PredictRequest):
@@ -901,9 +932,10 @@ async def get_ai_status():
 SPRING_BOOT_URL = "http://localhost:8080"
 
 @app.get("/api/admin/users", tags=["Admin"])
-async def get_admin_users():
-    """사용자 목록 조회 (Spring Boot 프록시 + 분석 이력 병합)"""
+async def get_admin_users(page: int = 1, limit: int = 20):
+    """사용자 목록 조회 (페이지네이션 지원)"""
     import httpx
+    import math
     
     users = []
     spring_boot_available = False
@@ -911,7 +943,6 @@ async def get_admin_users():
     # 1. Spring Boot User Service에서 실제 가입 사용자 조회 시도
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            # 인증 없이 사용자 목록 조회 (공개 엔드포인트 필요 또는 관리자 토큰 사용)
             response = await client.get(f"{SPRING_BOOT_URL}/api/admin/users-public")
             if response.status_code == 200:
                 data = response.json()
@@ -932,7 +963,6 @@ async def get_admin_users():
     # 3. 분석 이력 및 AI 로그에서 사용자 ID 수집하여 병합
     analysis_users = {}
     try:
-        # 분석 이력에서 사용자 수집
         history = db_service.get_analysis_history(limit=1000)
         for h in history:
             uid = h.get('user_id', 'anonymous')
@@ -941,7 +971,6 @@ async def get_admin_users():
                     analysis_users[uid] = 0
                 analysis_users[uid] += 1
         
-        # AI 로그에서 사용자 수집
         ai_logs = db_service.get_ai_logs(limit=1000)
         for log in ai_logs:
             uid = log.get('user_id', 'anonymous')
@@ -950,7 +979,6 @@ async def get_admin_users():
                     analysis_users[uid] = 0
                 analysis_users[uid] += 1
                 
-        # 매물 조회 이력에서 사용자 수집
         views = db_service.get_vehicle_views(limit=1000)
         for v in views:
             uid = v.get('user_id', 'anonymous')
@@ -984,12 +1012,20 @@ async def get_admin_users():
         email = user.get('email', '')
         user['analysisCount'] = analysis_users.get(email, 0)
     
+    # 6. 페이지네이션 적용
+    total_count = len(users)
+    total_pages = math.ceil(total_count / limit) if total_count > 0 else 1
+    offset = (page - 1) * limit
+    paginated_users = users[offset:offset + limit]
+    
     return {
         "success": True,
-        "users": users,
-        "total": len(users),
-        "source": "spring_boot" if spring_boot_available else "local",
-        "message": "Spring Boot 연동" if spring_boot_available else "로컬 데이터"
+        "users": paginated_users,
+        "total": total_count,
+        "page": page,
+        "totalPages": total_pages,
+        "limit": limit,
+        "source": "spring_boot" if spring_boot_available else "local"
     }
 
 @app.put("/api/admin/users/{user_id}", tags=["Admin"])
@@ -1140,40 +1176,68 @@ async def get_vehicle_detail(car_id: int, category: str = "domestic"):
 
 
 @app.get("/api/admin/ai-logs", tags=["Admin"])
-async def get_ai_logs(log_type: str = None, limit: int = 50):
-    """AI 분석 로그 조회 (네고 대본 생성 기록 등) - DB 기반"""
-    # DB에서 조회 우선
-    db_logs = db_service.get_ai_logs(log_type, limit)
+async def get_ai_logs(log_type: str = None, page: int = 1, limit: int = 20):
+    """AI 분석 로그 조회 (페이지네이션 지원)"""
+    import math
+    
+    # 페이지네이션 계산
+    offset = (page - 1) * limit
+    
+    # 전체 건수 조회
+    total_count = db_service.get_total_ai_logs_count(log_type)
+    total_pages = math.ceil(total_count / limit) if total_count > 0 else 1
+    
+    # DB에서 조회
+    db_logs = db_service.get_ai_logs(log_type, limit, offset)
     db_stats = db_service.get_ai_stats()
 
     # DB에 데이터가 없으면 메모리 fallback
-    if not db_logs:
+    if not db_logs and page == 1:
         logs = history_service.get_ai_logs(log_type, limit)
         stats = history_service.get_ai_stats()
         return {
             "success": True,
             "logs": logs,
             "stats": stats,
-            "total": len(logs)
+            "total": len(logs),
+            "page": 1,
+            "totalPages": 1,
+            "limit": limit
         }
 
     return {
         "success": True,
         "logs": db_logs,
         "stats": db_stats,
-        "total": len(db_logs)
+        "total": total_count,
+        "page": page,
+        "totalPages": total_pages,
+        "limit": limit
     }
 
 
 @app.get("/api/admin/analysis-history", tags=["Admin"])
-async def get_analysis_history(user_id: str = None, limit: int = 50):
-    """분석 이력 조회 (예측 결과 포함) - DB 기반"""
-    history = db_service.get_analysis_history(user_id, limit)
+async def get_analysis_history(user_id: str = None, page: int = 1, limit: int = 20):
+    """분석 이력 조회 (페이지네이션 지원)"""
+    import math
+    
+    # 페이지네이션 계산
+    offset = (page - 1) * limit
+    
+    # 전체 건수 조회
     total_count = db_service.get_total_analysis_count(user_id)
+    total_pages = math.ceil(total_count / limit) if total_count > 0 else 1
+    
+    # DB에서 조회
+    history = db_service.get_analysis_history(user_id, limit, offset)
+    
     return {
         "success": True,
         "history": history,
-        "total": total_count  # DB 전체 레코드 수
+        "total": total_count,
+        "page": page,
+        "totalPages": total_pages,
+        "limit": limit
     }
 
 
