@@ -327,6 +327,134 @@ class CarImageService:
         "푸조 508": "/car-images/푸조 508.jpg",
         # 피아트
         "피아트 500": "/car-images/피아트 500.jpg",
+        
+        # === 대체 매핑 (시리즈 → 대표 이미지) ===
+        # 테슬라 (모든 모델 → 대표 이미지)
+        "모델 3": "/car-images/테슬라 모델3.jpg",
+        "모델 S": "/car-images/테슬라 모델S.jpg",
+        "모델 X": "/car-images/테슬라 모델X.jpg",
+        "모델 Y": "/car-images/테슬라 모델Y.png",
+        "사이버트럭": "/car-images/테슬라 모델X.jpg",  # 대체
+        
+        # 아이오닉 시리즈 → 아이오닉 대표
+        "아이오닉 일렉트릭": "/car-images/아이오닉.png",
+        "아이오닉 하이브리드": "/car-images/아이오닉.png",
+        "아이오닉5": "/car-images/아이오닉.png",
+        "아이오닉6": "/car-images/아이오닉.png",
+        "아이오닉9": "/car-images/아이오닉.png",
+        "더 뉴 아이오닉 일렉트릭": "/car-images/아이오닉.png",
+        "더 뉴 아이오닉 하이브리드": "/car-images/아이오닉.png",
+        "더 뉴 아이오닉5": "/car-images/아이오닉.png",
+        
+        # 쏘울 시리즈 → 쏘울 대표
+        "쏘울 EV": "/car-images/쏘울.png",
+        "쏘울 부스터": "/car-images/쏘울.png",
+        "쏘울 부스터 EV": "/car-images/쏘울.png",
+        "올 뉴 쏘울": "/car-images/쏘울.png",
+        "더 뉴 쏘울": "/car-images/쏘울.png",
+        
+        # 미니 쿠퍼 시리즈 → 미니쿠퍼 대표
+        "쿠퍼": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S": "/car-images/미니쿠퍼.png",
+        "쿠퍼 D": "/car-images/미니쿠퍼.png",
+        "쿠퍼 SD": "/car-images/미니쿠퍼.png",
+        "쿠퍼 일렉트릭": "/car-images/미니쿠퍼.png",
+        "쿠퍼 컨버터블": "/car-images/미니쿠퍼.png",
+        "쿠퍼 컨트리맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 클럽맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 쿠페": "/car-images/미니쿠퍼.png",
+        "쿠퍼 로드스터": "/car-images/미니쿠퍼.png",
+        "쿠퍼 C 4세대": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 4세대": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 로드스터": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 컨버터블": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 컨버터블 4세대": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 컨트리맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 컨트리맨 3세대": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 쿠페": "/car-images/미니쿠퍼.png",
+        "쿠퍼 S 클럽맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 D 컨트리맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 D 클럽맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 D 페이스맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 SD 컨트리맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 SD 클럽맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 SD 페이스맨": "/car-images/미니쿠퍼.png",
+        "쿠퍼 일렉트릭 4세대": "/car-images/미니쿠퍼.png",
+        "쿠퍼 컨트리맨 일렉트릭 3세대": "/car-images/미니쿠퍼.png",
+        
+        # 람보르기니 시리즈 → 대표
+        "아벤타도르": "/car-images/람보르기니 아벤타도르.jpg",
+        "우라칸": "/car-images/람보르기니 우라칸.jpg",
+        "우루스": "/car-images/람보르기니 우루스.jpg",
+        "가야르도": "/car-images/람보르기니 우라칸.jpg",
+        
+        # 롤스로이스 시리즈 → 대표
+        "고스트": "/car-images/롤스로이스 고스트.jpg",
+        "고스트 2세대": "/car-images/롤스로이스 고스트.jpg",
+        "팬텀": "/car-images/롤스로이스 팬텀.jpg",
+        "컬리넌": "/car-images/롤스로이스 컬리넌.jpg",
+        "던": "/car-images/롤스로이스 고스트.jpg",
+        "스펙터": "/car-images/롤스로이스 고스트.jpg",
+        
+        # 벤틀리 시리즈 → 대표
+        "벤테이가": "/car-images/벤틀리 벤테이가.jpg",
+        "플라잉스퍼 1세대": "/car-images/벤틀리 플라잉스퍼.jpg",
+        "플라잉스퍼 2세대": "/car-images/벤틀리 플라잉스퍼.jpg",
+        "플라잉스퍼 3세대": "/car-images/벤틀리 플라잉스퍼.jpg",
+        "컨티넨탈 GT 1세대": "/car-images/벤틀리 컨티넨탈 GT.jpg",
+        "컨티넨탈 GT 2세대": "/car-images/벤틀리 컨티넨탈 GT.jpg",
+        "컨티넨탈 GT 3세대": "/car-images/벤틀리 컨티넨탈 GT.jpg",
+        "뮬산": "/car-images/벤틀리 플라잉스퍼.jpg",
+        
+        # 마세라티 시리즈 → 대표
+        "기블리": "/car-images/마세라티 기블리.jpg",
+        "르반떼": "/car-images/마세라티 르반떼.jpg",
+        "콰트로포르테": "/car-images/마세라티 콰트로포르테.jpg",
+        "그란투리스모": "/car-images/마세라티 기블리.jpg",
+        "그란카브리오": "/car-images/마세라티 기블리.jpg",
+        "그레칼레": "/car-images/마세라티 르반떼.jpg",
+        
+        # 페라리 시리즈 → 대표
+        "로마": "/car-images/페라리 로마.jpg",
+        "296 GTB": "/car-images/페라리 296.jpg",
+        "296 GTS": "/car-images/페라리 296.jpg",
+        "488 GTB": "/car-images/페라리 488.jpg",
+        "488 스파이더": "/car-images/페라리 488.jpg",
+        "488 피스타": "/car-images/페라리 488.jpg",
+        "F8 스파이더": "/car-images/페라리 F8.jpg",
+        "F8 트리뷰토": "/car-images/페라리 F8.jpg",
+        "SF90 스트라달레": "/car-images/페라리 SF90.jpg",
+        "SF90 스파이더": "/car-images/페라리 SF90.jpg",
+        "812 GTS": "/car-images/페라리 SF90.jpg",
+        "812 슈퍼패스트": "/car-images/페라리 SF90.jpg",
+        "포르토피노": "/car-images/페라리 로마.jpg",
+        "푸로산게": "/car-images/페라리 SF90.jpg",
+        "GTC4 루쏘": "/car-images/페라리 488.jpg",
+        "458": "/car-images/페라리 488.jpg",
+        "F430": "/car-images/페라리 488.jpg",
+        "360": "/car-images/페라리 488.jpg",
+        "F12 베를리네타": "/car-images/페라리 SF90.jpg",
+        
+        # 포드/미국차 시리즈 → 대표
+        "머스탱": "/car-images/포드 머스탱.jpg",
+        "머스탱 7세대": "/car-images/포드 머스탱.jpg",
+        "익스플로러": "/car-images/포드 익스플로러.jpg",
+        "익스플로러 6세대": "/car-images/포드 익스플로러.jpg",
+        "브롱코 6세대": "/car-images/포드 브롱코.jpg",
+        "F150": "/car-images/포드 F150.jpg",
+        
+        # 지프 시리즈 → 대표
+        "그랜드 체로키": "/car-images/지프 그랜드 체로키.jpg",
+        "그랜드 체로키(WL)": "/car-images/지프 그랜드 체로키.jpg",
+        "랭글러 (JK)": "/car-images/지프 랭글러.jpg",
+        "랭글러 (JL)": "/car-images/지프 랭글러.jpg",
+        "랭글러 (TJ)": "/car-images/지프 랭글러.jpg",
+        "랭글러 (YJ)": "/car-images/지프 랭글러.jpg",
+        "레니게이드": "/car-images/지프 레니게이드.jpg",
+        "체로키(KL)": "/car-images/지프 체로키.jpg",
+        "컴패스": "/car-images/지프 레니게이드.jpg",
+        "컴패스 2세대": "/car-images/지프 레니게이드.jpg",
+        "글래디에이터 (JT)": "/car-images/지프 랭글러.jpg",
     }
     
     # 기본 이미지 (모델을 찾지 못한 경우)
