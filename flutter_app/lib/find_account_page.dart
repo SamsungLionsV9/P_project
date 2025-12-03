@@ -9,9 +9,14 @@ class FindAccountPage extends StatefulWidget {
   State<FindAccountPage> createState() => _FindAccountPageState();
 }
 
-class _FindAccountPageState extends State<FindAccountPage> {
+class _FindAccountPageState extends State<FindAccountPage> with SingleTickerProviderStateMixin {
   final AuthService _authService = AuthService();
+  late TabController _tabController;
   final PageController _pageController = PageController();
+
+  // 아이디 찾기
+  final TextEditingController _findIdEmailController = TextEditingController();
+  bool _isLoadingFindId = false;
 
   // 비밀번호 찾기
   final TextEditingController _emailController = TextEditingController();
@@ -26,13 +31,46 @@ class _FindAccountPageState extends State<FindAccountPage> {
   bool _obscureConfirmPassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
   void dispose() {
+    _tabController.dispose();
     _pageController.dispose();
+    _findIdEmailController.dispose();
     _emailController.dispose();
     _codeController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  /// 아이디 찾기
+  Future<void> _findId() async {
+    if (_findIdEmailController.text.isEmpty) {
+      _showMessage('이메일을 입력해주세요', isError: true);
+      return;
+    }
+
+    if (!_isValidEmail(_findIdEmailController.text)) {
+      _showMessage('올바른 이메일 형식이 아닙니다', isError: true);
+      return;
+    }
+
+    setState(() => _isLoadingFindId = true);
+
+    final result = await _authService.findId(_findIdEmailController.text.trim());
+
+    setState(() => _isLoadingFindId = false);
+
+    if (result['success'] == true) {
+      _showMessage('아이디 정보가 이메일로 발송되었습니다\n이메일을 확인해주세요');
+    } else {
+      _showMessage(result['message'] ?? '아이디 찾기 실패', isError: true);
+    }
   }
 
   /// 이메일 인증 코드 발송
@@ -142,7 +180,7 @@ class _FindAccountPageState extends State<FindAccountPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          '비밀번호 찾기',
+          '아이디/비밀번호 찾기',
           style: TextStyle(
             color: textColor,
             fontWeight: FontWeight.bold,
@@ -150,19 +188,148 @@ class _FindAccountPageState extends State<FindAccountPage> {
           ),
         ),
         centerTitle: true,
-      ),
-      body: SafeArea(
-        child: PageView(
-          controller: _pageController,
-          physics: const NeverScrollableScrollPhysics(), // 스와이프 비활성화
-          children: [
-            // 1단계: 이메일 입력 및 인증 코드 발송
-            _buildEmailStep(isDark, textColor),
-            // 2단계: 인증 코드 확인 및 비밀번호 재설정
-            _buildResetStep(isDark, textColor),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: const Color(0xFF0066FF),
+          unselectedLabelColor: Colors.grey[600],
+          indicatorColor: const Color(0xFF0066FF),
+          tabs: const [
+            Tab(text: '아이디 찾기'),
+            Tab(text: '비밀번호 찾기'),
           ],
         ),
       ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // 아이디 찾기
+          _buildFindIdTab(isDark, textColor),
+          // 비밀번호 찾기
+          _buildFindPasswordTab(isDark, textColor),
+        ],
+      ),
+    );
+  }
+
+  /// 아이디 찾기 탭
+  Widget _buildFindIdTab(bool isDark, Color textColor) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              const Text(
+                '🔍',
+                style: TextStyle(fontSize: 28),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '아이디 찾기',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '가입하신 이메일로 계정 정보를 발송해드립니다.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 40),
+
+          // 이메일 입력
+          _buildTextField(
+            controller: _findIdEmailController,
+            hintText: "이메일",
+            keyboardType: TextInputType.emailAddress,
+            isDark: isDark,
+          ),
+          const SizedBox(height: 24),
+
+          // 아이디 찾기 버튼
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isLoadingFindId ? null : _findId,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0066FF),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: _isLoadingFindId
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      "아이디 찾기",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 안내 문구
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 20, color: Colors.blue[300]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '가입하신 이메일 주소를 입력하시면\n해당 이메일로 계정 정보(이메일, 사용자명)를 발송해드립니다.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 비밀번호 찾기 탭
+  Widget _buildFindPasswordTab(bool isDark, Color textColor) {
+    return PageView(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(), // 스와이프 비활성화
+      children: [
+        // 1단계: 이메일 입력 및 인증 코드 발송
+        _buildEmailStep(isDark, textColor),
+        // 2단계: 인증 코드 확인 및 비밀번호 재설정
+        _buildResetStep(isDark, textColor),
+      ],
     );
   }
 
@@ -440,4 +607,3 @@ class _FindAccountPageState extends State<FindAccountPage> {
     );
   }
 }
-

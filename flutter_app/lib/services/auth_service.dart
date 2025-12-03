@@ -335,4 +335,24 @@ class AuthService {
       return {'success': false, 'message': '서버 연결 실패'};
     }
   }
+
+  /// 아이디 찾기 - 이메일로 가입한 계정 정보 이메일 발송
+  Future<Map<String, dynamic>> findId(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/auth/find-id'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      ).timeout(const Duration(seconds: 30));
+
+      final data = jsonDecode(response.body);
+      return {
+        'success': data['success'] ?? false,
+        'message': data['message'] ?? '아이디 찾기 실패',
+      };
+    } catch (e) {
+      debugPrint('아이디 찾기 에러: $e');
+      return {'success': false, 'message': '서버 연결 실패'};
+    }
+  }
 }

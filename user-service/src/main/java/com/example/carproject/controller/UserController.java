@@ -346,5 +346,42 @@ public class UserController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+    
+    /**
+     * 아이디 찾기 - 이메일로 가입한 계정 정보 이메일 발송
+     * POST /api/auth/find-id
+     */
+    @PostMapping("/find-id")
+    public ResponseEntity<?> findId(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            if (email == null || email.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "이메일을 입력해주세요");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            userService.findIdByEmail(email);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "아이디 정보가 이메일로 발송되었습니다");
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "아이디 찾기 실패: " + e.getMessage());
+            
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 }
 

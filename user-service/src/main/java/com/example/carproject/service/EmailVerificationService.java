@@ -154,4 +154,48 @@ public class EmailVerificationService {
         helper.setText(htmlContent, true);
         mailSender.send(message);
     }
+    
+    /**
+     * 아이디 찾기 이메일 발송
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void sendFindIdEmail(String email, String username) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        
+        helper.setTo(email);
+        helper.setSubject("[중고차 시세 예측] 아이디 찾기 결과");
+        
+        String htmlContent = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+            </head>
+            <body style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #0066FF, #00AAFF); padding: 30px; border-radius: 10px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">🚗 중고차 시세 예측</h1>
+                </div>
+                <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+                    <h2 style="color: #333;">아이디 찾기 결과</h2>
+                    <p style="color: #666; font-size: 16px;">요청하신 계정 정보입니다.</p>
+                    <div style="background: white; border: 2px solid #0066FF; border-radius: 10px; padding: 20px; margin: 20px 0;">
+                        <p style="color: #333; font-size: 14px; margin: 8px 0;"><strong>이메일:</strong> %s</p>
+                        <p style="color: #333; font-size: 14px; margin: 8px 0;"><strong>사용자명:</strong> %s</p>
+                    </div>
+                    <p style="color: #999; font-size: 14px;">
+                        • 로그인은 이메일 주소로 가능합니다.<br>
+                        • 본인이 요청하지 않은 경우 이 메일을 무시하세요.
+                    </p>
+                </div>
+                <p style="color: #aaa; font-size: 12px; text-align: center; margin-top: 20px;">
+                    © 2025 중고차 시세 예측 AI. All rights reserved.
+                </p>
+            </body>
+            </html>
+            """.formatted(email, username);
+        
+        helper.setText(htmlContent, true);
+        mailSender.send(message);
+    }
 }

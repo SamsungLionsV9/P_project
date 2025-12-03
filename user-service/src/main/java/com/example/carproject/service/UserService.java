@@ -346,5 +346,25 @@ public class UserService implements UserDetailsService {
                 })
                 .orElse(false);
     }
+    
+    /**
+     * 아이디 찾기 - 이메일로 가입한 계정 정보 이메일 발송
+     */
+    @Transactional
+    public void findIdByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 이메일입니다"));
+        
+        if (!user.getIsActive()) {
+            throw new IllegalArgumentException("비활성화된 계정입니다");
+        }
+        
+        // 이메일로 아이디 정보 발송
+        try {
+            emailVerificationService.sendFindIdEmail(email, user.getUsername());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("이메일 발송 실패: " + e.getMessage());
+        }
+    }
 }
 
