@@ -76,6 +76,28 @@ class CarImageService:
         "GV60": "https://www.genesis.com/content/dam/genesis-p2/kr/assets/models/gv60/exterior/genesis-gv60-exterior.png",
         "GV70": "https://www.genesis.com/content/dam/genesis-p2/kr/assets/models/gv70/exterior/genesis-gv70-exterior.png",
         "GV80": "https://www.genesis.com/content/dam/genesis-p2/kr/assets/models/gv80/exterior/genesis-gv80-exterior.png",
+        
+        # 테슬라 (로컬 이미지 파일 사용)
+        "모델 3": "/car-images/테슬라 모델3.jpg",
+        "모델3": "/car-images/테슬라 모델3.jpg",
+        "Model 3": "/car-images/테슬라 모델3.jpg",
+        "Model3": "/car-images/테슬라 모델3.jpg",
+        "테슬라 모델3": "/car-images/테슬라 모델3.jpg",
+        "모델 S": "/car-images/테슬라 모델S.jpg",
+        "모델S": "/car-images/테슬라 모델S.jpg",
+        "Model S": "/car-images/테슬라 모델S.jpg",
+        "ModelS": "/car-images/테슬라 모델S.jpg",
+        "테슬라 모델S": "/car-images/테슬라 모델S.jpg",
+        "모델 X": "/car-images/테슬라 모델X.jpg",
+        "모델X": "/car-images/테슬라 모델X.jpg",
+        "Model X": "/car-images/테슬라 모델X.jpg",
+        "ModelX": "/car-images/테슬라 모델X.jpg",
+        "테슬라 모델X": "/car-images/테슬라 모델X.jpg",
+        "모델 Y": "/car-images/테슬라 모델Y.png",
+        "모델Y": "/car-images/테슬라 모델Y.png",
+        "Model Y": "/car-images/테슬라 모델Y.png",
+        "ModelY": "/car-images/테슬라 모델Y.png",
+        "테슬라 모델Y": "/car-images/테슬라 모델Y.png",
     }
     
     # 기본 이미지 (모델을 찾지 못한 경우)

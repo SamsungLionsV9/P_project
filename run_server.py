@@ -82,9 +82,9 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# 차량 이미지 폴더 경로
-CAR_IMAGES_DIR = os.path.join(os.path.dirname(__file__), "차량 이미지", "차량 이미지")  # 국산차
-CAR_IMAGES_IMPORTED_DIR = os.path.join(os.path.dirname(__file__), "차량 이미지", "외제차 이미지")  # 외제차
+# 차량 이미지 폴더 경로 (모든 이미지 통합 - 237개)
+CAR_IMAGES_DIR = os.path.join(os.path.dirname(__file__), "차량 이미지")  # 모든 차량 이미지
+CAR_IMAGES_IMPORTED_DIR = CAR_IMAGES_DIR  # 하위호환성 유지 (동일 폴더 참조)
 
 # CORS
 app.add_middleware(

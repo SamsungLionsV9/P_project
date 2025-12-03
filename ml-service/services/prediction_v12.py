@@ -118,6 +118,49 @@ class PredictionServiceV12:
                 return 'domestic'
         return 'imported'
     
+    def _find_best_model_match(self, model_name: str, model_enc: Dict) -> str:
+        """모델 이름 퍼지 매칭 - 최신 세대 코드 우선"""
+        # 부분 일치 찾기 (모델 이름이 포함된 것)
+        matches = []
+        model_clean = model_name.split('(')[0].strip()  # 괄호 제거
+        
+        for key in model_enc.keys():
+            key_clean = key.split('(')[0].strip()
+            if model_clean in key or key_clean in model_name or model_name in key:
+                matches.append((key, model_enc[key]))
+        
+        if not matches:
+            return model_name
+        
+        # 하이브리드/전기 제외한 일반 모델 필터링
+        regular_matches = [(k, v) for k, v in matches 
+                          if '하이브리드' not in k and 'HEV' not in k and '전기' not in k and 'EV' not in k]
+        
+        target_matches = regular_matches if regular_matches else matches
+        
+        # 1순위: 괄호 세대 코드가 있는 모델 (예: (GN7), (W213), (G30))
+        generation_matches = [(k, v) for k, v in target_matches if '(' in k and ')' in k]
+        if generation_matches:
+            # 세대 코드 모델 중 가장 높은 값 선택
+            best_match = max(generation_matches, key=lambda x: x[1])
+            return best_match[0]
+        
+        # 2순위: "더 뉴" 또는 "뉴"가 포함된 최신 모델
+        new_matches = [(k, v) for k, v in target_matches if '더 뉴' in k or '뉴' in k]
+        if new_matches:
+            best_match = max(new_matches, key=lambda x: x[1])
+            return best_match[0]
+        
+        # 3순위: 합리적인 가격 범위의 모델 (100~8000만원)
+        reasonable_matches = [(k, v) for k, v in target_matches if 100 <= v <= 8000]
+        if reasonable_matches:
+            best_match = max(reasonable_matches, key=lambda x: x[1])
+            return best_match[0]
+        
+        # 폴백: 전체에서 가장 높은 값
+        best_match = max(target_matches, key=lambda x: x[1])
+        return best_match[0]
+    
     def _get_mileage_group(self, mileage: int) -> str:
         if mileage < 30000: return 'A'
         elif mileage < 60000: return 'B'
@@ -142,14 +185,19 @@ class PredictionServiceV12:
         """국산차 V12 피처 생성 (FuelType 포함)"""
         age = 2025 - year
         mg = self._get_mileage_group(mileage)
-        my = f"{model_name}_{year}"
+        
+        # 모델명 퍼지 매칭
+        model_enc = self.domestic_encoders.get('model_enc', {})
+        best_model = self._find_best_model_match(model_name, model_enc)
+        
+        my = f"{best_model}_{year}"
         mymg = f"{my}_{mg}"
         fuel_norm = self._normalize_fuel(fuel)
         
         enc = self.domestic_encoders
         default_val = 2500
         
-        model_enc_val = enc.get('model_enc', {}).get(model_name, default_val)
+        model_enc_val = model_enc.get(best_model, default_val)
         my_enc_val = enc.get('model_year_enc', {}).get(my, model_enc_val)
         mymg_enc_val = enc.get('model_year_mg_enc', {}).get(mymg, my_enc_val)
         brand_enc_val = enc.get('brand_enc', {}).get('현대', default_val)
@@ -196,13 +244,18 @@ class PredictionServiceV12:
         """국산차 V11 피처 생성 (FuelType 미포함 - 폴백용)"""
         age = 2025 - year
         mg = self._get_mileage_group(mileage)
-        my = f"{model_name}_{year}"
+        
+        # 모델명 퍼지 매칭
+        model_enc = self.domestic_encoders.get('model_enc', {})
+        best_model = self._find_best_model_match(model_name, model_enc)
+        
+        my = f"{best_model}_{year}"
         mymg = f"{my}_{mg}"
 
         enc = self.domestic_encoders
         default_val = 2500
 
-        model_enc_val = enc.get('model_enc', {}).get(model_name, default_val)
+        model_enc_val = model_enc.get(best_model, default_val)
         my_enc_val = enc.get('model_year_enc', {}).get(my, model_enc_val)
         mymg_enc_val = enc.get('model_year_mg_enc', {}).get(mymg, my_enc_val)
         brand_enc_val = enc.get('brand_enc', {}).get('현대', default_val)
@@ -225,7 +278,7 @@ class PredictionServiceV12:
             'Age': age,
             'Age_log': np.log1p(age),
             'Age_sq': age ** 2,
-            'Mileage': mileage,
+            'mileage': mileage,  # V11 모델은 소문자 mileage 사용
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
             'is_accident_free': 1 if accident_free else 0,
@@ -235,9 +288,8 @@ class PredictionServiceV12:
             **opt_values
         }
 
-        # V11 피처만 선택
-        available_features = [col for col in self.domestic_features if col in f]
-        return pd.DataFrame([{k: f.get(k, 0) for k in available_features}])[available_features]
+        # V11 피처만 선택 (모델이 기대하는 피처 순서대로)
+        return pd.DataFrame([f])[self.domestic_features]
 
     def _extract_class(self, model_name: str, brand: str) -> tuple:
         """외제차 클래스 추출"""
@@ -286,7 +338,12 @@ class PredictionServiceV12:
         """외제차 V14 피처 생성 (FuelType 포함)"""
         age = 2025 - year
         mg = self._get_mileage_group(mileage)
-        my = f"{model_name}_{year}"
+        
+        # 모델명 퍼지 매칭
+        model_enc = self.imported_encoders.get('model_enc', {})
+        best_model = self._find_best_model_match(model_name, model_enc)
+        
+        my = f"{best_model}_{year}"
         mymg = f"{my}_{mg}"
         cls, cls_rank = self._extract_class(model_name, brand)
         cls_year = f"{cls}_{year}"
@@ -303,7 +360,7 @@ class PredictionServiceV12:
         grade_map = {'normal': 0, 'good': 1, 'excellent': 2}
         
         f = {
-            'Model_enc': enc.get('model_enc', {}).get(model_name, global_mean),
+            'Model_enc': model_enc.get(best_model, global_mean),
             'Model_Year_enc': enc.get('model_year_enc', {}).get(my, global_mean),
             'Model_Year_MG_enc': enc.get('model_year_mg_enc', {}).get(mymg, global_mean),
             'Brand_enc': enc.get('brand_enc', {}).get(brand, global_mean),
@@ -331,7 +388,12 @@ class PredictionServiceV12:
         """외제차 V13 피처 생성 (FuelType 미포함 - 폴백용)"""
         age = 2025 - year
         mg = self._get_mileage_group(mileage)
-        my = f"{model_name}_{year}"
+        
+        # 모델명 퍼지 매칭
+        model_enc = self.imported_encoders.get('model_enc', {})
+        best_model = self._find_best_model_match(model_name, model_enc)
+        
+        my = f"{best_model}_{year}"
         mymg = f"{my}_{mg}"
         cls, cls_rank = self._extract_class(model_name, brand)
         cls_year = f"{cls}_{year}"
@@ -347,7 +409,7 @@ class PredictionServiceV12:
         grade_map = {'normal': 0, 'good': 1, 'excellent': 2}
 
         f = {
-            'Model_enc': enc.get('model_enc', {}).get(model_name, global_mean),
+            'Model_enc': model_enc.get(best_model, global_mean),
             'Brand_enc': enc.get('brand_enc', {}).get(brand, global_mean),
             'Model_Year_enc': enc.get('model_year_enc', {}).get(my, global_mean),
             'Model_Year_MG_enc': enc.get('model_year_mg_enc', {}).get(mymg, global_mean),
@@ -358,16 +420,15 @@ class PredictionServiceV12:
             'Age': age,
             'Age_log': np.log1p(age),
             'Age_sq': age ** 2,
-            'Mileage': mileage,
+            'mileage': mileage,  # V13 모델은 소문자 mileage 사용
             'Mile_log': np.log1p(mileage),
             'Km_per_Year': mileage / (age + 1),
             'is_accident_free': 1 if accident_free else 0,
             'inspection_grade_enc': grade_map.get(grade, 0),
         }
 
-        # V13 피처만 선택
-        available_features = [col for col in self.imported_features if col in f]
-        return pd.DataFrame([{k: f.get(k, 0) for k in available_features}])[available_features]
+        # V13 피처만 선택 (모델이 기대하는 피처 순서대로)
+        return pd.DataFrame([f])[self.imported_features]
 
     # 시장 현실 기반 연료별 가격 조정 (실제 중고차 시장 데이터 기반)
     # 동일 모델/연식/주행거리 조건에서의 연료별 가격 차이
@@ -398,16 +459,16 @@ class PredictionServiceV12:
                 features = self._create_domestic_features_v12(
                     model_name, year, mileage, '가솔린', options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력: log(만원) -> 만원 변환
+                base_price = np.expm1(pred_log)
                 base_price = base_price * fuel_adj  # 시장 현실 기반 연료 조정
             else:
                 # Fallback V11
                 features = self._create_domestic_features_v11(
                     model_name, year, mileage, options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력: log(만원) -> 만원 변환
+                base_price = np.expm1(pred_log)
                 base_price = base_price * fuel_adj
             
             # 국산차 옵션 프리미엄 명시적 추가
@@ -429,15 +490,15 @@ class PredictionServiceV12:
                 features = self._create_imported_features_v14(
                     model_name, brand, year, mileage, '가솔린', options, accident_free, grade)
                 pred_log = self.imported_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력: log(만원) -> 만원 변환
+                base_price = np.expm1(pred_log)
             else:
                 # Fallback V13
                 features = self._create_imported_features_v13(
                     model_name, brand, year, mileage, options, accident_free, grade)
                 pred_log = self.imported_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력: log(만원) -> 만원 변환
+                base_price = np.expm1(pred_log)
             
             # 연료 조정 + 옵션 프리미엄
             base_price = base_price * imported_fuel_adj
