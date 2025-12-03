@@ -224,7 +224,7 @@ class _HomePageContentState extends State<HomePageContent> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  Expanded(child: const MarketTrendCard()),
+                  const Expanded(child: MarketTrendCard()),
                   const SizedBox(width: 12),
                   Expanded(
                     child: AiPickCard(

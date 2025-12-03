@@ -242,7 +242,7 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   TextButton(
                     onPressed: () {
-                      // TODO: 아이디/비밀번호 찾기 구현
+                      // 아이디/비밀번호 찾기 구현 예정
                       _showMessage('준비 중인 기능입니다.');
                     },
                     child: Text(
