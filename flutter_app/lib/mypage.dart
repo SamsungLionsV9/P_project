@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
+import 'services/auth_service.dart';
 import 'providers/comparison_provider.dart';
 import 'providers/recent_views_provider.dart';
 import 'models/car_data.dart';
 import 'comparison_page.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/common/option_badges.dart';
+import 'login_page.dart';
 
 /// 마이페이지 - 백엔드 연동 버전
 /// 찜한 차량, 최근 분석, 가격 알림 모두 DB에서 관리
@@ -111,6 +113,39 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     );
   }
 
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('로그아웃'),
+        content: const Text('로그아웃 하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('로그아웃', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final authService = AuthService();
+      await authService.logout();
+      
+      if (mounted) {
+        // 로그인 페이지로 이동 (스택 초기화)
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   bool _hasActiveAlert(Favorite fav) {
     return _alerts.any((a) =>
         a.brand == fav.brand &&
@@ -142,6 +177,11 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
           IconButton(
             icon: Icon(Icons.refresh, color: textColor),
             onPressed: _loadData,
+          ),
+          IconButton(
+            icon: Icon(Icons.logout, color: textColor),
+            onPressed: _handleLogout,
+            tooltip: '로그아웃',
           ),
         ],
       ),
