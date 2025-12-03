@@ -1,60 +1,46 @@
 import React, { useState, useEffect } from "react";
-import { Eye, FolderOpen, CheckCircle, RefreshCw, AlertTriangle } from "lucide-react";
 
 function DashboardPage() {
   const [stats, setStats] = useState({
     todayCount: 0,
     totalCount: 0,
-    todayPredictions: 0,
-    todayViews: 0,
-    totalPredictions: 0,
-    totalViews: 0,
-    avgConfidence: 0,  // 실제 DB 값 사용 (더미 제거)
+    avgConfidence: 85,
     popularModels: [],
-    aiStats: {},
   });
   const [dailyData, setDailyData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const loadDashboardData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // 확장된 통계 API 사용 (시세 예측 + 매물 조회 포함)
-      const statsRes = await fetch("/api/admin/dashboard-stats-extended");
-      if (!statsRes.ok) {
-        throw new Error(`서버 오류: ${statsRes.status}`);
-      }
-      const statsData = await statsRes.json();
-      if (statsData.success) {
-        setStats({
-          todayCount: statsData.todayTotal || statsData.todayCount || 0,
-          totalCount: statsData.totalCount || 0,
-          todayPredictions: statsData.todayPredictions || 0,
-          todayViews: statsData.todayViews || 0,
-          totalPredictions: statsData.totalPredictions || 0,
-          totalViews: statsData.totalViews || 0,
-          avgConfidence: statsData.avgConfidence || 0,  // 실제 DB 값만 사용
-          popularModels: statsData.popularModels || [],
-          aiStats: statsData.aiStats || {},
-        });
-      }
-
-      const dailyRes = await fetch("/api/admin/daily-requests?days=7");
-      const dailyResult = await dailyRes.json();
-      if (dailyResult.success) {
-        setDailyData(dailyResult.data || []);
-      }
-    } catch (err) {
-      console.error("Dashboard data load failed:", err);
-      setError(err.message || "대시보드 데이터를 불러오는데 실패했습니다");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        const statsRes = await fetch(
+          "http://localhost:8001/api/admin/dashboard-stats"
+        );
+        const statsData = await statsRes.json();
+        if (statsData.success) {
+          setStats({
+            todayCount: statsData.todayCount || 0,
+            totalCount: statsData.totalCount || 0,
+            avgConfidence: statsData.avgConfidence || 85,
+            popularModels: statsData.popularModels || [],
+          });
+        }
+
+        const dailyRes = await fetch(
+          "http://localhost:8001/api/admin/daily-requests?days=7"
+        );
+        const dailyResult = await dailyRes.json();
+        if (dailyResult.success) {
+          setDailyData(dailyResult.data || []);
+        }
+      } catch (error) {
+        console.error("Dashboard data load failed:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadDashboardData();
   }, []);
 
@@ -87,57 +73,32 @@ function DashboardPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", color: "#e74c3c" }}>
-        <div style={{ marginBottom: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-          <AlertTriangle size={18} /> {error}
-        </div>
-        <button className="btn-primary" onClick={loadDashboardData} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-          <RefreshCw size={14} /> 다시 시도
-        </button>
-      </div>
-    );
-  }
-
   return (
     <>
-      {/* 통계 카드 3개 */}
+      {/* 카드 3개 */}
       <section className="stat-cards">
         <div className="stat-card">
           <div className="stat-card-header">
-            <div className="stat-icon stat-icon-green"><Eye size={20} /></div>
-            <span className="stat-label">오늘 전체 조회</span>
+            <div className="stat-icon stat-icon-green">👁️</div>
+            <span className="stat-label">오늘 시세 조회</span>
           </div>
-          <div className="stat-value">
-            {stats.todayCount > 0 ? `${stats.todayCount.toLocaleString()}건` : "0건"}
-          </div>
-          <div className="stat-detail" style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-            시세예측 {stats.todayPredictions || 0}건 / 매물조회 {stats.todayViews || 0}건
-          </div>
+          <div className="stat-value">{stats.todayCount.toLocaleString()}건</div>
         </div>
 
         <div className="stat-card">
           <div className="stat-card-header">
-            <div className="stat-icon stat-icon-yellow"><FolderOpen size={20} /></div>
+            <div className="stat-icon stat-icon-yellow">📁</div>
             <span className="stat-label">전체 누적 조회</span>
           </div>
-          <div className="stat-value">
-            {stats.totalCount > 0 ? `${stats.totalCount.toLocaleString()}건` : "0건"}
-          </div>
-          <div className="stat-detail" style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
-            예측 {stats.totalPredictions || 0} / 조회 {stats.totalViews || 0}
-          </div>
+          <div className="stat-value">{stats.totalCount.toLocaleString()}건</div>
         </div>
 
         <div className="stat-card">
           <div className="stat-card-header">
-            <div className="stat-icon stat-icon-blue"><CheckCircle size={20} /></div>
+            <div className="stat-icon stat-icon-blue">✔️</div>
             <span className="stat-label">평균 신뢰도</span>
           </div>
-          <div className="stat-value">
-            {stats.avgConfidence > 0 ? `${stats.avgConfidence}%` : "-"}
-          </div>
+          <div className="stat-value">{stats.avgConfidence}%</div>
         </div>
       </section>
 
@@ -155,14 +116,11 @@ function DashboardPage() {
                 <div key={m.name || idx} className="bar-item">
                   <div
                     className="bar"
-                    data-value={m.value || 0}
                     style={{
-                      height: `${Math.max((m.value / maxModelValue) * 100, 5)}%`,
+                      height: `${(m.value / maxModelValue) * 100}%`,
                     }}
                   />
-                  <span className="bar-label" title={m.name || "기타"}>
-                    {m.name || "기타"}
-                  </span>
+                  <span className="bar-label">{m.name || "기타"}</span>
                 </div>
               ))}
             </div>

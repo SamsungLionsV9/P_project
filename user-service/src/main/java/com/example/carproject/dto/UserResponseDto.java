@@ -17,16 +17,20 @@ public class UserResponseDto {
     private String username;
     private String email;
     private String phoneNumber;
-    private User.Role role;
+    private String role;
+    private String provider;
+    private Boolean isActive;
     private LocalDateTime createdAt;
     
     public static UserResponseDto from(User user) {
         return UserResponseDto.builder()
                 .id(user.getId())
-                .username(user.getUsername())
+                .username(user.getDisplayName())  // 실제 사용자명(닉네임) 사용
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
-                .role(user.getRole())
+                .role(user.getRole().name())
+                .provider(user.getProvider().name())
+                .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

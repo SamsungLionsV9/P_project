@@ -5,7 +5,7 @@ import time
 import random
 import os
 
-def scrape_encar_partitioned(output_file="encar_raw_domestic.csv", batch_size=100):
+def scrape_encar_partitioned(output_file="encar_raw_data_final.csv", batch_size=100):
     url = "http://api.encar.com/search/car/list/general"
     
     headers = {

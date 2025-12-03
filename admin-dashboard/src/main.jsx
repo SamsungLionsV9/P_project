@@ -24,7 +24,7 @@ function Root() {
 
   const verifyToken = async (token, savedUser) => {
     try {
-      const response = await fetch('/api/admin/me', {
+      const response = await fetch('http://localhost:8080/api/admin/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

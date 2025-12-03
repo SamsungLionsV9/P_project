@@ -1,0 +1,14 @@
+=== Improved Model Metrics ===
+RMSE: 515.84 만원
+MAE: 231.25 만원
+R²: 0.8719
+MAPE: 12.62%
+
+Best Params:
+{'regressor__subsample': 0.7, 'regressor__reg_lambda': 1, 'regressor__reg_alpha': 0, 'regressor__n_estimators': 1000, 'regressor__min_child_weight': 1, 'regressor__max_depth': 6, 'regressor__learning_rate': 0.1, 'regressor__gamma': 0, 'regressor__colsample_bytree': 0.7}
+
+Price Range Performance:
+저가 (<1000): MAE=94, MAPE=15.6%, N=7466
+중저가 (1000-2000): MAE=170, MAPE=11.5%, N=7366
+중가 (2000-4000): MAE=294, MAPE=10.5%, N=6411
+고가 (4000+): MAE=734, MAPE=12.5%, N=2143

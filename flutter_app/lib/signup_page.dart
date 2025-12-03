@@ -1,10 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'services/auth_service.dart';
 
 /// 전문적인 회원가입 페이지 (이메일 인증 포함)
 class SignupPage extends StatefulWidget {
-  const SignupPage({super.key});
+  final String? oauthEmail;
+  final String? oauthProvider;
+  final String? oauthProviderId;
+  final String? oauthImageUrl;
+  
+  const SignupPage({
+    super.key,
+    this.oauthEmail,
+    this.oauthProvider,
+    this.oauthProviderId,
+    this.oauthImageUrl,
+  });
 
   @override
   State<SignupPage> createState() => _SignupPageState();
@@ -29,7 +41,80 @@ class _SignupPageState extends State<SignupPage> {
   bool _obscureConfirmPassword = true;
   int _resendCountdown = 0;
   Timer? _countdownTimer;
+  
+  // OAuth 회원가입 정보
+  bool _isOAuthSignup = false;
+  String? _oauthProvider;
+  String? _oauthEmail;
+  String? _oauthProviderId;
+  String? _oauthImageUrl;
 
+  @override
+  void initState() {
+    super.initState();
+    
+    // 1. 생성자로 전달된 OAuth 정보 확인 (모바일 앱에서 사용)
+    if (widget.oauthEmail != null && widget.oauthProvider != null) {
+      _initOAuthSignup(
+        email: widget.oauthEmail!,
+        provider: widget.oauthProvider!,
+        providerId: widget.oauthProviderId,
+        imageUrl: widget.oauthImageUrl,
+      );
+    }
+    // 2. URL 파라미터에서 OAuth 정보 확인 (웹에서 사용)
+    else if (kIsWeb) {
+      _checkOAuthSignup();
+    }
+  }
+  
+  /// OAuth 회원가입 초기화
+  void _initOAuthSignup({
+    required String email,
+    required String provider,
+    String? providerId,
+    String? imageUrl,
+  }) {
+    setState(() {
+      _isOAuthSignup = true;
+      _oauthProvider = provider;
+      _oauthEmail = email;
+      _oauthProviderId = providerId;
+      _oauthImageUrl = imageUrl;
+      _emailController.text = email;
+      // OAuth 회원가입은 이메일 인증 불필요
+      _isEmailVerified = true;
+    });
+    debugPrint('OAuth 회원가입 초기화: $email ($provider)');
+  }
+  
+  void _checkOAuthSignup() {
+    try {
+      final uri = Uri.base;
+      final oauth = uri.queryParameters['oauth'];
+      final provider = uri.queryParameters['provider'];
+      final email = uri.queryParameters['email'];
+      final providerId = uri.queryParameters['providerId'];
+      final imageUrl = uri.queryParameters['imageUrl'];
+      
+      if (oauth == 'true' && provider != null && email != null) {
+        setState(() {
+          _isOAuthSignup = true;
+          _oauthProvider = provider;
+          _oauthEmail = email;
+          _oauthProviderId = providerId;
+          _oauthImageUrl = imageUrl;
+          _emailController.text = email;
+          // OAuth 회원가입은 이메일 인증 불필요
+          _isEmailVerified = true;
+        });
+        debugPrint('OAuth 회원가입 감지: $email ($provider)');
+      }
+    } catch (e) {
+      debugPrint('OAuth 회원가입 확인 오류: $e');
+    }
+  }
+  
   @override
   void dispose() {
     _nameController.dispose();
@@ -154,17 +239,46 @@ class _SignupPageState extends State<SignupPage> {
     setState(() => _isLoading = true);
     
     try {
-      final result = await _authService.signup(
-        _emailController.text.trim(),
-        _passwordController.text,
-        _nameController.text.trim(),
-      );
+      Map<String, dynamic> result;
+      
+      if (_isOAuthSignup) {
+        // OAuth 회원가입
+        result = await _authService.oauthSignup(
+          _emailController.text.trim(),
+          _nameController.text.trim(),
+          _oauthProvider!,
+          _oauthProviderId ?? '',
+          _oauthImageUrl,
+        );
+      } else {
+        // 일반 회원가입
+        result = await _authService.signup(
+          _emailController.text.trim(),
+          _passwordController.text,
+          _nameController.text.trim(),
+        );
+      }
       
       setState(() => _isLoading = false);
       
       if (result['success'] == true) {
         setState(() => _currentStep = 2);
         _showMessage('회원가입이 완료되었습니다!');
+        
+        // OAuth 회원가입인 경우 토큰이 있으면 저장
+        if (_isOAuthSignup && result['token'] != null) {
+          await _authService.handleOAuthCallback(
+            result['token'],
+            _emailController.text.trim(),
+            _oauthProvider!,
+          );
+          
+          // 웹 환경에서 URL 정리
+          if (kIsWeb) {
+            // 회원가입 완료 후 약간의 딜레이를 주고 메인 페이지로 이동
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
+        }
       } else {
         // 회원가입 실패 시 에러 메시지 표시
         final errorMessage = result['message'] ?? '회원가입 실패';
@@ -324,6 +438,7 @@ class _SignupPageState extends State<SignupPage> {
             icon: Icons.email_outlined,
             isDark: isDark,
             keyboardType: TextInputType.emailAddress,
+            enabled: !_isOAuthSignup,  // OAuth 회원가입 시 이메일 수정 불가
             validator: (v) {
               if (v?.isEmpty == true) return '이메일을 입력하세요';
               if (!_isValidEmail(v!)) return '올바른 이메일 형식이 아닙니다';
@@ -332,64 +447,96 @@ class _SignupPageState extends State<SignupPage> {
           ),
           const SizedBox(height: 16),
           
-          // 비밀번호
-          _buildTextField(
-            controller: _passwordController,
-            label: '비밀번호',
-            hint: '8자 이상, 영문+숫자+특수문자',
-            icon: Icons.lock_outline,
-            isDark: isDark,
-            obscureText: _obscurePassword,
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-            ),
-            validator: _validatePassword,
-          ),
-          const SizedBox(height: 16),
-          
-          // 비밀번호 확인
-          _buildTextField(
-            controller: _confirmPasswordController,
-            label: '비밀번호 확인',
-            hint: '비밀번호를 다시 입력하세요',
-            icon: Icons.lock_outline,
-            isDark: isDark,
-            obscureText: _obscureConfirmPassword,
-            suffixIcon: IconButton(
-              icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-            ),
-            validator: (v) {
-              if (v != _passwordController.text) return '비밀번호가 일치하지 않습니다';
-              return null;
-            },
-          ),
-          const SizedBox(height: 32),
-          
-          // 다음 버튼
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _sendVerificationCode,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0066FF),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          // 비밀번호 (OAuth 회원가입 시 숨김)
+          if (!_isOAuthSignup) ...[
+            _buildTextField(
+              controller: _passwordController,
+              label: '비밀번호',
+              hint: '8자 이상, 영문+숫자+특수문자',
+              icon: Icons.lock_outline,
+              isDark: isDark,
+              obscureText: _obscurePassword,
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
-              child: _isLoading
-                ? const SizedBox(
-                    width: 24, height: 24,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
-                : const Text(
-                    '인증 코드 발송',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
+              validator: _validatePassword,
             ),
-          ),
+            const SizedBox(height: 16),
+            
+            // 비밀번호 확인
+            _buildTextField(
+              controller: _confirmPasswordController,
+              label: '비밀번호 확인',
+              hint: '비밀번호를 다시 입력하세요',
+              icon: Icons.lock_outline,
+              isDark: isDark,
+              obscureText: _obscureConfirmPassword,
+              suffixIcon: IconButton(
+                icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+              ),
+              validator: (v) {
+                if (v != _passwordController.text) return '비밀번호가 일치하지 않습니다';
+                return null;
+              },
+            ),
+            const SizedBox(height: 32),
+            
+            // 다음 버튼 (일반 회원가입)
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _sendVerificationCode,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0066FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isLoading
+                  ? const SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      '인증 코드 발송',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+              ),
+            ),
+          ] else ...[
+            // OAuth 회원가입 완료 버튼
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : () {
+                  if (_formKey.currentState!.validate()) {
+                    // OAuth 회원가입은 이메일 인증 없이 바로 완료
+                    _completeSignup();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0066FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isLoading
+                  ? const SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      '회원가입 완료',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -536,16 +683,29 @@ class _SignupPageState extends State<SignupPage> {
           width: double.infinity,
           height: 56,
           child: ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () async {
+              // OAuth 회원가입 완료 후 메인 페이지로 리다이렉트
+              if (_isOAuthSignup && _authService.isLoggedIn) {
+                // 모든 페이지를 닫고 메인 페이지로 이동
+                // Navigator.pop을 여러 번 호출하여 모든 페이지를 닫고 메인으로 이동
+                Navigator.of(context).popUntil((route) {
+                  // 첫 번째 페이지(메인 페이지)까지 모든 페이지 제거
+                  return route.isFirst;
+                });
+              } else {
+                // 일반 회원가입은 이전 페이지로 돌아가기
+                Navigator.pop(context, true);
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0066FF),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
-              '로그인하러 가기',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            child: Text(
+              _isOAuthSignup && _authService.isLoggedIn ? '메인으로 이동' : '로그인하러 가기',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ),
         ),
@@ -564,6 +724,7 @@ class _SignupPageState extends State<SignupPage> {
     TextInputType? keyboardType,
     Widget? suffixIcon,
     String? Function(String?)? validator,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -581,6 +742,7 @@ class _SignupPageState extends State<SignupPage> {
           obscureText: obscureText,
           keyboardType: keyboardType,
           validator: validator,
+          enabled: enabled,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon, color: Colors.grey),

@@ -12,66 +12,36 @@ function UserPage() {
   const [users, setUsers] = useState([]);
   const [displayedUsers, setDisplayedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
-  // 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const PAGE_SIZE = 20;
   const [editForm, setEditForm] = useState({
     username: "",
     phoneNumber: "",
     role: "USER",
   });
 
-  const loadUsers = async (page = currentPage) => {
+  const loadUsers = async () => {
     setLoading(true);
-    setError(null);
     try {
       const token = localStorage.getItem("adminToken");
-      const params = new URLSearchParams();
-      params.append("page", String(page));
-      params.append("limit", String(PAGE_SIZE));
-
-      const response = await fetch(`/api/admin/users?${params}`, {
+      const response = await fetch("http://localhost:8080/api/admin/users", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error("인증이 필요합니다. 다시 로그인해주세요.");
-        }
-        throw new Error(`서버 오류: ${response.status}`);
-      }
       const data = await response.json();
       if (data.success) {
         setUsers(data.users);
         setDisplayedUsers(data.users);
-        setTotalPages(data.totalPages || 1);
-        setTotalCount(data.total || 0);
-        setCurrentPage(data.page || 1);
-      } else {
-        throw new Error(data.message || "사용자 목록 로드 실패");
       }
-    } catch (err) {
-      console.error("Failed to load users:", err);
-      setError(err.message || "사용자 목록을 불러오는데 실패했습니다");
+    } catch (error) {
+      console.error("Failed to load users:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-      loadUsers(page);
-    }
-  };
-
   useEffect(() => {
-    loadUsers(1);
+    loadUsers();
   }, []);
 
   const handleChange = (key, value) => {
@@ -98,8 +68,7 @@ function UserPage() {
 
   const handleReset = () => {
     setFilters({ email: "", username: "", phone: "", role: "all" });
-    setCurrentPage(1);
-    loadUsers(1);
+    setDisplayedUsers(users);
   };
 
   const handleEdit = (user) => {
@@ -115,7 +84,7 @@ function UserPage() {
     try {
       const token = localStorage.getItem("adminToken");
       const response = await fetch(
-        `/api/admin/users/${editingUser.id}`,
+        `http://localhost:8080/api/admin/users/${editingUser.id}`,
         {
           method: "PUT",
           headers: {
@@ -148,7 +117,7 @@ function UserPage() {
     try {
       const token = localStorage.getItem("adminToken");
       const response = await fetch(
-        `/api/admin/users/${user.id}`,
+        `http://localhost:8080/api/admin/users/${user.id}`,
         {
           method: "DELETE",
           headers: {
@@ -174,7 +143,7 @@ function UserPage() {
       const token = localStorage.getItem("adminToken");
       const endpoint = user.isActive ? "deactivate" : "activate";
       const response = await fetch(
-        `/api/admin/users/${user.id}/${endpoint}`,
+        `http://localhost:8080/api/admin/users/${user.id}/${endpoint}`,
         {
           method: "PUT",
           headers: {
@@ -254,12 +223,9 @@ function UserPage() {
             <button className="btn-ghost" onClick={handleReset}>
               초기화
             </button>
-            <button className="btn-ghost" onClick={() => loadUsers(currentPage)}>
+            <button className="btn-ghost" onClick={loadUsers}>
               새로고침
             </button>
-            <span style={{ marginLeft: 'auto', color: '#666', fontSize: '14px' }}>
-              총 {totalCount.toLocaleString()}명
-            </span>
           </div>
         </div>
         <div className="filter-underline" />
@@ -268,7 +234,7 @@ function UserPage() {
       <section className="table-section">
         <div className="table-header-row">
           <div className="table-header-left">
-            사용자 관리 ({currentPage} / {totalPages} 페이지)
+            사용자 관리 ({displayedUsers.length}명)
           </div>
         </div>
 
@@ -276,17 +242,6 @@ function UserPage() {
           {loading ? (
             <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
               로딩 중...
-            </div>
-          ) : error ? (
-            <div style={{ padding: "40px", textAlign: "center", color: "#e74c3c" }}>
-              <div style={{ marginBottom: "10px" }}>⚠️ {error}</div>
-              <button className="btn-primary" onClick={loadUsers}>
-                다시 시도
-              </button>
-            </div>
-          ) : displayedUsers.length === 0 ? (
-            <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
-              등록된 사용자가 없습니다
             </div>
           ) : (
             <table className="data-table">
@@ -346,13 +301,7 @@ function UserPage() {
             </table>
           )}
 
-          {!loading && displayedUsers.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-            />
-          )}
+          <Pagination />
         </div>
       </section>
 

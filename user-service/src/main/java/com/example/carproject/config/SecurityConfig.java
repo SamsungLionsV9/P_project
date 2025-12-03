@@ -3,6 +3,7 @@ package com.example.carproject.config;
 import com.example.carproject.oauth2.CustomOAuth2UserService;
 import com.example.carproject.oauth2.OAuth2AuthenticationFailureHandler;
 import com.example.carproject.oauth2.OAuth2AuthenticationSuccessHandler;
+import com.example.carproject.oauth2.OAuth2RedirectUriFilter;
 import com.example.carproject.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,7 +13,6 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -28,7 +28,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 public class SecurityConfig {
     
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -36,17 +36,20 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
+    private final OAuth2RedirectUriFilter oAuth2RedirectUriFilter;
     
     public SecurityConfig(@Lazy JwtAuthenticationFilter jwtAuthFilter, 
                          @Lazy UserDetailsService userDetailsService,
                          @Lazy CustomOAuth2UserService customOAuth2UserService,
                          @Lazy OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler,
-                         @Lazy OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler) {
+                         @Lazy OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler,
+                         OAuth2RedirectUriFilter oAuth2RedirectUriFilter) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
         this.customOAuth2UserService = customOAuth2UserService;
         this.oAuth2AuthenticationSuccessHandler = oAuth2AuthenticationSuccessHandler;
         this.oAuth2AuthenticationFailureHandler = oAuth2AuthenticationFailureHandler;
+        this.oAuth2RedirectUriFilter = oAuth2RedirectUriFilter;
     }
     
     @Bean
@@ -57,25 +60,36 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 공개 엔드포인트
                         .requestMatchers(
-                                "/api/auth/signup",
-                                "/api/auth/login",
-                                "/api/auth/health",
+                                "/api/auth/signup", 
+                                "/api/auth/oauth/signup",  // OAuth 회원가입
+                                "/api/auth/login", 
+                                "/api/auth/health", 
                                 "/api/auth/logout",
                                 "/api/auth/email/**",  // 이메일 인증 엔드포인트
                                 "/api/auth/password/**",  // 비밀번호 재설정 엔드포인트
-                                "/api/admin/login",    // 관리자 로그인은 공개
-                                "/api/admin/users-public",  // admin-dashboard용 사용자 목록 공개
+                                "/api/admin/login",    // 관리자 로그인
                                 // OAuth2 관련 엔드포인트
                                 "/oauth2/**",
-                                "/login/oauth2/**"
+                                "/login/oauth2/**",
+                                "/login"  // 기본 로그인 페이지도 허용 (OAuth2 선택 페이지)
                         ).permitAll()
-                        // Admin API는 ADMIN 권한 필요 (로그인 제외)
+                        // 관리자 전용 엔드포인트 (ADMIN 역할 필요)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)  // OAuth2를 위해 세션 허용
                 )
+                // API 요청에 대해 401 반환 (리디렉션 방지)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(401);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"success\":false,\"message\":\"인증이 필요합니다\"}");
+                        })
+                )
+                // 기본 폼 로그인 비활성화 (OAuth2만 사용)
+                .formLogin(form -> form.disable())
                 // OAuth2 로그인 설정
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
@@ -85,6 +99,7 @@ public class SecurityConfig {
                         .failureHandler(oAuth2AuthenticationFailureHandler)
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(oAuth2RedirectUriFilter, org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();

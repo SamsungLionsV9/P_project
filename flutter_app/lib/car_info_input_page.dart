@@ -136,7 +136,7 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
                     _buildDropdown(
                       hint: "${DateTime.now().year}년",
                       value: _selectedYear,
-                      items: List.generate(10, (index) => "${DateTime.now().year - index}년"),
+                      items: List.generate(11, (index) => "${DateTime.now().year - index}년"),
                       onChanged: (val) => setState(() => _selectedYear = val),
                       isDark: isDark,
                       textColor: textColor,
@@ -457,10 +457,10 @@ class _CarInfoInputPageState extends State<CarInfoInputPage> {
       return;
     }
     
-    // 연식 파싱
-    int year = 2024;
+    // 연식 파싱 (현재 연도를 기본값으로)
+    int year = DateTime.now().year;
     if (_selectedYear != null) {
-      year = int.tryParse(_selectedYear!.replaceAll('년', '')) ?? 2024;
+      year = int.tryParse(_selectedYear!.replaceAll('년', '')) ?? DateTime.now().year;
     }
     
     setState(() {
