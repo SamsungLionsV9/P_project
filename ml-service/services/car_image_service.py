@@ -74,6 +74,8 @@ class CarImageService:
         "캐피탈": "/car-images/캐피탈.png",
         "그랜드 카니발": "/car-images/그랜드 카니발.png",
         "카니발 II": "/car-images/카니발 II.png",
+        "스포티지": "/car-images/기아 스포티지.jpg",
+        "기아 스포티지": "/car-images/기아 스포티지.jpg",
         # 현대
         "그랜저": "/car-images/그랜저.png",
         "쏘나타": "/car-images/쏘나타.png",
@@ -91,6 +93,16 @@ class CarImageService:
         "포텐샤": "/car-images/포텐샤.png",
         "에스페로": "/car-images/에스페로.png",
         "스테이츠맨": "/car-images/스테이츠맨.png",
+        "코나": "/car-images/현대 코나.jpg",
+        "현대 코나": "/car-images/현대 코나.jpg",
+        "팰리세이드": "/car-images/현대 팰리세이드.jpg",
+        "현대 팰리세이드": "/car-images/현대 팰리세이드.jpg",
+        "베뉴": "/car-images/현대 베뉴.jpg",
+        "현대 베뉴": "/car-images/현대 베뉴.jpg",
+        "벨로스터": "/car-images/현대 벨로스터.jpg",
+        "현대 벨로스터": "/car-images/현대 벨로스터.jpg",
+        "캐스퍼": "/car-images/현대 캐스퍼.jpg",
+        "현대 캐스퍼": "/car-images/현대 캐스퍼.jpg",
         # 제네시스
         "G70": "/car-images/G70.png",
         "G80": "/car-images/G80.png",
@@ -181,6 +193,15 @@ class CarImageService:
         "GLE": "/car-images/GLE.png",
         "GLS": "/car-images/GLS.png",
         "AMG GT": "/car-images/AMG GT.png",
+        "G-클래스": "/car-images/벤츠 G-클래스.jpg",
+        "GLA": "/car-images/벤츠 GLA.jpg",
+        "GLB": "/car-images/벤츠 GLB.jpg",
+        "스프린터": "/car-images/벤츠 스프린터.jpg",
+        "벤츠 스프린터": "/car-images/벤츠 스프린터.jpg",
+        "벤츠 G-클래스": "/car-images/벤츠 G-클래스.jpg",
+        "벤츠 GLA": "/car-images/벤츠 GLA.jpg",
+        "벤츠 GLB": "/car-images/벤츠 GLB.jpg",
+        "벤츠 EQ시리즈": "/car-images/벤츠 EQ시리즈.jpg",
         # BMW
         "BMW 3시리즈": "/car-images/BMW 3시리즈.png",
         "BMW 5시리즈": "/car-images/BMW 5시리즈.png",
@@ -306,6 +327,9 @@ class CarImageService:
         "모델Y": "/car-images/테슬라 모델Y.png",
         "Model Y": "/car-images/테슬라 모델Y.png",
         "ModelY": "/car-images/테슬라 모델Y.png",
+        "사이버트럭": "/car-images/사이버트럭.jpg",
+        "테슬라 사이버트럭": "/car-images/사이버트럭.jpg",
+        "Cybertruck": "/car-images/사이버트럭.jpg",
         # 페라리
         "페라리 296": "/car-images/페라리 296.jpg",
         "페라리 488": "/car-images/페라리 488.jpg",
@@ -317,6 +341,11 @@ class CarImageService:
         "포드 머스탱": "/car-images/포드 머스탱.jpg",
         "포드 브롱코": "/car-images/포드 브롱코.jpg",
         "포드 익스플로러": "/car-images/포드 익스플로러.jpg",
+        # 쉐보레 (추가)
+        "챌린저": "/car-images/챌린저.jpg",
+        "콜벳": "/car-images/콜벳.jpg",
+        "도지 챌린저": "/car-images/챌린저.jpg",
+        "쉐보레 콜벳": "/car-images/콜벳.jpg",
         # 폴스타
         "폴스타2": "/car-images/폴스타2.jpg",
         "폴스타4": "/car-images/폴스타4.jpg",
@@ -334,7 +363,7 @@ class CarImageService:
         "모델 S": "/car-images/테슬라 모델S.jpg",
         "모델 X": "/car-images/테슬라 모델X.jpg",
         "모델 Y": "/car-images/테슬라 모델Y.png",
-        "사이버트럭": "/car-images/테슬라 모델X.jpg",  # 대체
+        # 사이버트럭은 실제 이미지로 변경
         
         # 아이오닉 시리즈 → 아이오닉 대표
         "아이오닉 일렉트릭": "/car-images/아이오닉.png",
@@ -442,6 +471,32 @@ class CarImageService:
         "익스플로러 6세대": "/car-images/포드 익스플로러.jpg",
         "브롱코 6세대": "/car-images/포드 브롱코.jpg",
         "F150": "/car-images/포드 F150.jpg",
+        
+        # 벤츠 시리즈 → 대표
+        "G-클래스": "/car-images/벤츠 G-클래스.jpg",
+        "GLA-클래스": "/car-images/벤츠 GLA.jpg",
+        "GLB-클래스": "/car-images/벤츠 GLB.jpg",
+        "EQA": "/car-images/벤츠 EQ시리즈.jpg",
+        "EQB": "/car-images/벤츠 EQ시리즈.jpg",
+        "EQC": "/car-images/벤츠 EQ시리즈.jpg",
+        "EQE": "/car-images/벤츠 EQ시리즈.jpg",
+        "EQS": "/car-images/벤츠 EQ시리즈.jpg",
+        
+        # 현대 시리즈 → 대표
+        "코나 일렉트릭": "/car-images/현대 코나.jpg",
+        "코나 하이브리드": "/car-images/현대 코나.jpg",
+        "더 뉴 팰리세이드": "/car-images/현대 팰리세이드.jpg",
+        "더 뉴 코나": "/car-images/현대 코나.jpg",
+        "베뉴 크로스": "/car-images/현대 베뉴.jpg",
+        "벨로스터 N": "/car-images/현대 벨로스터.jpg",
+        "캐스퍼 일렉트릭": "/car-images/현대 캐스퍼.jpg",
+        
+        # 기아 시리즈 → 대표
+        "스포티지 4세대": "/car-images/기아 스포티지.jpg",
+        "스포티지 5세대": "/car-images/기아 스포티지.jpg",
+        "스포티지 R": "/car-images/기아 스포티지.jpg",
+        "올 뉴 스포티지": "/car-images/기아 스포티지.jpg",
+        "더 뉴 스포티지": "/car-images/기아 스포티지.jpg",
         
         # 지프 시리즈 → 대표
         "그랜드 체로키": "/car-images/지프 그랜드 체로키.jpg",
