@@ -54,8 +54,8 @@ spring:
         registration:
           # Google 소셜 로그인
           google:
-            client-id: 1035321468876-e997jqubsefdrmgsp8m1h21oqs90f17v.apps.googleusercontent.com
-            client-secret: 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
+            client-id: 495922946884-cdsvm39fbbpsf9t8gg16mtsarvjafjhs.app.s.googleusercontent.com
+            client-secret: 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
             scope: profile, email
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
           

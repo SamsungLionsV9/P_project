@@ -238,21 +238,12 @@ class AuthService {
     // 플랫폼별 호스트 주소 사용
     final host = _localHost;
 
-    // 웹 환경에서는 현재 origin을 리다이렉트 URI로 사용
-    String redirectUri = '';
-    if (kIsWeb) {
-      // 현재 페이지의 origin 가져오기
-      redirectUri = Uri.base.origin;
-    } else {
-      redirectUri = 'http://$host:3000';
-    }
-
+    // Spring Boot OAuth2는 기본 리디렉션 URI를 사용하므로
+    // redirect_uri 파라미터를 전달하지 않음
+    // 기본 경로: {baseUrl}/login/oauth2/code/{registrationId}
     final baseUrl = 'http://$host:8080/oauth2/authorization/${provider.toLowerCase()}';
-    final uri = Uri.parse(baseUrl).replace(queryParameters: {
-      'redirect_uri': '$redirectUri/oauth2/redirect',
-    });
-
-    return uri.toString();
+    
+    return baseUrl;
   }
 
   /// 소셜 로그인 콜백 처리 (토큰 저장)
