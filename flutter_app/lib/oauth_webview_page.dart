@@ -5,7 +5,7 @@ import 'services/auth_service.dart';
 /// OAuth 소셜 로그인용 WebView 페이지
 class OAuthWebViewPage extends StatefulWidget {
   final String provider; // naver, kakao, google
-  
+
   const OAuthWebViewPage({super.key, required this.provider});
 
   @override
@@ -41,18 +41,18 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
           },
           onNavigationRequest: (NavigationRequest request) async {
             debugPrint('🔄 네비게이션: ${request.url}');
-            
+
             // OAuth 콜백 처리 (성공 시 JWT 토큰이 URL에 포함됨)
             final handled = await _handleOAuthCallback(request.url);
             if (handled) {
               return NavigationDecision.prevent;
             }
-            
+
             return NavigationDecision.navigate;
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint('❌ 웹 오류: ${error.description}');
-            
+
             // 10.0.2.2 연결 실패 시 에러 처리
             if (error.description.contains('net::ERR')) {
               _showError('서버에 연결할 수 없습니다.\n백엔드 서버가 실행 중인지 확인하세요.');
@@ -66,7 +66,7 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
   /// OAuth 콜백 URL 처리
   Future<bool> _handleOAuthCallback(String url) async {
     final uri = Uri.parse(url);
-    
+
     // 1. 기존 사용자 로그인 성공: /oauth2/redirect?token=...
     if (url.contains('/oauth2/redirect')) {
       final token = uri.queryParameters['token'];
@@ -81,30 +81,32 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
       }
 
       if (token != null) {
-        await _authService.handleOAuthCallback(token, email ?? '', provider ?? widget.provider);
+        await _authService.handleOAuthCallback(
+            token, email ?? '', provider ?? widget.provider);
+        if (!mounted) return true;
         Navigator.pop(context, {
           'success': true,
           'token': token,
           'email': email,
           'provider': provider ?? widget.provider,
-          'isExistingUser': true,  // 기존 사용자 표시
+          'isExistingUser': true, // 기존 사용자 표시
         });
         return true;
       }
     }
-    
+
     // 2. 신규 사용자 회원가입 필요: /signup?oauth=true&...
     if (url.contains('/signup') && url.contains('oauth=true')) {
       final email = uri.queryParameters['email'];
       final provider = uri.queryParameters['provider'];
       final providerId = uri.queryParameters['providerId'];
       final imageUrl = uri.queryParameters['imageUrl'];
-      
+
       debugPrint('📝 신규 OAuth 사용자 - 회원가입 필요: $email ($provider)');
-      
+
       Navigator.pop(context, {
-        'success': false,  // 로그인은 아직 완료되지 않음
-        'needsSignup': true,  // 회원가입 필요 플래그
+        'success': false, // 로그인은 아직 완료되지 않음
+        'needsSignup': true, // 회원가입 필요 플래그
         'email': email,
         'provider': provider ?? widget.provider,
         'providerId': providerId,
@@ -115,8 +117,9 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
 
     // 3. 에러 콜백
     if (url.contains('error=')) {
-      final error = uri.queryParameters['error_description'] ?? 
-                    uri.queryParameters['error'] ?? '로그인 실패';
+      final error = uri.queryParameters['error_description'] ??
+          uri.queryParameters['error'] ??
+          '로그인 실패';
       _showError(error);
       Navigator.pop(context, {'success': false, 'error': error});
       return true;
@@ -165,16 +168,22 @@ class _OAuthWebViewPageState extends State<OAuthWebViewPage> {
         leading: IconButton(
           icon: Icon(
             Icons.close,
-            color: widget.provider == 'kakao' ? Colors.black : 
-                   widget.provider == 'google' ? Colors.black : Colors.white,
+            color: widget.provider == 'kakao'
+                ? Colors.black
+                : widget.provider == 'google'
+                    ? Colors.black
+                    : Colors.white,
           ),
           onPressed: () => Navigator.pop(context, {'success': false}),
         ),
         title: Text(
           '${_getProviderName()} 로그인',
           style: TextStyle(
-            color: widget.provider == 'kakao' ? Colors.black : 
-                   widget.provider == 'google' ? Colors.black : Colors.white,
+            color: widget.provider == 'kakao'
+                ? Colors.black
+                : widget.provider == 'google'
+                    ? Colors.black
+                    : Colors.white,
           ),
         ),
         elevation: 0,

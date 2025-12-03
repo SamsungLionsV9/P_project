@@ -4,7 +4,7 @@ import '../theme/app_theme.dart';
 class HeroSection extends StatelessWidget {
   final VoidCallback onStartPressed;
 
-  const HeroSection({Key? key, required this.onStartPressed}) : super(key: key);
+  const HeroSection({super.key, required this.onStartPressed});
 
   @override
   Widget build(BuildContext context) {

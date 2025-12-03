@@ -34,17 +34,6 @@ class _DealAnalysisModalState extends State<DealAnalysisModal> {
 
   Future<void> _loadAnalysis() async {
     try {
-      // 매물 조회 기록 (통계용 - 비동기로 실행, 결과 기다리지 않음)
-      _api.recordVehicleView(
-        brand: widget.deal.brand,
-        model: widget.deal.model,
-        year: widget.deal.year,
-        mileage: widget.deal.mileage,
-        price: widget.deal.actualPrice,
-        carId: widget.deal.carId,
-        viewSource: 'deal_analysis',
-      );
-      
       final analysis = await _api.analyzeDeal(
         brand: widget.deal.brand,
         model: widget.deal.model,
@@ -367,77 +356,6 @@ class _DealAnalysisModalState extends State<DealAnalysisModal> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // 타이밍 지표 (있는 경우만 표시)
-        if (analysis.timing != null)
-          _buildSection(
-            title: "⏰ 구매 타이밍",
-            isDark: isDark,
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: analysis.timing!.decisionColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                analysis.timing!.label,
-                style: TextStyle(
-                  color: analysis.timing!.decisionColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text("타이밍 점수: ", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                    Text(
-                      "${analysis.timing!.timingScore}/100",
-                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: analysis.timing!.timingScore / 100,
-                    backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                    color: analysis.timing!.decisionColor,
-                    minHeight: 8,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...analysis.timing!.factors.map((factor) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Icon(
-                        factor.status == 'positive' ? Icons.trending_up
-                            : factor.status == 'negative' ? Icons.trending_down
-                            : Icons.remove,
-                        size: 16,
-                        color: factor.status == 'positive' ? Colors.green
-                            : factor.status == 'negative' ? Colors.red
-                            : Colors.grey,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          factor.description,
-                          style: TextStyle(color: textColor, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-              ],
-            ),
-          ),
-        if (analysis.timing != null) const SizedBox(height: 16),
 
         // 네고 포인트
         _buildSection(

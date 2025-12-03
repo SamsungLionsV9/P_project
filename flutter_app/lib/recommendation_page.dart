@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'services/api_service.dart';
-import 'services/auth_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'providers/recent_views_provider.dart';
 import 'widgets/common/option_badges.dart';
-import 'utils/car_image_mapper.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -19,13 +18,12 @@ class RecommendationPage extends StatefulWidget {
 class _RecommendationPageState extends State<RecommendationPage>
     with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
-  final AuthService _auth = AuthService();
   late TabController _tabController;
 
   List<PopularCar> _popularDomestic = [];
   List<PopularCar> _popularImported = [];
   List<RecommendedCar> _recommendations = [];
-  List<Favorite> _favorites = [];  // 찜 목록
+  List<Favorite> _favorites = []; // 찜 목록
 
   bool _isLoading = true;
   String? _error;
@@ -40,31 +38,15 @@ class _RecommendationPageState extends State<RecommendationPage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
-    _loadFavorites();  // 찜 목록 로드
+    _loadFavorites(); // 찜 목록 로드
     // Provider 초기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RecentViewsProvider>().loadRecentViews();
     });
   }
-  
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 로그인 상태 변경 감지
-    if (!_auth.isLoggedIn && _favorites.isNotEmpty) {
-      // 로그아웃 상태면 찜 목록 초기화
-      setState(() => _favorites = []);
-    }
-  }
-  
+
   /// 찜 목록 로드
   Future<void> _loadFavorites() async {
-    // 로그인 상태일 때만 로드
-    if (!_auth.isLoggedIn) {
-      setState(() => _favorites = []);
-      return;
-    }
-    
     try {
       final favorites = await _api.getFavorites();
       if (mounted) {
@@ -74,16 +56,9 @@ class _RecommendationPageState extends State<RecommendationPage>
       // 무시
     }
   }
-  
+
   /// 찜 토글 (고유 매물 단위로 구별 + 즉시 UI 반영)
   Future<void> _toggleFavorite(RecommendedCar car) async {
-    // 로그인 체크
-    final auth = AuthService();
-    if (!auth.isLoggedIn) {
-      _showSnackBar('로그인 후 찜 기능을 이용할 수 있습니다.');
-      return;
-    }
-    
     // isSameDeal로 정확한 매물 구별
     final existing = _favorites.where((f) => f.isSameDeal(car)).toList();
     final isCurrentlyFavorite = existing.isNotEmpty;
@@ -129,7 +104,7 @@ class _RecommendationPageState extends State<RecommendationPage>
         );
         _showSnackBar("'${car.brand} ${car.model}' 찜 목록에 추가되었습니다.");
       }
-      
+
       // 3. 서버에서 최신 상태로 동기화
       await _loadFavorites();
     } catch (e) {
@@ -138,7 +113,7 @@ class _RecommendationPageState extends State<RecommendationPage>
       _showSnackBar("오류가 발생했습니다.");
     }
   }
-  
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
@@ -182,39 +157,10 @@ class _RecommendationPageState extends State<RecommendationPage>
       });
     }
   }
-  
+
   /// 최근 조회 기록에 매물 추가 (Provider를 통해 전역 저장)
   void _addToRecentViewed(RecommendedCar car) {
     context.read<RecentViewsProvider>().addRecentCar(car);
-  }
-
-  /// 차량 이미지 위젯 빌더 (네트워크 이미지 사용)
-  Widget _buildCarImage(String model, {double size = 48, String? brand}) {
-    final imageUrl = brand != null
-        ? CarImageMapper.getImageUrlByBrandModel(brand, model)
-        : CarImageMapper.getImageUrl(model);
-    if (imageUrl != null) {
-      return Image.network(
-        imageUrl,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => Icon(
-          Icons.directions_car,
-          color: const Color(0xFF6C63FF),
-          size: size * 0.7,
-        ),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Icon(Icons.directions_car, color: const Color(0xFF6C63FF).withValues(alpha: 0.3), size: size * 0.7);
-        },
-      );
-    }
-    return Icon(
-      Icons.directions_car,
-      color: const Color(0xFF6C63FF),
-      size: size * 0.7,
-    );
   }
 
   @override
@@ -223,15 +169,9 @@ class _RecommendationPageState extends State<RecommendationPage>
       backgroundColor: const Color(0xFF1A1A2E),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A2E),
-        title: Row(
-          children: [
-            Icon(Icons.directions_car, color: Colors.white),
-            const SizedBox(width: 8),
-            const Text(
-              '차량 추천',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ],
+        title: const Text(
+          '🚗 차량 추천',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         bottom: TabBar(
           controller: _tabController,
@@ -252,7 +192,8 @@ class _RecommendationPageState extends State<RecommendationPage>
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF6C63FF)))
           : _error != null
               ? _buildErrorView()
               : TabBarView(
@@ -300,11 +241,11 @@ class _RecommendationPageState extends State<RecommendationPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionTitle('국산차 인기 모델', '엔카 등록 기준', Icons.flag),
+          _buildSectionTitle('🇰🇷 국산차 인기 모델', '엔카 등록 기준'),
           const SizedBox(height: 12),
           ..._popularDomestic.map((car) => _buildPopularCard(car)),
           const SizedBox(height: 24),
-          _buildSectionTitle('수입차 인기 모델', '엔카 등록 기준', Icons.public),
+          _buildSectionTitle('🌍 수입차 인기 모델', '엔카 등록 기준'),
           const SizedBox(height: 12),
           ..._popularImported.map((car) => _buildPopularCard(car)),
         ],
@@ -312,13 +253,9 @@ class _RecommendationPageState extends State<RecommendationPage>
     );
   }
 
-  Widget _buildSectionTitle(String title, String subtitle, [IconData? icon]) {
+  Widget _buildSectionTitle(String title, String subtitle) {
     return Row(
       children: [
-        if (icon != null) ...[
-          Icon(icon, color: Colors.white70, size: 20),
-          const SizedBox(width: 8),
-        ],
         Text(
           title,
           style: const TextStyle(
@@ -348,7 +285,7 @@ class _RecommendationPageState extends State<RecommendationPage>
         avgPrice: car.avgPrice,
         medianPrice: car.medianPrice,
         listings: car.listings,
-        onCarViewed: _addToRecentViewed,  // 최근 조회 콜백
+        onCarViewed: _addToRecentViewed, // 최근 조회 콜백
       ),
     );
   }
@@ -365,63 +302,60 @@ class _RecommendationPageState extends State<RecommendationPage>
           border: Border.all(color: Colors.white10),
         ),
         child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C63FF).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.directions_car, color: Color(0xFF6C63FF)),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: _buildCarImage(car.model, size: 36),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${car.brand} ${car.model}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '등록 ${car.listings}건 • 평균 ${car.avgPrice}만원',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${car.brand} ${car.model}',
+                  '${car.medianPrice}만원',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF6C63FF),
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
                 Text(
-                  '등록 ${car.listings}건 • 평균 ${car.avgPrice}만원',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                  '중앙값',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
                 ),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${car.medianPrice}만원',
-                style: const TextStyle(
-                  color: Color(0xFF6C63FF),
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                '예측가',
-                style: TextStyle(color: Colors.grey[500], fontSize: 11),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
-        ],
-      ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
+          ],
+        ),
       ),
     );
   }
@@ -514,7 +448,7 @@ class _RecommendationPageState extends State<RecommendationPage>
   void _showRecommendationAnalysis(RecommendedCar car) {
     // 최근 조회 기록에 추가 (로컬)
     _addToRecentViewed(car);
-    
+
     // 상세 분석 모달 표시
     showModalBottomSheet(
       context: context,
@@ -543,126 +477,135 @@ class _RecommendationPageState extends State<RecommendationPage>
           ),
         ),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (isGood)
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (isGood)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '🔥 가성비',
+                      style: TextStyle(color: Colors.green, fontSize: 12),
+                    ),
+                  ),
+                if (isGood) const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
+                    color: const Color(0xFF6C63FF).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
-                    '🔥 가성비',
-                    style: TextStyle(color: Colors.green, fontSize: 12),
+                  child: Text(
+                    car.type == 'domestic' ? '국산' : '수입',
+                    style:
+                        const TextStyle(color: Color(0xFF6C63FF), fontSize: 12),
                   ),
                 ),
-              if (isGood) const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6C63FF).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(4),
+                const Spacer(),
+                Text(
+                  '점수 ${car.score.toStringAsFixed(1)}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
                 ),
-                child: Text(
-                  car.type == 'domestic' ? '국산' : '수입',
-                  style: const TextStyle(color: Color(0xFF6C63FF), fontSize: 12),
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '점수 ${car.score.toStringAsFixed(1)}',
-                style: TextStyle(color: Colors.grey[500], fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${car.brand} ${car.model}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              ],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _buildInfoChip(Icons.calendar_today, '${car.year}년'),
-              const SizedBox(width: 12),
-              _buildInfoChip(Icons.speed, car.formattedMileage),
-              const SizedBox(width: 12),
-              _buildInfoChip(Icons.local_gas_station, car.fuel),
+            const SizedBox(height: 12),
+            Text(
+              '${car.brand} ${car.model}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _buildInfoChip(Icons.calendar_today, '${car.year}년'),
+                const SizedBox(width: 12),
+                _buildInfoChip(Icons.speed, car.formattedMileage),
+                const SizedBox(width: 12),
+                _buildInfoChip(Icons.local_gas_station, car.fuel),
+              ],
+            ),
+            // 옵션 배지 표시
+            if (car.options != null) ...[
+              const SizedBox(height: 10),
+              OptionBadges(options: car.options!, compact: true),
             ],
-          ),
-          // 옵션 배지 표시
-          if (car.options != null) ...[
-            const SizedBox(height: 10),
-            OptionBadges(options: car.options!, compact: true),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('실제가', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                  Text(
-                    '${car.actualPrice}만원',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('실제가',
+                        style:
+                            TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    Text(
+                      '${car.actualPrice}만원',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('예측가',
+                        style:
+                            TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    Text(
+                      '${car.predictedPrice}만원',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 16),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: car.priceDiff > 0
+                        ? Colors.green.withOpacity(0.2)
+                        : Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${car.priceDiff > 0 ? "+" : ""}${car.priceDiff}만원',
+                    style: TextStyle(
+                      color: car.priceDiff > 0 ? Colors.green : Colors.red,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-              ),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('예측가', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                  Text(
-                    '${car.predictedPrice}만원',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: car.priceDiff > 0
-                      ? Colors.green.withOpacity(0.2)
-                      : Colors.red.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  '${car.priceDiff > 0 ? "+" : ""}${car.priceDiff}만원',
-                  style: TextStyle(
-                    color: car.priceDiff > 0 ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // 상세보기 안내
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Icon(Icons.open_in_new, size: 14, color: Colors.grey[500]),
-              const SizedBox(width: 4),
-              Text('탭하여 상세보기', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // 상세보기 안내
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Icon(Icons.open_in_new, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 4),
+                Text('탭하여 상세보기',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -684,7 +627,7 @@ class _RecommendationPageState extends State<RecommendationPage>
       builder: (context, provider, child) {
         // 추천 탭에서 조회한 차량만 표시 (분석 페이지 매물 제외)
         final recentCars = provider.recommendationOnlyCars;
-        
+
         if (recentCars.isEmpty) {
           return Center(
             child: Column(
@@ -706,7 +649,7 @@ class _RecommendationPageState extends State<RecommendationPage>
             ),
           );
         }
-        
+
         return Column(
           children: [
             // 헤더
@@ -721,8 +664,10 @@ class _RecommendationPageState extends State<RecommendationPage>
                   ),
                   TextButton.icon(
                     onPressed: _clearRecentViewed,
-                    icon: const Icon(Icons.delete_sweep, size: 18, color: Colors.red),
-                    label: const Text('전체 삭제', style: TextStyle(color: Colors.red, fontSize: 13)),
+                    icon: const Icon(Icons.delete_sweep,
+                        size: 18, color: Colors.red),
+                    label: const Text('전체 삭제',
+                        style: TextStyle(color: Colors.red, fontSize: 13)),
                   ),
                 ],
               ),
@@ -744,7 +689,9 @@ class _RecommendationPageState extends State<RecommendationPage>
                         color: const Color(0xFF252542),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: car.isGoodDeal ? Colors.green.withValues(alpha: 0.4) : Colors.white10,
+                          color: car.isGoodDeal
+                              ? Colors.green.withOpacity(0.4)
+                              : Colors.white10,
                         ),
                       ),
                       child: Column(
@@ -756,12 +703,18 @@ class _RecommendationPageState extends State<RecommendationPage>
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: car.isGoodDeal ? Colors.green.withValues(alpha: 0.1) : Colors.white10,
+                                  color: car.isGoodDeal
+                                      ? Colors.green.withOpacity(0.1)
+                                      : Colors.white10,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: _buildCarImage(car.model, size: 40),
+                                child: Icon(
+                                  car.isGoodDeal
+                                      ? Icons.thumb_up
+                                      : Icons.directions_car,
+                                  color: car.isGoodDeal
+                                      ? Colors.green
+                                      : Colors.white54,
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -780,7 +733,9 @@ class _RecommendationPageState extends State<RecommendationPage>
                                     const SizedBox(height: 4),
                                     Text(
                                       '${car.year}년 • ${(car.mileage / 10000).toStringAsFixed(1)}만km • ${car.fuel}',
-                                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                      style: TextStyle(
+                                          color: Colors.grey[400],
+                                          fontSize: 13),
                                     ),
                                   ],
                                 ),
@@ -791,8 +746,12 @@ class _RecommendationPageState extends State<RecommendationPage>
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
                                   child: Icon(
-                                    isFavorite ? Icons.favorite : Icons.favorite_border,
-                                    color: isFavorite ? Colors.red : Colors.grey[500],
+                                    isFavorite
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: isFavorite
+                                        ? Colors.red
+                                        : Colors.grey[500],
                                     size: 22,
                                   ),
                                 ),
@@ -822,7 +781,8 @@ class _RecommendationPageState extends State<RecommendationPage>
                               const SizedBox(width: 8),
                               GestureDetector(
                                 onTap: () => provider.removeAt(index),
-                                child: Icon(Icons.close, size: 18, color: Colors.grey[600]),
+                                child: Icon(Icons.close,
+                                    size: 18, color: Colors.grey[600]),
                               ),
                             ],
                           ),
@@ -851,7 +811,8 @@ class _RecommendationPageState extends State<RecommendationPage>
       builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF252542),
         title: const Text('전체 삭제', style: TextStyle(color: Colors.white)),
-        content: const Text('모든 조회 기록을 삭제하시겠습니까?', style: TextStyle(color: Colors.white70)),
+        content: const Text('모든 조회 기록을 삭제하시겠습니까?',
+            style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -990,7 +951,7 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
   void _showDealAnalysis(RecommendedCar car) {
     // 최근 조회 기록에 추가 (콜백 호출)
     widget.onCarViewed?.call(car);
-    
+
     // 상세 분석 모달 표시
     showModalBottomSheet(
       context: context,
@@ -998,7 +959,7 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
       backgroundColor: Colors.transparent,
       builder: (context) => DealAnalysisModal(
         deal: car,
-        predictedPrice: car.predictedPrice,  // 각 매물의 예측가 사용
+        predictedPrice: car.predictedPrice, // 각 매물의 예측가 사용
       ),
     );
   }
@@ -1053,24 +1014,28 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '등록 ${widget.listings}건 • 평균 ${widget.avgPrice}만원 • 예측가 ${widget.medianPrice}만원',
+                      '등록 ${widget.listings}건 • 평균 ${widget.avgPrice}만원 • 중앙값 ${widget.medianPrice}만원',
                       style: TextStyle(color: Colors.grey[400], fontSize: 13),
                     ),
                     const SizedBox(height: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.green.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(Icons.recommend, color: Colors.green, size: 18),
                           SizedBox(width: 6),
                           Text(
                             '가성비 좋은 매물 추천',
-                            style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                                color: Colors.green,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -1084,12 +1049,17 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
-                        ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+                        ? Center(
+                            child: Text(_error!,
+                                style: const TextStyle(color: Colors.red)))
                         : _deals.isEmpty
-                            ? Center(child: Text('추천 매물이 없습니다', style: TextStyle(color: Colors.grey[500])))
+                            ? Center(
+                                child: Text('추천 매물이 없습니다',
+                                    style: TextStyle(color: Colors.grey[500])))
                             : ListView.builder(
                                 controller: scrollController,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
                                 itemCount: _deals.length,
                                 itemBuilder: (context, index) {
                                   final deal = _deals[index];
@@ -1107,7 +1077,7 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
   Widget _buildDealCard(RecommendedCar deal, int rank) {
     final priceDiff = deal.priceDiff;
     final isGood = priceDiff > 0;
-    
+
     return GestureDetector(
       onTap: () => _showDealAnalysis(deal),
       child: Container(
@@ -1131,7 +1101,8 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: rank <= 3 ? const Color(0xFF6C63FF) : Colors.grey[700],
+                    color:
+                        rank <= 3 ? const Color(0xFF6C63FF) : Colors.grey[700],
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -1170,14 +1141,18 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
                 ),
                 if (isGood)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.green.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       '추천',
-                      style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
               ],
@@ -1189,10 +1164,15 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('실제가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text('실제가',
+                          style:
+                              TextStyle(color: Colors.grey[500], fontSize: 11)),
                       Text(
                         '${deal.actualPrice}만원',
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -1201,7 +1181,9 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('예측가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text('예측가',
+                          style:
+                              TextStyle(color: Colors.grey[500], fontSize: 11)),
                       Text(
                         '${deal.predictedPrice}만원',
                         style: TextStyle(color: Colors.grey[300], fontSize: 16),
@@ -1212,7 +1194,9 @@ class _ModelDealsModalState extends State<_ModelDealsModal> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('차이', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                    Text('차이',
+                        style:
+                            TextStyle(color: Colors.grey[500], fontSize: 11)),
                     Text(
                       '${priceDiff > 0 ? "-" : "+"}${priceDiff.abs()}만원',
                       style: TextStyle(

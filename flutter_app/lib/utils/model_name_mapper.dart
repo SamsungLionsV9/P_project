@@ -5,6 +5,7 @@
 /// 
 /// 예: 그랜저 (2024년) → 그랜저 (GN7)
 ///     E-클래스 (2020년) → E-클래스 W213
+library;
 
 /// 브랜드별 사용자용 모델 목록
 const Map<String, List<String>> brandModels = {

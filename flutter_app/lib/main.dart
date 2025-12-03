@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'car_info_input_page.dart';
 import 'mypage.dart';
 import 'settings_page.dart';
 import 'recommendation_page.dart';
-import 'comparison_page.dart';
-import 'oauth_webview_page.dart';
-import 'signup_page.dart';
-import 'forgot_password_page.dart';
+
+import 'login_page.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
 import 'theme/theme_provider.dart';
@@ -17,16 +14,16 @@ import 'providers/recent_views_provider.dart';
 import 'providers/popular_cars_provider.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/model_deals_modal.dart';
-import 'widgets/common/bottom_nav_bar.dart';
-import 'utils/car_image_mapper.dart';
+import 'widgets/market_trend_card.dart';
+import 'widgets/ai_pick_card.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 저장된 토큰 로드
   final authService = AuthService();
   await authService.loadSavedToken();
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -99,18 +96,10 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  final GlobalKey _myPageKey = GlobalKey();
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-    });
-  }
-  
-  // 로그인 상태 변경 시 MyPage 업데이트
-  void _refreshMyPage() {
-    setState(() {
-      // IndexedStack을 재빌드하여 MyPage도 재빌드되도록 함
     });
   }
 
@@ -123,72 +112,65 @@ class _MainScreenState extends State<MainScreen> {
 
     // 페이지 리스트 (빌드 시점에 생성)
     final pages = [
-      HomePageContent(
-        onNavigateToSearch: () => _onItemTapped(1),
-        onLoginSuccess: _refreshMyPage,
-      ),
+      const HomePageContent(),
       const CarInfoInputPage(),
       const RecommendationPage(),
-      MyPage(key: _myPageKey),
+      const MyPage(),
       const SettingsPage(),
     ];
 
-    // MainScreenNavigator로 감싸서 하위 화면에서도 탭 전환 가능
-    return MainScreenNavigator(
-      switchTab: _onItemTapped,
-      child: Scaffold(
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: pages,
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: pages,
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
         ),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
-              ),
-            ],
-          ),
-          child: BottomNavigationBar(
-            backgroundColor: navBgColor,
-            type: BottomNavigationBarType.fixed,
-            currentIndex: _selectedIndex,
-            selectedItemColor: const Color(0xFF0066FF),
-            unselectedItemColor: unselectedItemColor,
-            selectedFontSize: 12,
-            unselectedFontSize: 12,
-            onTap: _onItemTapped,
-            elevation: 0,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
-                label: '홈',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.search),
-                activeIcon: Icon(Icons.search),
-                label: '내 차 찾기',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.recommend_outlined),
-                activeIcon: Icon(Icons.recommend),
-                label: '추천',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: '마이',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.settings_outlined),
-                activeIcon: Icon(Icons.settings),
-                label: '설정',
-              ),
-            ],
-          ),
+        child: BottomNavigationBar(
+          backgroundColor: navBgColor,
+          type: BottomNavigationBarType.fixed,
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF0066FF),
+          unselectedItemColor: unselectedItemColor,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          onTap: _onItemTapped,
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: '홈',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.search),
+              activeIcon: Icon(Icons.search),
+              label: '시세조회',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.recommend_outlined),
+              activeIcon: Icon(Icons.recommend),
+              label: '추천',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: '마이',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings),
+              label: '설정',
+            ),
+          ],
         ),
       ),
     );
@@ -196,10 +178,7 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 class HomePageContent extends StatefulWidget {
-  final VoidCallback? onNavigateToSearch;
-  final VoidCallback? onLoginSuccess;
-
-  const HomePageContent({super.key, this.onNavigateToSearch, this.onLoginSuccess});
+  const HomePageContent({super.key});
 
   @override
   State<HomePageContent> createState() => _HomePageContentState();
@@ -207,140 +186,26 @@ class HomePageContent extends StatefulWidget {
 
 class _HomePageContentState extends State<HomePageContent> {
   final AuthService _authService = AuthService();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
   bool _isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    _isLoggedIn = _authService.isLoggedIn;
+    _checkLoginStatus();
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  /// 이메일/비밀번호 로그인
-  Future<void> _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showMessage('이메일과 비밀번호를 입력하세요', isError: true);
-      return;
+  Future<void> _checkLoginStatus() async {
+    final isLoggedIn = _authService.isLoggedIn;
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = isLoggedIn;
+      });
     }
-
-    setState(() => _isLoading = true);
-
-    final result = await _authService.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (result['success'] == true) {
-      setState(() => _isLoggedIn = true);
-      _showMessage('로그인 성공!');
-      _emailController.clear();
-      _passwordController.clear();
-      // 로그인 성공 시 MyPage 업데이트
-      widget.onLoginSuccess?.call();
-    } else {
-      _showMessage(result['message'] ?? '로그인 실패', isError: true);
-    }
-  }
-
-  /// 소셜 로그인
-  Future<void> _socialLogin(String provider) async {
-    // 네이버는 WebView를 차단하므로 외부 브라우저 사용
-    if (provider == 'naver') {
-      final url = _authService.getSocialLoginUrl(provider);
-      _showMessage('네이버 로그인은 외부 브라우저에서 진행됩니다.\n(에뮬레이터에서는 제한될 수 있습니다)');
-      
-      try {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          _showMessage('브라우저를 열 수 없습니다', isError: true);
-        }
-      } catch (e) {
-        _showMessage('네이버 로그인 오류: $e', isError: true);
-      }
-      return;
-    }
-    
-    // 카카오, 구글은 WebView 사용
-    final result = await Navigator.push<Map<String, dynamic>>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OAuthWebViewPage(provider: provider),
-      ),
-    );
-
-    if (result != null && result['success'] == true) {
-      setState(() => _isLoggedIn = true);
-      _showMessage('${_getProviderName(provider)} 로그인 성공!');
-      // 로그인 성공 시 MyPage 업데이트
-      widget.onLoginSuccess?.call();
-    }
-  }
-
-  String _getProviderName(String provider) {
-    switch (provider) {
-      case 'naver': return '네이버';
-      case 'kakao': return '카카오';
-      case 'google': return 'Google';
-      default: return provider;
-    }
-  }
-
-  /// 회원가입 페이지로 이동
-  void _navigateToSignup() async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (context) => const SignupPage()),
-    );
-    
-    if (result == true) {
-      _showMessage('회원가입이 완료되었습니다. 로그인하세요!');
-    }
-  }
-
-  /// 로그아웃
-  Future<void> _logout() async {
-    await _authService.logout();
-    
-    // 로컬 상태 초기화
-    try {
-      // 최근 조회 목록 초기화
-      if (mounted) {
-        context.read<RecentViewsProvider>().clearAll();
-      }
-    } catch (e) {
-      debugPrint('최근 조회 목록 초기화 실패: $e');
-    }
-    
-    setState(() => _isLoggedIn = false);
-    _showMessage('로그아웃되었습니다');
-  }
-
-  void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
 
     return SafeArea(
@@ -348,82 +213,40 @@ class _HomePageContentState extends State<HomePageContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
-            
-            // 1. 메인 로그인 카드 영역
+            // 1. Hero Section (New Design)
+            _buildHeroSection(isDark),
+
+            const SizedBox(height: 24),
+
+            // 1.5 Market Trend & AI Pick Cards
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Expanded(child: const MarketTrendCard()),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AiPickCard(
+                      onTap: _showAiPickDetails,
                     ),
-                  ],
-                ),
-                child: _isLoggedIn 
-                  ? _buildLoggedInView(textColor)
-                  : _buildLoginForm(isDark, textColor),
+                  ),
+                ],
               ),
             ),
 
             const SizedBox(height: 32),
 
-            // 2. 바로가기 버튼 (로그인 없이 조회) - 탭 전환 방식
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: () {
-                    // Navigator.push 대신 탭 전환 (BottomNavigationBar 유지)
-                    widget.onNavigateToSearch?.call();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF0066FF)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search, color: Color(0xFF0066FF), size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        "바로 시세 조회하기",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0066FF),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // 3. 최근 조회 차량 섹션 (Provider 연동)
-            _buildSectionTitle("최근 조회 차량", textColor),
-            const SizedBox(height: 12),
-            _buildRecentViewsList(isDark: isDark),
-
-            const SizedBox(height: 32),
-
-            // 4. 인기 모델 추천 섹션 (Provider 연동)
+            // 2. 인기 모델 추천 섹션
             _buildSectionTitle("인기 모델 추천", textColor),
             const SizedBox(height: 12),
             _buildPopularCarsList(isDark: isDark),
+
+            const SizedBox(height: 32),
+
+            // 3. 최근 조회 차량 섹션
+            _buildSectionTitle("최근 조회 차량", textColor),
+            const SizedBox(height: 12),
+            _buildRecentViewsList(isDark: isDark),
 
             const SizedBox(height: 40),
           ],
@@ -432,233 +255,141 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  /// 로그인된 상태 뷰
-  Widget _buildLoggedInView(Color textColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: const Color(0xFF0066FF).withOpacity(0.1),
-              child: const Icon(Icons.person, size: 30, color: Color(0xFF0066FF)),
+  Widget _buildHeroSection(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 40),
+      decoration: const BoxDecoration(
+        color: Color(0xFF001F3F), // Dark Blue Background
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "AI Price Check, Signal",
+            style: TextStyle(
+              color: Color(0xFF4DA8DA), // Light Blue Accent
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "내 차 시세,\nAI로 정확하게 확인하세요",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 42),
+
+          // Check Price Button
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          const CarInfoInputPage(showBackButton: true)),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0066FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 8,
+                shadowColor: const Color(0xFF0066FF).withOpacity(0.5),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '환영합니다!',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
+                    "바로 시세 조회하기",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _authService.userEmail ?? '사용자',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-                  Text(
-                    _authService.provider != null ? '(${_getProviderName(_authService.provider!)} 로그인)' : '',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                  ),
+                  SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded),
                 ],
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: _logout,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red,
-              side: const BorderSide(color: Colors.red),
-            ),
-            child: const Text('로그아웃'),
           ),
-        ),
-      ],
-    );
-  }
 
-  /// 로그인 폼
-  Widget _buildLoginForm(bool isDark, Color textColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "중고차 시세 예측 AI",
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
-        ),
-        const SizedBox(height: 20),
-        
-        // 이메일 입력
-        _buildTextField(
-          controller: _emailController,
-          hintText: "이메일",
-          isDark: isDark,
-        ),
-        const SizedBox(height: 12),
-        
-        // 비밀번호 입력
-        _buildTextField(
-          controller: _passwordController,
-          hintText: "비밀번호",
-          obscureText: true,
-          isDark: isDark,
-        ),
-        const SizedBox(height: 8),
-        
-        // 비밀번호 재설정 링크
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () async {
-              final result = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
-              );
-              if (result == true) {
-                _showMessage('비밀번호가 재설정되었습니다. 새 비밀번호로 로그인하세요.');
-              }
-            },
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              "비밀번호 재설정",
-              style: TextStyle(
-                color: Color(0xFF0066FF),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
+          const SizedBox(height: 42),
 
-        // 로그인 버튼
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _login,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0066FF),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          // Login / Signup or Welcome Message
+          if (!_isLoggedIn)
+            Center(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    "관심 차량 찜하고, 가격 알림 받아보세요!",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const LoginPage()),
+                      );
+                      _checkLoginStatus(); // Refresh status after returning
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white, width: 1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                    ),
+                    child: const Text(
+                      "로그인 / 회원가입",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              elevation: 0,
-            ),
-            child: _isLoading
-              ? const SizedBox(
-                  width: 24, height: 24,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-              : const Text(
-                  "로그인",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "환영합니다, ${_authService.userEmail ?? '사용자'}님!",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // 소셜 로그인 버튼들
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildSocialButton("N", const Color(0xFF03C75A), Colors.white, provider: 'naver'),
-            const SizedBox(width: 16),
-            _buildSocialButton("K", const Color(0xFFFEE500), const Color(0xFF3C1E1E), provider: 'kakao'),
-            const SizedBox(width: 16),
-            _buildSocialButton("G", Colors.white, Colors.grey, isBorder: true, provider: 'google'),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // 회원가입 링크
-        Center(
-          child: GestureDetector(
-            onTap: _navigateToSignup,
-            child: const Text(
-              "회원가입",
-              style: TextStyle(
-                color: Color(0xFF0066FF),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+              ],
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Helper Widget: 텍스트 필드
-  Widget _buildTextField({
-    required String hintText,
-    bool obscureText = false,
-    required bool isDark,
-    TextEditingController? controller,
-  }) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        style: TextStyle(color: isDark ? Colors.white : Colors.black),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-      ),
-    );
-  }
-
-  // Helper Widget: 소셜 로그인 버튼
-  Widget _buildSocialButton(String text, Color bgColor, Color textColor, {bool isBorder = false, String? provider}) {
-    return GestureDetector(
-      onTap: provider != null ? () => _socialLogin(provider) : null,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: bgColor,
-          border: isBorder ? Border.all(color: Colors.grey[300]!) : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -673,12 +404,12 @@ class _HomePageContentState extends State<HomePageContent> {
           Text(
             title,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: textColor,
             ),
           ),
-          const Icon(Icons.arrow_forward, size: 20, color: Colors.grey),
+          Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
         ],
       ),
     );
@@ -694,7 +425,7 @@ class _HomePageContentState extends State<HomePageContent> {
             child: Center(child: CircularProgressIndicator()),
           );
         }
-        
+
         if (provider.recentViewedCars.isEmpty) {
           return SizedBox(
             height: 190,
@@ -713,7 +444,7 @@ class _HomePageContentState extends State<HomePageContent> {
             ),
           );
         }
-        
+
         return SizedBox(
           height: 190,
           child: ListView.separated(
@@ -739,7 +470,7 @@ class _HomePageContentState extends State<HomePageContent> {
       },
     );
   }
-  
+
   /// 최근 조회 차량 클릭 시 상세 분석 모달 표시
   void _showRecentCarDetail(RecommendedCar car) {
     showModalBottomSheet(
@@ -757,7 +488,7 @@ class _HomePageContentState extends State<HomePageContent> {
   void _showPopularModelDeals(PopularCar car) {
     // 최근 조회 Provider (모달에서 매물 클릭 시 기록 추가용)
     final recentViewsProvider = context.read<RecentViewsProvider>();
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -768,6 +499,28 @@ class _HomePageContentState extends State<HomePageContent> {
         avgPrice: car.avgPrice,
         medianPrice: car.medianPrice,
         listings: car.listings,
+        onCarViewed: (viewedCar) {
+          recentViewsProvider.addRecentCar(viewedCar);
+        },
+      ),
+    );
+  }
+
+  /// AI 추천 픽 클릭 시 상세 분석 모달 표시 (하드코딩된 데이터 사용)
+  void _showAiPickDetails() {
+    // 최근 조회 Provider (모달에서 매물 클릭 시 기록 추가용)
+    final recentViewsProvider = context.read<RecentViewsProvider>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ModelDealsModal(
+        brand: "현대",
+        model: "그랜저 IG",
+        avgPrice: 2450,
+        medianPrice: 2380,
+        listings: 1240,
         onCarViewed: (viewedCar) {
           recentViewsProvider.addRecentCar(viewedCar);
         },
@@ -789,7 +542,7 @@ class _HomePageContentState extends State<HomePageContent> {
       return '레어 ✨';
     }
   }
-  
+
   // 인기 모델 추천 리스트 (Provider 연동)
   Widget _buildPopularCarsList({required bool isDark}) {
     return Consumer<PopularCarsProvider>(
@@ -800,10 +553,10 @@ class _HomePageContentState extends State<HomePageContent> {
             child: Center(child: CircularProgressIndicator()),
           );
         }
-        
+
         // 국산차와 수입차 합쳐서 표시
         final allCars = [...provider.topDomestic, ...provider.topImported];
-        
+
         if (allCars.isEmpty) {
           return SizedBox(
             height: 190,
@@ -822,7 +575,7 @@ class _HomePageContentState extends State<HomePageContent> {
             ),
           );
         }
-        
+
         // 색상 팔레트
         final colors = [
           Colors.black87,
@@ -832,7 +585,7 @@ class _HomePageContentState extends State<HomePageContent> {
           Colors.green,
           Colors.purple,
         ];
-        
+
         return SizedBox(
           height: 190,
           child: ListView.separated(
@@ -877,119 +630,83 @@ class CarCard extends StatelessWidget {
     this.onTap,
   });
 
-  // 모델명에서 브랜드 로고 URL 추출
-  String? _getImageUrl() {
-    // name 형식: "브랜드 모델명" (예: "현대 그랜저", "기아 K5")
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      final brand = parts[0];
-      final model = parts.sublist(1).join(' ');
-      return CarImageMapper.getImageUrlByBrandModel(brand, model);
-    }
-    return CarImageMapper.getImageUrl(name);
-  }
-
   @override
   Widget build(BuildContext context) {
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black87;
-    final imageUrl = _getImageUrl();
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-      width: 140,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[50]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 차량 이미지 영역
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: imageUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          imageUrl,
-                          width: 80,
-                          height: 60,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            // 에러 로그 출력 (디버깅용)
-                            print('[Image Error] $name: $error');
-                            print('[Image URL] $imageUrl');
-                            return Icon(
-                              Icons.directions_car_filled,
-                              color: color,
-                              size: 48,
-                            );
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Icon(Icons.directions_car_filled, color: color.withValues(alpha: 0.3), size: 48);
-                          },
-                        ),
-                      )
-                    : Icon(
-                        Icons.directions_car_filled,
-                        color: color,
-                        size: 48,
-                      ),
+        width: 140,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border:
+              Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[50]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 차량 이미지 영역 (플레이스홀더)
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.directions_car_filled,
+                    color: Colors.white.withOpacity(0.5),
+                    size: 48,
+                  ),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // 차량 정보 텍스트
-          Text(
-            name,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: textColor,
+            // 차량 정보 텍스트
+            Text(
+              name,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: textColor,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            info,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[500],
-              fontWeight: FontWeight.w500,
+            const SizedBox(height: 4),
+            Text(
+              info,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey[500],
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            price,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0066FF),
+            const SizedBox(height: 6),
+            Text(
+              price,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0066FF),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

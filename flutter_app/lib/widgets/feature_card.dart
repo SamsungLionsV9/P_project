@@ -8,12 +8,12 @@ class FeatureCard extends StatelessWidget {
   final Color iconColor;
 
   const FeatureCard({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.description,
     this.iconColor = AppTheme.primaryBlue,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

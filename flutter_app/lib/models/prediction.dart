@@ -2,6 +2,7 @@
 /// 
 /// 분리된 위치: lib/models/prediction.dart
 /// 원본: lib/services/api_service.dart
+library;
 
 /// 가격 예측 결과
 class PredictionResult {
@@ -45,27 +46,14 @@ class TimingResult {
   });
 
   factory TimingResult.fromJson(Map<String, dynamic> json) {
-    // null 안전성 강화
-    final rawBreakdown = json['breakdown'];
-    Map<String, double> breakdown = {};
-    if (rawBreakdown is Map) {
-      breakdown = Map<String, double>.from(
-        rawBreakdown.map((k, v) => MapEntry(k.toString(), (v as num?)?.toDouble() ?? 0.0)),
-      );
-    }
-    
-    final rawReasons = json['reasons'];
-    List<String> reasons = [];
-    if (rawReasons is List) {
-      reasons = rawReasons.map((e) => e?.toString() ?? '').toList();
-    }
-    
     return TimingResult(
-      timingScore: (json['timing_score'] as num?)?.toDouble() ?? 0.0,
-      decision: json['decision']?.toString() ?? '관망',
-      color: json['color']?.toString() ?? '🟡',
-      breakdown: breakdown,
-      reasons: reasons,
+      timingScore: (json['timing_score'] as num).toDouble(),
+      decision: json['decision'] as String,
+      color: json['color'] as String,
+      breakdown: Map<String, double>.from(
+        (json['breakdown'] as Map).map((k, v) => MapEntry(k, (v as num).toDouble())),
+      ),
+      reasons: List<String>.from(json['reasons']),
     );
   }
 

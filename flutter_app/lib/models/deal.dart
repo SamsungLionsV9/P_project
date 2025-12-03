@@ -60,10 +60,10 @@ class PriceFairness {
 
   factory PriceFairness.fromJson(Map<String, dynamic> json) {
     return PriceFairness(
-      score: (json['score'] as num?)?.toInt() ?? 50,
-      label: json['label']?.toString() ?? '판단불가',
-      percentile: (json['percentile'] as num?)?.toInt() ?? 50,
-      description: json['description']?.toString() ?? '',
+      score: json['score'] ?? 50,
+      label: json['label'] ?? '판단불가',
+      percentile: json['percentile'] ?? 50,
+      description: json['description'] ?? '',
     );
   }
 }
@@ -81,19 +81,12 @@ class FraudRisk {
   });
 
   factory FraudRisk.fromJson(Map<String, dynamic> json) {
-    final rawFactors = json['factors'];
-    List<FraudFactor> factors = [];
-    if (rawFactors is List) {
-      factors = rawFactors
-          .where((e) => e != null)
-          .map((e) => FraudFactor.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    
     return FraudRisk(
-      score: (json['score'] as num?)?.toInt() ?? 0,
-      level: json['level']?.toString() ?? 'low',
-      factors: factors,
+      score: json['score'] ?? 0,
+      level: json['level'] ?? 'low',
+      factors: (json['factors'] as List? ?? [])
+          .map((e) => FraudFactor.fromJson(e))
+          .toList(),
     );
   }
   
@@ -173,12 +166,12 @@ class DealSummary {
 
   factory DealSummary.fromJson(Map<String, dynamic> json) {
     return DealSummary(
-      actualPrice: (json['actual_price'] as num?)?.toInt() ?? 0,
-      predictedPrice: (json['predicted_price'] as num?)?.toInt() ?? 0,
-      priceDiff: (json['price_diff'] as num?)?.toInt() ?? 0,
-      priceDiffPct: (json['price_diff_pct'] as num?)?.toDouble() ?? 0.0,
-      isGoodDeal: json['is_good_deal'] == true,
-      verdict: json['verdict']?.toString() ?? '',
+      actualPrice: json['actual_price'] ?? 0,
+      predictedPrice: json['predicted_price'] ?? 0,
+      priceDiff: json['price_diff'] ?? 0,
+      priceDiffPct: (json['price_diff_pct'] ?? 0).toDouble(),
+      isGoodDeal: json['is_good_deal'] ?? false,
+      verdict: json['verdict'] ?? '',
     );
   }
 }

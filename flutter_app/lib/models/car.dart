@@ -2,6 +2,7 @@
 /// 
 /// 분리된 위치: lib/models/car.dart
 /// 원본: lib/services/api_service.dart
+library;
 
 /// 차량 옵션 정보
 class CarOptions {

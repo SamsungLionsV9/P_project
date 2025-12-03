@@ -2,6 +2,7 @@
 /// 
 /// 분리된 위치: lib/models/ai.dart
 /// 원본: lib/services/api_service.dart
+library;
 
 /// AI 생성 네고 대본 모델
 class NegotiationScript {

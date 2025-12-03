@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/common/option_badges.dart';
-import 'widgets/common/bottom_nav_bar.dart';
 import 'providers/recent_views_provider.dart';
 
 class ResultPage extends StatefulWidget {
@@ -13,8 +12,8 @@ class ResultPage extends StatefulWidget {
   final int year;
   final int mileage;
   final String fuel;
-  final Map<String, bool>? selectedOptions;  // 선택한 옵션 정보
-  final String? inspectionGrade;  // 성능점검 등급
+  final Map<String, bool>? selectedOptions; // 선택한 옵션 정보
+  final String? inspectionGrade; // 성능점검 등급
 
   const ResultPage({
     super.key,
@@ -32,18 +31,19 @@ class ResultPage extends StatefulWidget {
   State<ResultPage> createState() => _ResultPageState();
 }
 
-class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateMixin {
+class _ResultPageState extends State<ResultPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ApiService _api = ApiService();
-  
+
   // 비슷한 차량 데이터
   SimilarResult? _similarResult;
   bool _loadingSimilar = true;
-  
+
   // 실매물 데이터
   List<RecommendedCar> _realDeals = [];
   bool _loadingDeals = true;
-  
+
   // 편의를 위한 getter
   SmartAnalysisResult get result => widget.analysisResult;
   PredictionResult get prediction => result.prediction;
@@ -56,7 +56,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     _loadSimilarData();
     _loadRealDeals();
   }
-  
+
   Future<void> _loadSimilarData() async {
     try {
       final similar = await _api.getSimilar(
@@ -74,7 +74,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       setState(() => _loadingSimilar = false);
     }
   }
-  
+
   Future<void> _loadRealDeals() async {
     try {
       final deals = await _api.getModelDeals(
@@ -123,15 +123,6 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           ),
         ),
         centerTitle: true,
-      ),
-      // 하단 네비게이션 바 추가 (현재 탭: 내 차 찾기 = 1)
-      bottomNavigationBar: SharedBottomNavBar(
-        currentIndex: 1, // 내 차 찾기 탭
-        onTap: (index) {
-          // 홈으로 돌아간 후 탭 전환
-          Navigator.of(context).popUntil((route) => route.isFirst);
-          MainScreenNavigator.of(context)?.switchTab(index);
-        },
       ),
       body: Column(
         children: [
@@ -211,7 +202,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               unselectedLabelColor: Colors.grey[400],
               indicatorColor: const Color(0xFF0066FF),
               indicatorWeight: 3,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              labelStyle:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               tabs: const [
                 Tab(text: "가격 분석"),
                 Tab(text: "구매 타이밍"),
@@ -265,7 +257,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                         child: CircularProgressIndicator(
                           value: prediction.confidence / 100,
                           strokeWidth: 12,
-                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                          backgroundColor:
+                              isDark ? Colors.grey[800] : Colors.grey[200],
                           color: _getConfidenceColor(prediction.confidence),
                         ),
                       ),
@@ -282,7 +275,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                           ),
                           Text(
                             _getConfidenceLabel(prediction.confidence),
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -306,7 +300,10 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               children: [
                 Text(
                   "비슷한 차량 가격 분포",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: textColor),
                 ),
                 const Text(
                   "최근 3개월 거래 데이터 기준",
@@ -318,14 +315,14 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // 실매물 섹션
           _buildRealDealsSection(cardColor, textColor, isDark),
         ],
       ),
     );
   }
-  
+
   /// 실매물 섹션 위젯
   Widget _buildRealDealsSection(Color cardColor, Color textColor, bool isDark) {
     return Container(
@@ -342,11 +339,15 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             children: [
               Row(
                 children: [
-                  const Icon(Icons.directions_car, color: Color(0xFF0066FF), size: 20),
+                  const Icon(Icons.directions_car,
+                      color: Color(0xFF0066FF), size: 20),
                   const SizedBox(width: 8),
                   Text(
                     "이 조건의 실매물",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: textColor),
                   ),
                 ],
               ),
@@ -357,15 +358,16 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                 ),
             ],
           ),
-          
+
           // 예측 조건 표시 (옵션, 성능점검 등)
-          if (widget.selectedOptions != null || widget.inspectionGrade != null) ...[
+          if (widget.selectedOptions != null ||
+              widget.inspectionGrade != null) ...[
             const SizedBox(height: 12),
             _buildPredictionConditions(isDark),
           ],
-          
+
           const SizedBox(height: 16),
-          
+
           if (_loadingDeals)
             const SizedBox(
               height: 100,
@@ -380,25 +382,28 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                   children: [
                     Icon(Icons.search_off, color: Colors.grey[400], size: 32),
                     const SizedBox(height: 8),
-                    Text("매물 데이터가 없습니다", style: TextStyle(color: Colors.grey[400])),
+                    Text("매물 데이터가 없습니다",
+                        style: TextStyle(color: Colors.grey[400])),
                   ],
                 ),
               ),
             )
           else
             Column(
-              children: _realDeals.map((deal) => _buildDealCard(deal, textColor, isDark)).toList(),
+              children: _realDeals
+                  .map((deal) => _buildDealCard(deal, textColor, isDark))
+                  .toList(),
             ),
         ],
       ),
     );
   }
-  
+
   /// 예측 조건 표시 위젯 (선택한 옵션, 성능점검 등급)
   Widget _buildPredictionConditions(bool isDark) {
     final options = widget.selectedOptions ?? {};
     final grade = widget.inspectionGrade;
-    
+
     // 활성화된 옵션만 필터
     final activeOptions = <String>[];
     if (options['sunroof'] == true) activeOptions.add('선루프');
@@ -406,22 +411,29 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     if (options['leatherSeat'] == true) activeOptions.add('가죽시트');
     if (options['smartKey'] == true) activeOptions.add('스마트키');
     if (options['rearCamera'] == true) activeOptions.add('후방카메라');
-    
+
     // 성능점검 등급 텍스트
     String gradeText = '';
-    if (grade == 'excellent') gradeText = '성능점검 ★★★★★';
-    else if (grade == 'good') gradeText = '성능점검 ★★★★';
-    else if (grade == 'average') gradeText = '성능점검 ★★★';
-    else if (grade == 'poor') gradeText = '성능점검 ★★';
-    
+    if (grade == 'excellent') {
+      gradeText = '성능점검 ★★★★★';
+    } else if (grade == 'good') {
+      gradeText = '성능점검 ★★★★';
+    } else if (grade == 'average') {
+      gradeText = '성능점검 ★★★';
+    } else if (grade == 'poor') {
+      gradeText = '성능점검 ★★';
+    }
+
     if (activeOptions.isEmpty && gradeText.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.withOpacity(0.05),
+        color: isDark
+            ? Colors.blue.withOpacity(0.1)
+            : Colors.blue.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.blue.withOpacity(0.2)),
       ),
@@ -449,13 +461,13 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       ),
     );
   }
-  
+
   /// 개별 매물 카드
   Widget _buildDealCard(RecommendedCar deal, Color textColor, bool isDark) {
     // 매물의 고유 조건 기준 예측가와 비교 (연식, 연료 등 반영)
     final priceDiff = deal.predictedPrice - deal.actualPrice;
     final isGood = priceDiff > 0;
-    
+
     return GestureDetector(
       onTap: () => _showDealAnalysisModal(deal),
       child: Container(
@@ -465,7 +477,9 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           color: isDark ? const Color(0xFF2A2A2A) : Colors.grey[50],
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isGood ? Colors.green.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+            color: isGood
+                ? Colors.green.withOpacity(0.3)
+                : Colors.grey.withOpacity(0.2),
           ),
         ),
         child: Row(
@@ -478,7 +492,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                     children: [
                       if (isGood)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           margin: const EdgeInsets.only(right: 8),
                           decoration: BoxDecoration(
                             color: Colors.green.withOpacity(0.1),
@@ -527,9 +542,9 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                   ),
                 ),
                 Text(
-                  isGood 
-                    ? "예측가 대비 -${priceDiff.abs()}만원"
-                    : "예측가 대비 +${priceDiff.abs()}만원",
+                  isGood
+                      ? "예측가 대비 -${priceDiff.abs()}만원"
+                      : "예측가 대비 +${priceDiff.abs()}만원",
                   style: TextStyle(
                     color: isGood ? Colors.green : Colors.red,
                     fontSize: 11,
@@ -544,13 +559,13 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       ),
     );
   }
-  
+
   /// 개별 매물 분석 모달 표시
   Future<void> _showDealAnalysisModal(RecommendedCar deal) async {
     // 최근 조회에 추가 (분석 페이지에서 클릭 = source: 'analysis')
     final dealWithSource = deal.copyWith(source: 'analysis');
     context.read<RecentViewsProvider>().addRecentCar(dealWithSource);
-    
+
     // 매물의 고유 조건(연식, 연료 등)에 맞는 예측가 사용
     // deal.predictedPrice는 해당 매물의 실제 조건으로 계산된 예측가
     showModalBottomSheet(
@@ -588,7 +603,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                     color: _getTimingColor(timing.timingScore),
                     boxShadow: [
                       BoxShadow(
-                        color: _getTimingColor(timing.timingScore).withOpacity(0.3),
+                        color: _getTimingColor(timing.timingScore)
+                            .withOpacity(0.3),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -596,7 +612,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                   ),
                   child: Center(
                     child: Text(
-                      "${timing.timingScore.toStringAsFixed(0)}",
+                      timing.timingScore.toStringAsFixed(0),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
@@ -636,7 +652,10 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               children: [
                 Text(
                   "타이밍 지표",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: textColor),
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -680,10 +699,14 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               children: [
                 Text(
                   "상세 분석",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: textColor),
                 ),
                 const SizedBox(height: 16),
-                ...timing.reasons.map((reason) => _buildCheckItem(reason, textColor)),
+                ...timing.reasons
+                    .map((reason) => _buildCheckItem(reason, textColor)),
               ],
             ),
           ),
@@ -692,7 +715,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildCircularIndicator(int score, String label, bool isDark, Color textColor) {
+  Widget _buildCircularIndicator(
+      int score, String label, bool isDark, Color textColor) {
     final color = _getScoreColor(score);
     return Column(
       children: [
@@ -724,7 +748,9 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           ),
         ),
         const SizedBox(height: 8),
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
+        Text(label,
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
         const Text("/ 100", style: TextStyle(color: Colors.grey, fontSize: 10)),
       ],
     );
@@ -748,7 +774,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     // 시장 상황 분석
     final priceAdvice = _getMarketPriceAdvice();
     final timingAdvice = _getMarketTimingAdvice();
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -769,7 +795,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                     color: Color(0xFF0066FF),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.analytics, color: Colors.white, size: 20),
+                  child: const Icon(Icons.analytics,
+                      color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -778,12 +805,16 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                     children: [
                       Text(
                         "시장 조언",
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: textColor),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         priceAdvice,
-                        style: TextStyle(color: textColor, height: 1.5, fontSize: 14),
+                        style: TextStyle(
+                            color: textColor, height: 1.5, fontSize: 14),
                       ),
                     ],
                   ),
@@ -805,11 +836,15 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.savings, color: Color(0xFF0066FF), size: 20),
+                    const Icon(Icons.savings,
+                        color: Color(0xFF0066FF), size: 20),
                     const SizedBox(width: 8),
                     Text(
                       "추천 예산 범위",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: textColor),
                     ),
                   ],
                 ),
@@ -819,12 +854,15 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.blue.withOpacity(0.1) : const Color(0xFFE3F2FD),
+                    color: isDark
+                        ? Colors.blue.withOpacity(0.1)
+                        : const Color(0xFFE3F2FD),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.lightbulb, color: Color(0xFF0066FF), size: 16),
+                      const Icon(Icons.lightbulb,
+                          color: Color(0xFF0066FF), size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -839,7 +877,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // 구매 타이밍 요약
           Container(
             padding: const EdgeInsets.all(24),
@@ -852,11 +890,15 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.schedule, color: Color(0xFF00C853), size: 20),
+                    const Icon(Icons.schedule,
+                        color: Color(0xFF00C853), size: 20),
                     const SizedBox(width: 8),
                     Text(
                       "타이밍 요약",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: textColor),
                     ),
                   ],
                 ),
@@ -877,18 +919,25 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF3E2723) : const Color(0xFFFFF8E1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? const Color(0xFF4E342E) : const Color(0xFFFFECB3)),
+              border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF4E342E)
+                      : const Color(0xFFFFECB3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.info_outline, color: Color(0xFFFFAB00), size: 20),
+                    const Icon(Icons.info_outline,
+                        color: Color(0xFFFFAB00), size: 20),
                     const SizedBox(width: 8),
                     Text(
                       "구매 전 확인사항",
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: textColor),
                     ),
                   ],
                 ),
@@ -923,17 +972,17 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       ),
     );
   }
-  
+
   // ========== 헬퍼 메서드 ==========
-  
+
   /// 가격 포맷팅 (1234.5 → "1,235")
   String _formatPrice(double price) {
     return price.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
   }
-  
+
   /// 신뢰도에 따른 색상
   Color _getConfidenceColor(double confidence) {
     if (confidence >= 80) return const Color(0xFF00C853);
@@ -941,7 +990,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     if (confidence >= 40) return const Color(0xFFFFAB00);
     return Colors.red;
   }
-  
+
   /// 신뢰도 라벨
   String _getConfidenceLabel(double confidence) {
     if (confidence >= 80) return '매우 높음';
@@ -949,37 +998,37 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     if (confidence >= 40) return '보통';
     return '낮음';
   }
-  
+
   /// 타이밍 점수에 따른 색상
   Color _getTimingColor(double score) {
     if (score >= 70) return const Color(0xFF00C853);
     if (score >= 50) return const Color(0xFFFFAB00);
     return Colors.red;
   }
-  
+
   /// 타이밍 설명
   String _getTimingDescription(double score) {
     if (score >= 70) return '구매하기 좋은 타이밍입니다';
     if (score >= 50) return '조금 더 기다려보세요';
     return '구매를 미루는 것이 좋습니다';
   }
-  
+
   /// 점수에 따른 색상
   Color _getScoreColor(int score) {
     if (score >= 70) return const Color(0xFF00C853);
     if (score >= 50) return const Color(0xFFFFAB00);
     return Colors.red;
   }
-  
+
   /// 시장 가격 조언 생성
   String _getMarketPriceAdvice() {
     final price = prediction.predictedPrice;
     final confidence = prediction.confidence;
     final brand = widget.brand;
     final model = widget.model;
-    
+
     String advice = "$brand $model ${widget.year}년식의 ";
-    
+
     if (confidence >= 80) {
       advice += "예상 시세는 ${_formatPrice(price)}만원입니다. ";
       advice += "동일 조건의 차량 데이터가 충분하여 신뢰도가 높습니다.\n\n";
@@ -990,48 +1039,49 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       advice += "예상 시세는 약 ${_formatPrice(price)}만원입니다. ";
       advice += "데이터가 부족하여 참고용으로 활용하세요.\n\n";
     }
-    
+
     advice += "실제 매물을 확인할 때는 차량 상태, 옵션, 사고 이력에 따라 가격이 달라질 수 있습니다.";
-    
+
     return advice;
   }
-  
+
   /// 시장 타이밍 조언 생성
   String _getMarketTimingAdvice() {
     final score = timing.timingScore;
-    
+
     if (score >= 70) {
       return "현재는 이 모델을 구매하기 좋은 시기입니다. "
-             "시장 가격이 안정적이며, 매물도 충분합니다. "
-             "마음에 드는 차량이 있다면 적극 검토해보세요.";
+          "시장 가격이 안정적이며, 매물도 충분합니다. "
+          "마음에 드는 차량이 있다면 적극 검토해보세요.";
     } else if (score >= 50) {
       return "현재 시장 상황은 보통입니다. "
-             "급하지 않다면 다음 달까지 기다려보는 것도 방법입니다. "
-             "가격 변동을 지켜보며 결정하세요.";
+          "급하지 않다면 다음 달까지 기다려보는 것도 방법입니다. "
+          "가격 변동을 지켜보며 결정하세요.";
     } else {
       return "현재는 구매를 서두르지 않는 것이 좋습니다. "
-             "시장 상황이 안정될 때까지 기다려보세요. "
-             "조금 더 기다려보세요.";
+          "시장 상황이 안정될 때까지 기다려보세요. "
+          "조금 더 기다려보세요.";
     }
   }
-  
+
   /// 추천 예산 범위 위젯
   Widget _buildBudgetRange(Color textColor, bool isDark) {
     final predicted = prediction.predictedPrice;
     final minBudget = (predicted * 0.9).round();
     final maxBudget = (predicted * 1.1).round();
-    
+
     return Row(
       children: [
         Expanded(
           child: Column(
             children: [
-              Text("최소", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              Text("최소",
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               const SizedBox(height: 4),
               Text(
                 "${_formatPrice(minBudget.toDouble())}만원",
-                style: TextStyle(
-                  color: const Color(0xFF0066FF),
+                style: const TextStyle(
+                  color: Color(0xFF0066FF),
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1047,7 +1097,8 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
         Expanded(
           child: Column(
             children: [
-              Text("예측가", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              Text("예측가",
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               const SizedBox(height: 4),
               Text(
                 "${_formatPrice(predicted)}만원",
@@ -1068,12 +1119,13 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
         Expanded(
           child: Column(
             children: [
-              Text("최대", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              Text("최대",
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               const SizedBox(height: 4),
               Text(
                 "${_formatPrice(maxBudget.toDouble())}만원",
-                style: TextStyle(
-                  color: const Color(0xFFE53935),
+                style: const TextStyle(
+                  color: Color(0xFFE53935),
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -1084,7 +1136,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       ],
     );
   }
-  
+
   /// 비슷한 차량 분포 위젯
   Widget _buildSimilarDistribution(Color cardColor, Color textColor) {
     if (_loadingSimilar) {
@@ -1093,7 +1145,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     if (_similarResult == null || _similarResult!.similarCount == 0) {
       return SizedBox(
         height: 100,
@@ -1103,25 +1155,29 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             children: [
               Icon(Icons.search_off, color: Colors.grey[400], size: 32),
               const SizedBox(height: 8),
-              Text("비슷한 차량 데이터가 부족합니다", style: TextStyle(color: Colors.grey[400])),
+              Text("비슷한 차량 데이터가 부족합니다",
+                  style: TextStyle(color: Colors.grey[400])),
             ],
           ),
         ),
       );
     }
-    
+
     final similar = _similarResult!;
     final dist = similar.priceDistribution;
     final histogram = similar.histogram;
-    
+
     // 히스토그램 최대 10개로 제한 (너무 많으면 UI 깨짐)
-    final limitedHistogram = histogram.length > 10 
-        ? histogram.sublist(0, 10) 
-        : histogram;
-    
+    final limitedHistogram =
+        histogram.length > 10 ? histogram.sublist(0, 10) : histogram;
+
     // 히스토그램 최대값
-    final maxCount = limitedHistogram.isEmpty ? 1 : limitedHistogram.map((h) => h['count'] as int).reduce((a, b) => a > b ? a : b);
-    
+    final maxCount = limitedHistogram.isEmpty
+        ? 1
+        : limitedHistogram
+            .map((h) => h['count'] as int)
+            .reduce((a, b) => a > b ? a : b);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1130,14 +1186,17 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem("최저", "${(dist['min'] as num).toInt()}만", Colors.blue),
-              _buildStatItem("중앙", "${(dist['median'] as num).toInt()}만", Colors.green),
-              _buildStatItem("최고", "${(dist['max'] as num).toInt()}만", Colors.orange),
+              _buildStatItem(
+                  "최저", "${(dist['min'] as num).toInt()}만", Colors.blue),
+              _buildStatItem(
+                  "중앙", "${(dist['median'] as num).toInt()}만", Colors.green),
+              _buildStatItem(
+                  "최고", "${(dist['max'] as num).toInt()}만", Colors.orange),
             ],
           ),
           const SizedBox(height: 16),
         ],
-        
+
         // 히스토그램 (최대 10개)
         if (limitedHistogram.isNotEmpty) ...[
           SizedBox(
@@ -1149,9 +1208,10 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                 final rangeMin = bar['range_min'] as int;
                 final rangeMax = bar['range_max'] as int;
                 final barHeight = maxCount > 0 ? (count / maxCount) * 100 : 0.0;
-                final predictedInRange = prediction.predictedPrice >= rangeMin && 
-                                         prediction.predictedPrice < rangeMax;
-                
+                final predictedInRange =
+                    prediction.predictedPrice >= rangeMin &&
+                        prediction.predictedPrice < rangeMax;
+
                 return Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 1),
@@ -1162,15 +1222,16 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
                         if (count >= 5)
                           Text(
                             "$count",
-                            style: TextStyle(fontSize: 8, color: Colors.grey[500]),
+                            style:
+                                TextStyle(fontSize: 8, color: Colors.grey[500]),
                           ),
                         const SizedBox(height: 2),
                         Container(
                           height: barHeight.clamp(4.0, 100.0),
                           constraints: const BoxConstraints(minHeight: 4),
                           decoration: BoxDecoration(
-                            color: predictedInRange 
-                                ? const Color(0xFF0066FF) 
+                            color: predictedInRange
+                                ? const Color(0xFF0066FF)
                                 : const Color(0xFF0066FF).withOpacity(0.3),
                             borderRadius: BorderRadius.circular(3),
                           ),
@@ -1187,27 +1248,30 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("${limitedHistogram.first['range_min']}만", 
+              Text("${limitedHistogram.first['range_min']}만",
                   style: TextStyle(fontSize: 9, color: Colors.grey[500])),
-              Text("${limitedHistogram.last['range_max']}만", 
+              Text("${limitedHistogram.last['range_max']}만",
                   style: TextStyle(fontSize: 9, color: Colors.grey[500])),
             ],
           ),
         ],
-        
+
         const SizedBox(height: 16),
-        
+
         // 내 위치
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: _getPositionColor(similar.positionColor).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _getPositionColor(similar.positionColor).withOpacity(0.3)),
+            border: Border.all(
+                color:
+                    _getPositionColor(similar.positionColor).withOpacity(0.3)),
           ),
           child: Row(
             children: [
-              Icon(Icons.place, color: _getPositionColor(similar.positionColor), size: 20),
+              Icon(Icons.place,
+                  color: _getPositionColor(similar.positionColor), size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1221,7 +1285,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             ],
           ),
         ),
-        
+
         const SizedBox(height: 8),
         Text(
           "비교 대상: ${similar.similarCount}대",
@@ -1230,24 +1294,31 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       ],
     );
   }
-  
+
   Widget _buildStatItem(String label, String value, Color color) {
     return Column(
       children: [
         Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
         const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: color)),
       ],
     );
   }
-  
+
   Color _getPositionColor(String color) {
     switch (color) {
-      case 'green': return const Color(0xFF00C853);
-      case 'blue': return const Color(0xFF0066FF);
-      case 'orange': return const Color(0xFFFF9800);
-      case 'red': return Colors.red;
-      default: return Colors.grey;
+      case 'green':
+        return const Color(0xFF00C853);
+      case 'blue':
+        return const Color(0xFF0066FF);
+      case 'orange':
+        return const Color(0xFFFF9800);
+      case 'red':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 }

@@ -10,6 +10,7 @@
 /// import 'package:flutter_app/models/car.dart';
 /// import 'package:flutter_app/models/prediction.dart';
 /// ```
+library;
 
 // 차량 관련 모델
 export 'car.dart';

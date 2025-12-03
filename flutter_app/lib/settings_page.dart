@@ -38,130 +38,124 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context, themeProvider, child) {
         // 다크 모드에 따른 색상 정의
         final isDark = themeProvider.isDarkMode;
-        final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA);
+        final bgColor =
+            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA);
         final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
         final textColor = isDark ? Colors.white : Colors.black;
         final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
         final iconColor = isDark ? Colors.white70 : Colors.black87;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: bgColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: textColor),
-          onPressed: () {
-             // 메인 탭 구조상 뒤로가기 동작 정의 필요 시 구현
-          },
-        ),
-        title: Text(
-          "설정",
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+        return Scaffold(
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: bgColor,
+            elevation: 0,
+            automaticallyImplyLeading: false,
+            title: Text(
+              "설정",
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            centerTitle: true,
           ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionHeader("일반", subTextColor),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  _buildSwitchTile(
-                    title: "다크 모드",
-                    value: themeProvider.isDarkMode,
-                    onChanged: (value) => themeProvider.setDarkMode(value),
-                    textColor: textColor,
-                    activeColor: const Color(0xFF0066FF),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionHeader("일반", subTextColor),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  _buildDivider(isDark),
-                  _buildListTile(
-                    title: "알림 설정",
-                    onTap: () {},
-                    textColor: textColor,
-                    iconColor: iconColor,
+                  child: Column(
+                    children: [
+                      _buildSwitchTile(
+                        title: "다크 모드",
+                        value: themeProvider.isDarkMode,
+                        onChanged: (value) => themeProvider.setDarkMode(value),
+                        textColor: textColor,
+                        activeColor: const Color(0xFF0066FF),
+                      ),
+                      _buildDivider(isDark),
+                      _buildListTile(
+                        title: "알림 설정",
+                        onTap: () {},
+                        textColor: textColor,
+                        iconColor: iconColor,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 32),
+                _buildSectionHeader("AI 엔진", subTextColor),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      // Groq API 연결 상태 표시
+                      _buildAiStatusTile(textColor, subTextColor),
+                      _buildDivider(isDark),
+                      _buildListTile(
+                        title: "API 키 설정 (선택)",
+                        subtitle: "기본 엔진 사용 중",
+                        onTap: () {},
+                        textColor: textColor,
+                        subTextColor: subTextColor,
+                        iconColor: iconColor,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                _buildSectionHeader("지원 및 정보", subTextColor),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildListTile(
+                        title: "기록 삭제",
+                        onTap: () {},
+                        textColor: textColor,
+                        iconColor: iconColor,
+                        isDestructive: true,
+                      ),
+                      _buildDivider(isDark),
+                      _buildListTile(
+                        title: "문의하기",
+                        onTap: () {},
+                        textColor: textColor,
+                        iconColor: iconColor,
+                      ),
+                      _buildDivider(isDark),
+                      _buildListTile(
+                        title: "버전 정보",
+                        trailingText: "v1.0.0",
+                        onTap: null, // 클릭 불가
+                        textColor: textColor,
+                        subTextColor: subTextColor,
+                        iconColor: iconColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 32),
-
-            _buildSectionHeader("AI 엔진", subTextColor),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  // Groq API 연결 상태 표시
-                  _buildAiStatusTile(textColor, subTextColor),
-                  _buildDivider(isDark),
-                  _buildListTile(
-                    title: "API 키 설정 (선택)",
-                    subtitle: "기본 엔진 사용 중",
-                    onTap: () {},
-                    textColor: textColor,
-                    subTextColor: subTextColor,
-                    iconColor: iconColor,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            _buildSectionHeader("지원 및 정보", subTextColor),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  _buildListTile(
-                    title: "기록 삭제",
-                    onTap: () {},
-                    textColor: textColor,
-                    iconColor: iconColor,
-                    isDestructive: true,
-                  ),
-                  _buildDivider(isDark),
-                  _buildListTile(
-                    title: "문의하기",
-                    onTap: () {},
-                    textColor: textColor,
-                    iconColor: iconColor,
-                  ),
-                  _buildDivider(isDark),
-                  _buildListTile(
-                    title: "버전 정보",
-                    trailingText: "v1.0.0",
-                    onTap: null, // 클릭 불가
-                    textColor: textColor,
-                    subTextColor: subTextColor,
-                    iconColor: iconColor,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
       },
     );
   }
@@ -263,7 +257,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               )
             else
-              Icon(Icons.arrow_forward_ios, color: iconColor.withOpacity(0.3), size: 16),
+              Icon(Icons.arrow_forward_ios,
+                  color: iconColor.withOpacity(0.3), size: 16),
           ],
         ),
       ),

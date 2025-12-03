@@ -2,6 +2,7 @@
 /// 
 /// 분리된 위치: lib/models/user.dart
 /// 원본: lib/services/api_service.dart
+library;
 
 import 'car.dart';  // RecommendedCar 사용
 

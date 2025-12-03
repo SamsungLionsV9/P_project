@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/api_service.dart';
-import 'widgets/common/bottom_nav_bar.dart';
 
 class NegotiationPage extends StatefulWidget {
   final int initialTabIndex; // 0: 문자 전송, 1: 전화 통화
@@ -9,13 +8,13 @@ class NegotiationPage extends StatefulWidget {
   final String? price;
   final String? info;
   // 고도화: 정확한 가격 정보
-  final int? actualPrice;  // 실제 판매가
-  final int? predictedPrice;  // AI 예측가
-  final int? year;  // 연식
-  final int? mileage;  // 주행거리
+  final int? actualPrice; // 실제 판매가
+  final int? predictedPrice; // AI 예측가
+  final int? year; // 연식
+  final int? mileage; // 주행거리
 
   const NegotiationPage({
-    super.key, 
+    super.key,
     this.initialTabIndex = 0,
     this.carName,
     this.price,
@@ -38,7 +37,7 @@ class _NegotiationPageState extends State<NegotiationPage> {
   bool _checkTire = true;
   bool _checkPrice = true;
   bool _checkCoolDeal = false;
-  
+
   // AI 생성 대본 상태
   bool _isGenerating = false;
   String? _generatedMessage;
@@ -50,7 +49,7 @@ class _NegotiationPageState extends State<NegotiationPage> {
     super.initState();
     _currentTabIndex = widget.initialTabIndex;
   }
-  
+
   /// 선택된 체크포인트 리스트
   List<String> get _selectedCheckpoints {
     final List<String> points = [];
@@ -59,11 +58,11 @@ class _NegotiationPageState extends State<NegotiationPage> {
     if (_checkCoolDeal) points.add("쿨거래 의사");
     return points;
   }
-  
+
   /// AI 대본 생성
   Future<void> _generateScript() async {
     setState(() => _isGenerating = true);
-    
+
     try {
       final script = await _apiService.generateNegotiationScript(
         carName: widget.carName ?? '차량',
@@ -76,13 +75,13 @@ class _NegotiationPageState extends State<NegotiationPage> {
         year: widget.year,
         mileage: widget.mileage,
       );
-      
+
       setState(() {
         _generatedMessage = script.messageScript;
         _generatedPhoneScripts = script.phoneScript;
         _generatedTip = script.tip;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -110,7 +109,7 @@ class _NegotiationPageState extends State<NegotiationPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black;
-    final subTextColor = isDark ? Colors.grey[400] : Colors.black87;
+
     final borderColor = isDark ? Colors.grey[800]! : const Color(0xFFBBDEFB);
 
     return Scaffold(
@@ -131,14 +130,6 @@ class _NegotiationPageState extends State<NegotiationPage> {
           ),
         ),
         centerTitle: true,
-      ),
-      // 하단 네비게이션 바 추가 (현재 탭: 내 차 찾기 = 1)
-      bottomNavigationBar: SharedBottomNavBar(
-        currentIndex: 1, // 내 차 찾기 탭
-        onTap: (index) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-          MainScreenNavigator.of(context)?.switchTab(index);
-        },
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -172,9 +163,24 @@ class _NegotiationPageState extends State<NegotiationPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _buildCheckboxItem("타이어 마모 상태 (교체 필요 어필)", _checkTire, (v) => setState(() => _checkTire = v!), textColor, isDark),
-                    _buildCheckboxItem("동급 매물 대비 높은 가격", _checkPrice, (v) => setState(() => _checkPrice = v!), textColor, isDark),
-                    _buildCheckboxItem("쿨거래 의사 표현 (계약금 즉시 입금)", _checkCoolDeal, (v) => setState(() => _checkCoolDeal = v!), textColor, isDark),
+                    _buildCheckboxItem(
+                        "타이어 마모 상태 (교체 필요 어필)",
+                        _checkTire,
+                        (v) => setState(() => _checkTire = v!),
+                        textColor,
+                        isDark),
+                    _buildCheckboxItem(
+                        "동급 매물 대비 높은 가격",
+                        _checkPrice,
+                        (v) => setState(() => _checkPrice = v!),
+                        textColor,
+                        isDark),
+                    _buildCheckboxItem(
+                        "쿨거래 의사 표현 (계약금 즉시 입금)",
+                        _checkCoolDeal,
+                        (v) => setState(() => _checkCoolDeal = v!),
+                        textColor,
+                        isDark),
                     const SizedBox(height: 16),
                     // AI 대본 생성 버튼
                     SizedBox(
@@ -182,15 +188,18 @@ class _NegotiationPageState extends State<NegotiationPage> {
                       height: 48,
                       child: ElevatedButton.icon(
                         onPressed: _isGenerating ? null : _generateScript,
-                        icon: _isGenerating 
-                          ? const SizedBox(
-                              width: 20, height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Icon(Icons.auto_awesome, size: 20),
+                        icon: _isGenerating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Icon(Icons.auto_awesome, size: 20),
                         label: Text(
                           _isGenerating ? "생성 중..." : "🤖 AI 대본 생성",
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF9C27B0),
@@ -215,7 +224,8 @@ class _NegotiationPageState extends State<NegotiationPage> {
                 ),
                 child: Row(
                   children: [
-                    _buildTabButton("문자 전송", Icons.chat_bubble_outline, 0, isDark),
+                    _buildTabButton(
+                        "문자 전송", Icons.chat_bubble_outline, 0, isDark),
                     _buildTabButton("전화 통화", Icons.phone_in_talk, 1, isDark),
                   ],
                 ),
@@ -223,9 +233,9 @@ class _NegotiationPageState extends State<NegotiationPage> {
               const SizedBox(height: 24),
 
               // 3. 탭 컨텐츠
-              if (_currentTabIndex == 0) 
-                _buildTextMessageView(isDark, cardColor, textColor) 
-              else 
+              if (_currentTabIndex == 0)
+                _buildTextMessageView(isDark, cardColor, textColor)
+              else
                 _buildPhoneCallView(isDark, cardColor, textColor, borderColor),
             ],
           ),
@@ -234,7 +244,8 @@ class _NegotiationPageState extends State<NegotiationPage> {
     );
   }
 
-  Widget _buildCheckboxItem(String text, bool value, Function(bool?) onChanged, Color textColor, bool isDark) {
+  Widget _buildCheckboxItem(String text, bool value, Function(bool?) onChanged,
+      Color textColor, bool isDark) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -245,10 +256,12 @@ class _NegotiationPageState extends State<NegotiationPage> {
             child: Checkbox(
               value: value,
               onChanged: onChanged,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6)),
               activeColor: isDark ? Colors.grey[700] : Colors.black,
               checkColor: Colors.white,
-              side: BorderSide(color: isDark ? Colors.grey[500]! : Colors.black),
+              side:
+                  BorderSide(color: isDark ? Colors.grey[500]! : Colors.black),
             ),
           ),
           const SizedBox(width: 12),
@@ -300,7 +313,7 @@ class _NegotiationPageState extends State<NegotiationPage> {
 
   // 문자 전송 뷰
   Widget _buildTextMessageView(bool isDark, Color cardColor, Color textColor) {
-    final String defaultMessage = """안녕하세요, 엔카 보고 연락드립니다.
+    const String defaultMessage = """안녕하세요, 엔카 보고 연락드립니다.
 
 차량 상태는 마음에 드는데, AI 분석 결과와 타이어 상태를 보니 가격 조정이 조금 필요해 보입니다.
 
@@ -321,7 +334,8 @@ class _NegotiationPageState extends State<NegotiationPage> {
             decoration: BoxDecoration(
               color: const Color(0xFF9C27B0).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF9C27B0).withOpacity(0.3)),
+              border:
+                  Border.all(color: const Color(0xFF9C27B0).withOpacity(0.3)),
             ),
             child: const Row(
               children: [
@@ -329,7 +343,10 @@ class _NegotiationPageState extends State<NegotiationPage> {
                 SizedBox(width: 8),
                 Text(
                   'AI가 생성한 맞춤 대본입니다',
-                  style: TextStyle(color: Color(0xFF9C27B0), fontSize: 12, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Color(0xFF9C27B0),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -381,14 +398,24 @@ class _NegotiationPageState extends State<NegotiationPage> {
   }
 
   // 전화 통화 뷰
-  Widget _buildPhoneCallView(bool isDark, Color cardColor, Color textColor, Color borderColor) {
-    final bool isAiGenerated = _generatedPhoneScripts != null && _generatedPhoneScripts!.isNotEmpty;
+  Widget _buildPhoneCallView(
+      bool isDark, Color cardColor, Color textColor, Color borderColor) {
+    final bool isAiGenerated =
+        _generatedPhoneScripts != null && _generatedPhoneScripts!.isNotEmpty;
     final String tip = _generatedTip ?? "자신감 있는 목소리로, 하지만 정중하게 협상하세요";
-    
+
     // 기본 스크립트
     final defaultScripts = [
-      {"step": 1, "title": "1단계: 인사 & 매물 확인", "content": "\"사장님 안녕하세요, OO차량 아직 있나요?\""},
-      {"step": 2, "title": "2단계: 네고 시도", "content": "\"차는 좋은데, 예산이 조금 초과돼서요. 30만원만 빼주시면 지금 바로 갈게요.\""},
+      {
+        "step": 1,
+        "title": "1단계: 인사 & 매물 확인",
+        "content": "\"사장님 안녕하세요, OO차량 아직 있나요?\""
+      },
+      {
+        "step": 2,
+        "title": "2단계: 네고 시도",
+        "content": "\"차는 좋은데, 예산이 조금 초과돼서요. 30만원만 빼주시면 지금 바로 갈게요.\""
+      },
       {"step": 3, "title": "3단계: 마무리", "content": "\"감사합니다. 문자로 주소 찍어주세요.\""},
     ];
 
@@ -398,7 +425,8 @@ class _NegotiationPageState extends State<NegotiationPage> {
           children: [
             Text(
               "단계별 통화 대본",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
             ),
             if (isAiGenerated) ...[
               const SizedBox(width: 8),
@@ -410,34 +438,42 @@ class _NegotiationPageState extends State<NegotiationPage> {
                 ),
                 child: const Text(
                   'AI 생성',
-                  style: TextStyle(color: Color(0xFF9C27B0), fontSize: 10, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Color(0xFF9C27B0),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ],
         ),
         const SizedBox(height: 16),
-        
+
         // 스크립트 카드들
         if (isAiGenerated)
           ...List.generate(_generatedPhoneScripts!.length, (index) {
             final script = _generatedPhoneScripts![index];
-            return _buildScriptCard(index + 1, "단계 ${index + 1}", script, cardColor, textColor, isDark);
+            return _buildScriptCard(index + 1, "단계 ${index + 1}", script,
+                cardColor, textColor, isDark);
           })
         else
           ...defaultScripts.map((s) => _buildScriptCard(
-            s['step'] as int,
-            s['title'] as String,
-            s['content'] as String,
-            cardColor, textColor, isDark,
-          )),
-        
+                s['step'] as int,
+                s['title'] as String,
+                s['content'] as String,
+                cardColor,
+                textColor,
+                isDark,
+              )),
+
         const SizedBox(height: 24),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A237E).withOpacity(0.3) : const Color(0xFFE3F2FD),
+            color: isDark
+                ? const Color(0xFF1A237E).withOpacity(0.3)
+                : const Color(0xFFE3F2FD),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor),
           ),
@@ -462,7 +498,8 @@ class _NegotiationPageState extends State<NegotiationPage> {
     );
   }
 
-  Widget _buildScriptCard(int step, String title, String content, Color cardColor, Color textColor, bool isDark) {
+  Widget _buildScriptCard(int step, String title, String content,
+      Color cardColor, Color textColor, bool isDark) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
@@ -470,7 +507,8 @@ class _NegotiationPageState extends State<NegotiationPage> {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? Colors.grey[700]! : const Color(0xFF0066FF)),
+        border: Border.all(
+            color: isDark ? Colors.grey[700]! : const Color(0xFF0066FF)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

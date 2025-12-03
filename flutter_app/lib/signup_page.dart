@@ -9,7 +9,7 @@ class SignupPage extends StatefulWidget {
   final String? oauthProvider;
   final String? oauthProviderId;
   final String? oauthImageUrl;
-  
+
   const SignupPage({
     super.key,
     this.oauthEmail,
@@ -25,34 +25,34 @@ class SignupPage extends StatefulWidget {
 class _SignupPageState extends State<SignupPage> {
   final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
-  
+
   // Controllers
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _verificationCodeController = TextEditingController();
-  
+
   // State
-  int _currentStep = 0;  // 0: 정보입력, 1: 이메일인증, 2: 완료
+  int _currentStep = 0; // 0: 정보입력, 1: 이메일인증, 2: 완료
   bool _isLoading = false;
-  bool _isEmailVerified = false;
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   int _resendCountdown = 0;
   Timer? _countdownTimer;
-  
+
   // OAuth 회원가입 정보
   bool _isOAuthSignup = false;
   String? _oauthProvider;
-  String? _oauthEmail;
+
   String? _oauthProviderId;
   String? _oauthImageUrl;
 
   @override
   void initState() {
     super.initState();
-    
+
     // 1. 생성자로 전달된 OAuth 정보 확인 (모바일 앱에서 사용)
     if (widget.oauthEmail != null && widget.oauthProvider != null) {
       _initOAuthSignup(
@@ -67,7 +67,7 @@ class _SignupPageState extends State<SignupPage> {
       _checkOAuthSignup();
     }
   }
-  
+
   /// OAuth 회원가입 초기화
   void _initOAuthSignup({
     required String email,
@@ -78,16 +78,13 @@ class _SignupPageState extends State<SignupPage> {
     setState(() {
       _isOAuthSignup = true;
       _oauthProvider = provider;
-      _oauthEmail = email;
       _oauthProviderId = providerId;
       _oauthImageUrl = imageUrl;
       _emailController.text = email;
-      // OAuth 회원가입은 이메일 인증 불필요
-      _isEmailVerified = true;
     });
     debugPrint('OAuth 회원가입 초기화: $email ($provider)');
   }
-  
+
   void _checkOAuthSignup() {
     try {
       final uri = Uri.base;
@@ -96,17 +93,14 @@ class _SignupPageState extends State<SignupPage> {
       final email = uri.queryParameters['email'];
       final providerId = uri.queryParameters['providerId'];
       final imageUrl = uri.queryParameters['imageUrl'];
-      
+
       if (oauth == 'true' && provider != null && email != null) {
         setState(() {
           _isOAuthSignup = true;
           _oauthProvider = provider;
-          _oauthEmail = email;
           _oauthProviderId = providerId;
           _oauthImageUrl = imageUrl;
           _emailController.text = email;
-          // OAuth 회원가입은 이메일 인증 불필요
-          _isEmailVerified = true;
         });
         debugPrint('OAuth 회원가입 감지: $email ($provider)');
       }
@@ -114,7 +108,7 @@ class _SignupPageState extends State<SignupPage> {
       debugPrint('OAuth 회원가입 확인 오류: $e');
     }
   }
-  
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -155,13 +149,14 @@ class _SignupPageState extends State<SignupPage> {
   /// Step 1 → Step 2: 이메일 인증 코드 발송
   Future<void> _sendVerificationCode() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
-    final result = await _authService.sendVerificationCode(_emailController.text.trim());
-    
+
+    final result =
+        await _authService.sendVerificationCode(_emailController.text.trim());
+
     setState(() => _isLoading = false);
-    
+
     if (result['success'] == true) {
       setState(() {
         _currentStep = 1;
@@ -189,13 +184,14 @@ class _SignupPageState extends State<SignupPage> {
   /// 인증 코드 재발송
   Future<void> _resendCode() async {
     if (_resendCountdown > 0) return;
-    
+
     setState(() => _isLoading = true);
-    
-    final result = await _authService.sendVerificationCode(_emailController.text.trim());
-    
+
+    final result =
+        await _authService.sendVerificationCode(_emailController.text.trim());
+
     setState(() => _isLoading = false);
-    
+
     if (result['success'] == true) {
       _startResendCountdown();
       _showMessage('인증 코드가 재발송되었습니다');
@@ -210,22 +206,19 @@ class _SignupPageState extends State<SignupPage> {
       _showMessage('6자리 인증 코드를 입력하세요', isError: true);
       return;
     }
-    
+
     setState(() => _isLoading = true);
-    
+
     final result = await _authService.verifyCode(
       _emailController.text.trim(),
       _verificationCodeController.text.trim(),
     );
-    
+
     setState(() => _isLoading = false);
-    
+
     if (result['success'] == true) {
-      setState(() {
-        _isEmailVerified = true;
-      });
       _showMessage('이메일 인증 완료!');
-      
+
       // 인증 성공 후 약간의 딜레이를 주고 회원가입 진행
       await Future.delayed(const Duration(milliseconds: 500));
       await _completeSignup();
@@ -237,10 +230,10 @@ class _SignupPageState extends State<SignupPage> {
   /// 회원가입 완료
   Future<void> _completeSignup() async {
     setState(() => _isLoading = true);
-    
+
     try {
       Map<String, dynamic> result;
-      
+
       if (_isOAuthSignup) {
         // OAuth 회원가입
         result = await _authService.oauthSignup(
@@ -258,13 +251,13 @@ class _SignupPageState extends State<SignupPage> {
           _nameController.text.trim(),
         );
       }
-      
+
       setState(() => _isLoading = false);
-      
+
       if (result['success'] == true) {
         setState(() => _currentStep = 2);
         _showMessage('회원가입이 완료되었습니다!');
-        
+
         // OAuth 회원가입인 경우 토큰이 있으면 저장
         if (_isOAuthSignup && result['token'] != null) {
           await _authService.handleOAuthCallback(
@@ -272,7 +265,7 @@ class _SignupPageState extends State<SignupPage> {
             _emailController.text.trim(),
             _oauthProvider!,
           );
-          
+
           // 웹 환경에서 URL 정리
           if (kIsWeb) {
             // 회원가입 완료 후 약간의 딜레이를 주고 메인 페이지로 이동
@@ -305,14 +298,15 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black),
+          icon: Icon(Icons.arrow_back,
+              color: isDark ? Colors.white : Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -328,7 +322,7 @@ class _SignupPageState extends State<SignupPage> {
               // Progress Indicator
               _buildProgressIndicator(),
               const SizedBox(height: 32),
-              
+
               // Content based on step
               if (_currentStep == 0) _buildInfoInputStep(isDark),
               if (_currentStep == 1) _buildVerificationStep(isDark),
@@ -366,14 +360,14 @@ class _SignupPageState extends State<SignupPage> {
           ),
           child: Center(
             child: isActive && _currentStep > step
-              ? const Icon(Icons.check, color: Colors.white, size: 20)
-              : Text(
-                  '${step + 1}',
-                  style: TextStyle(
-                    color: isActive ? Colors.white : Colors.grey[600],
-                    fontWeight: FontWeight.bold,
+                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                : Text(
+                    '${step + 1}',
+                    style: TextStyle(
+                      color: isActive ? Colors.white : Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
           ),
         ),
         const SizedBox(height: 4),
@@ -418,7 +412,7 @@ class _SignupPageState extends State<SignupPage> {
             style: TextStyle(color: Colors.grey[600], height: 1.5),
           ),
           const SizedBox(height: 32),
-          
+
           // 이름
           _buildTextField(
             controller: _nameController,
@@ -429,7 +423,7 @@ class _SignupPageState extends State<SignupPage> {
             validator: (v) => v?.isEmpty == true ? '이름을 입력하세요' : null,
           ),
           const SizedBox(height: 16),
-          
+
           // 이메일
           _buildTextField(
             controller: _emailController,
@@ -438,7 +432,7 @@ class _SignupPageState extends State<SignupPage> {
             icon: Icons.email_outlined,
             isDark: isDark,
             keyboardType: TextInputType.emailAddress,
-            enabled: !_isOAuthSignup,  // OAuth 회원가입 시 이메일 수정 불가
+            enabled: !_isOAuthSignup, // OAuth 회원가입 시 이메일 수정 불가
             validator: (v) {
               if (v?.isEmpty == true) return '이메일을 입력하세요';
               if (!_isValidEmail(v!)) return '올바른 이메일 형식이 아닙니다';
@@ -446,7 +440,7 @@ class _SignupPageState extends State<SignupPage> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           // 비밀번호 (OAuth 회원가입 시 숨김)
           if (!_isOAuthSignup) ...[
             _buildTextField(
@@ -457,13 +451,15 @@ class _SignupPageState extends State<SignupPage> {
               isDark: isDark,
               obscureText: _obscurePassword,
               suffixIcon: IconButton(
-                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
               validator: _validatePassword,
             ),
             const SizedBox(height: 16),
-            
+
             // 비밀번호 확인
             _buildTextField(
               controller: _confirmPasswordController,
@@ -473,8 +469,11 @@ class _SignupPageState extends State<SignupPage> {
               isDark: isDark,
               obscureText: _obscureConfirmPassword,
               suffixIcon: IconButton(
-                icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                icon: Icon(_obscureConfirmPassword
+                    ? Icons.visibility_off
+                    : Icons.visibility),
+                onPressed: () => setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword),
               ),
               validator: (v) {
                 if (v != _passwordController.text) return '비밀번호가 일치하지 않습니다';
@@ -482,7 +481,7 @@ class _SignupPageState extends State<SignupPage> {
               },
             ),
             const SizedBox(height: 32),
-            
+
             // 다음 버튼 (일반 회원가입)
             SizedBox(
               width: double.infinity,
@@ -496,14 +495,19 @@ class _SignupPageState extends State<SignupPage> {
                   ),
                 ),
                 child: _isLoading
-                  ? const SizedBox(
-                      width: 24, height: 24,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Text(
-                      '인증 코드 발송',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text(
+                        '인증 코드 발송',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
+                      ),
               ),
             ),
           ] else ...[
@@ -513,12 +517,14 @@ class _SignupPageState extends State<SignupPage> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : () {
-                  if (_formKey.currentState!.validate()) {
-                    // OAuth 회원가입은 이메일 인증 없이 바로 완료
-                    _completeSignup();
-                  }
-                },
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        if (_formKey.currentState!.validate()) {
+                          // OAuth 회원가입은 이메일 인증 없이 바로 완료
+                          _completeSignup();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0066FF),
                   shape: RoundedRectangleBorder(
@@ -526,14 +532,19 @@ class _SignupPageState extends State<SignupPage> {
                   ),
                 ),
                 child: _isLoading
-                  ? const SizedBox(
-                      width: 24, height: 24,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Text(
-                      '회원가입 완료',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text(
+                        '회원가입 완료',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
+                      ),
               ),
             ),
           ],
@@ -563,14 +574,15 @@ class _SignupPageState extends State<SignupPage> {
               const TextSpan(text: '인증 코드가 '),
               TextSpan(
                 text: _emailController.text,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0066FF)),
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, color: Color(0xFF0066FF)),
               ),
               const TextSpan(text: '\n으로 발송되었습니다.'),
             ],
           ),
         ),
         const SizedBox(height: 32),
-        
+
         // 인증 코드 입력
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -598,21 +610,21 @@ class _SignupPageState extends State<SignupPage> {
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // 타이머 및 재발송
         Center(
           child: _resendCountdown > 0
-            ? Text(
-                '재발송 가능: ${_resendCountdown}초',
-                style: TextStyle(color: Colors.grey[600]),
-              )
-            : TextButton(
-                onPressed: _resendCode,
-                child: const Text('인증 코드 재발송'),
-              ),
+              ? Text(
+                  '재발송 가능: $_resendCountdown초',
+                  style: TextStyle(color: Colors.grey[600]),
+                )
+              : TextButton(
+                  onPressed: _resendCode,
+                  child: const Text('인증 코드 재발송'),
+                ),
         ),
         const SizedBox(height: 32),
-        
+
         // 인증 버튼
         SizedBox(
           width: double.infinity,
@@ -626,18 +638,23 @@ class _SignupPageState extends State<SignupPage> {
               ),
             ),
             child: _isLoading
-              ? const SizedBox(
-                  width: 24, height: 24,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-              : const Text(
-                  '인증 확인',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text(
+                    '인증 확인',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
           ),
         ),
         const SizedBox(height: 16),
-        
+
         // 이전 단계
         Center(
           child: TextButton(
@@ -704,8 +721,13 @@ class _SignupPageState extends State<SignupPage> {
               ),
             ),
             child: Text(
-              _isOAuthSignup && _authService.isLoggedIn ? '메인으로 이동' : '로그인하러 가기',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+              _isOAuthSignup && _authService.isLoggedIn
+                  ? '메인으로 이동'
+                  : '로그인하러 가기',
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
             ),
           ),
         ),

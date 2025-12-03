@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
-import 'services/auth_service.dart';
 import 'providers/comparison_provider.dart';
 import 'providers/recent_views_provider.dart';
 import 'models/car_data.dart';
 import 'comparison_page.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/common/option_badges.dart';
-import 'utils/car_image_mapper.dart';
 
 /// 마이페이지 - 백엔드 연동 버전
 /// 찜한 차량, 최근 분석, 가격 알림 모두 DB에서 관리
@@ -19,77 +17,29 @@ class MyPage extends StatefulWidget {
   State<MyPage> createState() => _MyPageState();
 }
 
-class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
-  final AuthService _auth = AuthService();
   late TabController _tabController;
 
   // 데이터 상태
   List<Favorite> _favorites = [];
-  List<SearchHistory> _history = [];
+
   List<PriceAlert> _alerts = [];
-  
+
   bool _isLoading = true;
   String? _error;
-  bool _lastLoggedInState = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _lastLoggedInState = _auth.isLoggedIn;
-    WidgetsBinding.instance.addObserver(this);
-    // 로그인 상태일 때만 데이터 로드
-    if (_auth.isLoggedIn) {
-      _loadData();
-    } else {
-      // 비로그인 상태면 데이터 초기화
-      _favorites = [];
-      _history = [];
-      _alerts = [];
-      _isLoading = false;
-    }
+    _loadData();
   }
-  
+
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
-  }
-  
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 앱이 포그라운드로 돌아올 때 로그인 상태 확인
-    if (state == AppLifecycleState.resumed) {
-      _checkLoginState();
-    }
-  }
-  
-  void _checkLoginState() {
-    final currentLoggedIn = _auth.isLoggedIn;
-    if (currentLoggedIn != _lastLoggedInState) {
-      _lastLoggedInState = currentLoggedIn;
-      setState(() {
-        if (currentLoggedIn) {
-          // 로그인 상태로 변경됨
-          _loadData();
-        } else {
-          // 로그아웃 상태로 변경됨
-          _favorites = [];
-          _history = [];
-          _alerts = [];
-          _isLoading = false;
-        }
-      });
-    }
-  }
-  
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // 로그인 상태 변경 감지
-    _checkLoginState();
   }
 
   Future<void> _loadData() async {
@@ -101,14 +51,12 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
     try {
       final results = await Future.wait([
         _api.getFavorites(),
-        _api.getHistory(limit: 20),
         _api.getAlerts(),
       ]);
 
       setState(() {
         _favorites = results[0] as List<Favorite>;
-        _history = results[1] as List<SearchHistory>;
-        _alerts = results[2] as List<PriceAlert>;
+        _alerts = results[1] as List<PriceAlert>;
         _isLoading = false;
       });
     } catch (e) {
@@ -119,91 +67,26 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
     }
   }
 
-  Future<void> _toggleFavorite(SearchHistory item) async {
-    // 이미 즐겨찾기에 있는지 확인
-    final existing = _favorites.where((f) => 
-      f.brand == item.brand && f.model == item.model && f.year == item.year
-    ).toList();
-
-    if (existing.isNotEmpty) {
-      // 삭제
-      await _api.removeFavorite(existing.first.id);
-      _showSnackBar("'${item.brand} ${item.model}' 찜 목록에서 삭제되었습니다.");
-    } else {
-      // 추가
-      await _api.addFavorite(
-        brand: item.brand,
-        model: item.model,
-        year: item.year,
-        mileage: item.mileage,
-        predictedPrice: item.predictedPrice,
-      );
-      _showSnackBar("'${item.brand} ${item.model}' 찜 목록에 추가되었습니다.");
-    }
-    
-    _loadData();
-  }
-
   Future<void> _removeFavorite(Favorite fav) async {
     await _api.removeFavorite(fav.id);
     _showSnackBar("'${fav.brand} ${fav.model}' 찜 목록에서 삭제되었습니다.");
     _loadData();
   }
 
-  /// 검색 이력 개별 삭제
-  Future<void> _removeHistory(SearchHistory item) async {
-    if (item.id != null) {
-      final success = await _api.removeHistory(item.id!);
-      if (success) {
-        _showSnackBar("'${item.brand} ${item.model}' 기록이 삭제되었습니다.");
-        _loadData();
-      } else {
-        _showSnackBar("삭제에 실패했습니다.", isError: true);
-      }
-    }
-  }
-
-  /// 검색 이력 전체 삭제
-  Future<void> _clearAllHistory() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('전체 삭제'),
-        content: const Text('최근 분석 기록을 모두 삭제하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      final count = await _api.clearHistory();
-      _showSnackBar("$count개의 기록이 삭제되었습니다.");
-      _loadData();
-    }
-  }
-
   Future<void> _toggleAlert(Favorite fav) async {
     // 알림이 있는지 확인
-    final existing = _alerts.where((a) => 
-      a.brand == fav.brand && a.model == fav.model && a.year == fav.year
-    ).toList();
+    final existing = _alerts
+        .where((a) =>
+            a.brand == fav.brand && a.model == fav.model && a.year == fav.year)
+        .toList();
 
     if (existing.isNotEmpty) {
       // 토글
       await _api.toggleAlert(existing.first.id);
       final newState = !existing.first.isActive;
-      _showSnackBar(newState 
-        ? "'${fav.brand} ${fav.model}' 알림이 활성화되었습니다."
-        : "'${fav.brand} ${fav.model}' 알림이 비활성화되었습니다.");
+      _showSnackBar(newState
+          ? "'${fav.brand} ${fav.model}' 알림이 활성화되었습니다."
+          : "'${fav.brand} ${fav.model}' 알림이 비활성화되었습니다.");
     } else {
       // 새로 추가
       await _api.addAlert(
@@ -214,7 +97,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
       );
       _showSnackBar("'${fav.brand} ${fav.model}' 목표 가격 알림이 설정되었습니다.");
     }
-    
+
     _loadData();
   }
 
@@ -228,16 +111,12 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
     );
   }
 
-  bool _isInFavorites(SearchHistory item) {
-    return _favorites.any((f) => 
-      f.brand == item.brand && f.model == item.model && f.year == item.year
-    );
-  }
-
   bool _hasActiveAlert(Favorite fav) {
-    return _alerts.any((a) => 
-      a.brand == fav.brand && a.model == fav.model && a.year == fav.year && a.isActive
-    );
+    return _alerts.any((a) =>
+        a.brand == fav.brand &&
+        a.model == fav.model &&
+        a.year == fav.year &&
+        a.isActive);
   }
 
   @override
@@ -245,92 +124,6 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-
-    // 로그인 상태 변경 감지 (build 메서드에서 매번 체크)
-    final currentLoggedIn = _auth.isLoggedIn;
-    if (currentLoggedIn != _lastLoggedInState) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkLoginState();
-      });
-    }
-
-    // 로그인 상태가 아니면 로그인 유도 화면 표시
-    if (!_auth.isLoggedIn) {
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          elevation: 0,
-          title: Text(
-            "마이 페이지",
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          centerTitle: true,
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: 80,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  '로그인이 필요합니다',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '찜한 차량과 분석 이력을 확인하려면\n로그인해 주세요.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: () {
-                    // 홈 탭(로그인 화면)으로 이동
-                    // MainPage의 _onNavTap(0) 호출 필요 - 부모에게 알림
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('홈 탭에서 로그인해 주세요.'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0066FF),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    '로그인하기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -352,35 +145,36 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
           ),
         ],
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : _error != null 
-          ? _buildErrorView()
-          : Column(
-              children: [
-                TabBar(
-                  controller: _tabController,
-                  labelColor: const Color(0xFF0066FF),
-                  unselectedLabelColor: Colors.grey[400],
-                  indicatorColor: const Color(0xFF0066FF),
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  tabs: const [
-                    Tab(text: "찜한 차량"),
-                    Tab(text: "최근 분석"),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? _buildErrorView()
+              : Column(
+                  children: [
+                    TabBar(
+                      controller: _tabController,
+                      labelColor: const Color(0xFF0066FF),
+                      unselectedLabelColor: Colors.grey[400],
+                      indicatorColor: const Color(0xFF0066FF),
+                      indicatorWeight: 3,
+                      labelStyle: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14),
+                      tabs: const [
+                        Tab(text: "찜한 차량"),
+                        Tab(text: "최근 분석"),
+                      ],
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildFavoritesTab(isDark, cardColor, textColor),
+                          _buildHistoryTab(isDark, cardColor, textColor),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildFavoritesTab(isDark, cardColor, textColor),
-                      _buildHistoryTab(isDark, cardColor, textColor),
-                    ],
-                  ),
-                ),
-              ],
-            ),
     );
   }
 
@@ -406,7 +200,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
   // 1. 찜한 차량 탭 (DB 기반)
   Widget _buildFavoritesTab(bool isDark, Color cardColor, Color textColor) {
     final comparisonProvider = Provider.of<ComparisonProvider>(context);
-    
+
     if (_favorites.isEmpty) {
       return Center(
         child: Column(
@@ -414,9 +208,11 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
           children: [
             Icon(Icons.favorite_border, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text("찜한 차량이 없습니다", style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+            Text("찜한 차량이 없습니다",
+                style: TextStyle(color: Colors.grey[500], fontSize: 16)),
             const SizedBox(height: 8),
-            Text("최근 분석에서 하트를 눌러 추가하세요", style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+            Text("최근 분석에서 하트를 눌러 추가하세요",
+                style: TextStyle(color: Colors.grey[600], fontSize: 14)),
           ],
         ),
       );
@@ -435,7 +231,8 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ComparisonPage()),
+                    MaterialPageRoute(
+                        builder: (context) => const ComparisonPage()),
                   );
                 },
                 icon: const Icon(Icons.compare_arrows),
@@ -443,12 +240,13 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0066FF),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
           ),
-        
+
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadData,
@@ -457,7 +255,8 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
               itemCount: _favorites.length,
               separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
-                return _buildFavoriteCard(_favorites[index], isDark, cardColor, textColor);
+                return _buildFavoriteCard(
+                    _favorites[index], isDark, cardColor, textColor);
               },
             ),
           ),
@@ -472,7 +271,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
       builder: (context, provider, child) {
         // 분석 페이지에서 클릭한 매물만 표시
         final analysisDeals = provider.analysisOnlyCars;
-        
+
         if (analysisDeals.isEmpty) {
           return Center(
             child: Column(
@@ -480,11 +279,12 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
               children: [
                 Icon(Icons.history, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
-                Text("최근 분석한 매물이 없습니다", style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+                Text("최근 분석한 매물이 없습니다",
+                    style: TextStyle(color: Colors.grey[500], fontSize: 16)),
                 const SizedBox(height: 8),
-                Text("시세 예측 결과에서 매물을 클릭하면\n여기에 기록됩니다", 
-                     textAlign: TextAlign.center,
-                     style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                Text("시세 예측 결과에서 매물을 클릭하면\n여기에 기록됩니다",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14)),
               ],
             ),
           );
@@ -504,8 +304,10 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                   ),
                   TextButton.icon(
                     onPressed: () => _clearAnalysisDeals(provider),
-                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                    label: const Text("전체 삭제", style: TextStyle(color: Colors.red)),
+                    icon: const Icon(Icons.delete_outline,
+                        size: 18, color: Colors.red),
+                    label: const Text("전체 삭제",
+                        style: TextStyle(color: Colors.red)),
                   ),
                 ],
               ),
@@ -514,10 +316,12 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
               child: ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                 itemCount: analysisDeals.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final deal = analysisDeals[index];
-                  return _buildAnalysisDealCard(deal, isDark, cardColor, textColor);
+                  return _buildAnalysisDealCard(
+                      deal, isDark, cardColor, textColor);
                 },
               ),
             ),
@@ -526,7 +330,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
       },
     );
   }
-  
+
   /// 분석 매물 전체 삭제
   Future<void> _clearAnalysisDeals(RecentViewsProvider provider) async {
     final confirmed = await showDialog<bool>(
@@ -546,18 +350,19 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
         ],
       ),
     );
-    
+
     if (confirmed == true) {
       provider.clearBySource('analysis');
     }
   }
-  
+
   /// 분석 매물 카드 위젯
-  Widget _buildAnalysisDealCard(RecommendedCar deal, bool isDark, Color cardColor, Color textColor) {
+  Widget _buildAnalysisDealCard(
+      RecommendedCar deal, bool isDark, Color cardColor, Color textColor) {
     final isGood = deal.priceDiff > 0;
     // 찜 여부 확인 (고유 매물 단위로 구별)
     final isFavorite = _favorites.any((f) => f.isSameDeal(deal));
-    
+
     return GestureDetector(
       onTap: () => _showDealAnalysis(deal),
       child: Container(
@@ -566,7 +371,9 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
           color: cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isGood ? Colors.green.withOpacity(0.3) : (isDark ? Colors.grey[800]! : Colors.grey[200]!),
+            color: isGood
+                ? Colors.green.withOpacity(0.3)
+                : (isDark ? Colors.grey[800]! : Colors.grey[200]!),
           ),
         ),
         child: Column(
@@ -576,18 +383,26 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
               children: [
                 if (isGood)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
                       color: Colors.green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text('가성비', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                    child: const Text('가성비',
+                        style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
                   ),
                 Expanded(
                   child: Text(
                     '${deal.brand} ${deal.model}',
-                    style: TextStyle(color: textColor, fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: textColor,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -622,8 +437,14 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('실제가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                      Text('${deal.actualPrice}만원', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('실제가',
+                          style:
+                              TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text('${deal.actualPrice}만원',
+                          style: TextStyle(
+                              color: textColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -631,15 +452,21 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('예측가', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
-                      Text('${deal.predictedPrice}만원', style: TextStyle(color: Colors.grey[400], fontSize: 16)),
+                      Text('예측가',
+                          style:
+                              TextStyle(color: Colors.grey[500], fontSize: 11)),
+                      Text('${deal.predictedPrice}만원',
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 16)),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('차이', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                    Text('차이',
+                        style:
+                            TextStyle(color: Colors.grey[500], fontSize: 11)),
                     Text(
                       '${deal.priceDiff > 0 ? "-" : "+"}${deal.priceDiff.abs()}만원',
                       style: TextStyle(
@@ -657,7 +484,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
       ),
     );
   }
-  
+
   /// RecommendedCar에서 찜 토글 (고유 매물 단위로 구별 + 즉시 UI 반영)
   Future<void> _toggleFavoriteFromDeal(RecommendedCar deal) async {
     // isSameDeal로 정확한 매물 구별 (detailUrl 또는 가격+주행거리 조합)
@@ -705,7 +532,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
         );
         _showSnackBar("'${deal.brand} ${deal.model}' 찜 목록에 추가되었습니다.");
       }
-      
+
       // 3. 서버에서 최신 상태로 동기화
       await _loadData();
     } catch (e) {
@@ -714,7 +541,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
       _showSnackBar("오류가 발생했습니다.");
     }
   }
-  
+
   /// 매물 상세 분석 모달 표시
   void _showDealAnalysis(RecommendedCar deal) {
     showModalBottomSheet(
@@ -729,11 +556,12 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
   }
 
   // 찜한 차량 카드 위젯
-  Widget _buildFavoriteCard(Favorite fav, bool isDark, Color cardColor, Color textColor) {
+  Widget _buildFavoriteCard(
+      Favorite fav, bool isDark, Color cardColor, Color textColor) {
     final comparisonProvider = Provider.of<ComparisonProvider>(context);
     final borderColor = isDark ? Colors.grey[800]! : Colors.grey[100]!;
     final hasAlert = _hasActiveAlert(fav);
-    
+
     // Favorite를 CarData로 변환
     final carData = CarData(
       id: fav.id.toString(),
@@ -745,7 +573,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
       isLiked: true,
     );
     final isComparing = comparisonProvider.isComparing(carData);
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -762,7 +590,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
       ),
       child: Row(
         children: [
-          // 차량 이미지
+          // 차량 아이콘
           Container(
             width: 100,
             height: 80,
@@ -770,10 +598,8 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
               color: const Color(0xFF0066FF).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _buildCarImage(fav.brand, fav.model),
-            ),
+            child: const Icon(Icons.directions_car,
+                color: Color(0xFF0066FF), size: 40),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -782,7 +608,10 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
               children: [
                 Text(
                   "${fav.brand} ${fav.model}",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textColor),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: textColor),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -812,22 +641,26 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                   if (!success && !isComparing) {
                     _showSnackBar("최대 3대까지 비교할 수 있습니다");
                   } else {
-                    _showSnackBar(isComparing 
-                      ? "비교 목록에서 제거되었습니다"
-                      : "비교 목록에 추가되었습니다 (${comparisonProvider.compareCount + 1}/3)");
+                    _showSnackBar(isComparing
+                        ? "비교 목록에서 제거되었습니다"
+                        : "비교 목록에 추가되었습니다 (${comparisonProvider.compareCount + 1}/3)");
                   }
                 },
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isComparing 
-                        ? (isDark ? const Color(0xFF1A237E) : const Color(0xFFE3F2FD)) 
+                    color: isComparing
+                        ? (isDark
+                            ? const Color(0xFF1A237E)
+                            : const Color(0xFFE3F2FD))
                         : (isDark ? Colors.grey[800] : Colors.grey[100]),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
                     isComparing ? Icons.compare_arrows : Icons.add_chart,
-                    color: isComparing ? const Color(0xFF0066FF) : Colors.grey[400],
+                    color: isComparing
+                        ? const Color(0xFF0066FF)
+                        : Colors.grey[400],
                     size: 20,
                   ),
                 ),
@@ -839,14 +672,19 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: hasAlert 
-                        ? (isDark ? const Color(0xFF3E2723) : const Color(0xFFFFF8E1)) 
+                    color: hasAlert
+                        ? (isDark
+                            ? const Color(0xFF3E2723)
+                            : const Color(0xFFFFF8E1))
                         : (isDark ? Colors.grey[800] : Colors.grey[100]),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
-                    hasAlert ? Icons.notifications_active : Icons.notifications_none,
-                    color: hasAlert ? const Color(0xFFFFAB00) : Colors.grey[400],
+                    hasAlert
+                        ? Icons.notifications_active
+                        : Icons.notifications_none,
+                    color:
+                        hasAlert ? const Color(0xFFFFAB00) : Colors.grey[400],
                     size: 20,
                   ),
                 ),
@@ -858,7 +696,9 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF3E2020) : const Color(0xFFFFEBEE),
+                    color: isDark
+                        ? const Color(0xFF3E2020)
+                        : const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(
@@ -872,123 +712,6 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
           ),
         ],
       ),
-    );
-  }
-
-  // 최근 분석 카드 위젯
-  Widget _buildHistoryCard(SearchHistory item, bool isDark, Color cardColor, Color textColor) {
-    final borderColor = isDark ? Colors.grey[800]! : Colors.grey[100]!;
-    final isLiked = _isInFavorites(item);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // 차량 아이콘
-          Container(
-            width: 80,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.grey[isDark ? 800 : 200],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.directions_car, color: Colors.grey[isDark ? 400 : 600], size: 30),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "${item.brand} ${item.model}",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "예상가 ${item.predictedPrice?.toStringAsFixed(0) ?? '-'}만원",
-                  style: const TextStyle(
-                    color: Color(0xFF0066FF),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "${item.year}년 · ${(item.mileage / 10000).toStringAsFixed(1)}만km",
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          // 좋아요 버튼
-          IconButton(
-            onPressed: () => _toggleFavorite(item),
-            icon: Icon(
-              isLiked ? Icons.favorite : Icons.favorite_border,
-              color: isLiked ? const Color(0xFFFF5252) : Colors.grey[400],
-              size: 24,
-            ),
-          ),
-          // 삭제 버튼
-          IconButton(
-            onPressed: () => _removeHistory(item),
-            icon: Icon(
-              Icons.close,
-              color: Colors.grey[400],
-              size: 20,
-            ),
-            tooltip: '기록 삭제',
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 차량 이미지 위젯 빌드
-  Widget _buildCarImage(String brand, String model) {
-    final imageUrl = CarImageMapper.getImageUrlByBrandModel(brand, model);
-    
-    if (imageUrl != null) {
-      return Image.network(
-        imageUrl,
-        width: 100,
-        height: 80,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const Center(
-            child: Icon(Icons.directions_car, color: Color(0xFF0066FF), size: 40),
-          );
-        },
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              value: loadingProgress.expectedTotalBytes != null
-                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                  : null,
-            ),
-          );
-        },
-      );
-    }
-    
-    return const Center(
-      child: Icon(Icons.directions_car, color: Color(0xFF0066FF), size: 40),
     );
   }
 }

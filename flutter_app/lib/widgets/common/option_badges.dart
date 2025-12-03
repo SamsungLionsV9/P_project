@@ -126,19 +126,13 @@ class OptionDetailSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.settings_suggest_outlined, size: 20, color: textColor),
-              const SizedBox(width: 8),
-              Text(
-                "차량 옵션",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-            ],
+          Text(
+            "🚗 차량 옵션",
+            style: TextStyle(
+              fontSize: 16, 
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
           ),
           const SizedBox(height: 16),
           

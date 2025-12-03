@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 class InteractiveDemo extends StatefulWidget {
-  const InteractiveDemo({Key? key}) : super(key: key);
+  const InteractiveDemo({super.key});
 
   @override
   State<InteractiveDemo> createState() => _InteractiveDemoState();
@@ -55,12 +55,12 @@ class _InteractiveDemoState extends State<InteractiveDemo> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
-                    const Text("💰 예상 시세: ", style: TextStyle(color: Colors.grey)),
-                    const Text("3,200만원", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    const Icon(Icons.check_circle, color: AppTheme.secondaryGreen, size: 16),
+                    Text("💰 예상 시세: ", style: TextStyle(color: Colors.grey)),
+                    Text("3,200만원", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Spacer(),
+                    Icon(Icons.check_circle, color: AppTheme.secondaryGreen, size: 16),
                   ],
                 ),
                 const SizedBox(height: 8),
