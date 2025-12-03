@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'services/auth_service.dart';
 import 'signup_page.dart';
 import 'oauth_webview_page.dart';
+import 'find_account_page.dart';
 import 'main.dart';
 
 class LoginPage extends StatefulWidget {
@@ -242,8 +243,12 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   TextButton(
                     onPressed: () {
-                      // 아이디/비밀번호 찾기 구현 예정
-                      _showMessage('준비 중인 기능입니다.');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FindAccountPage(),
+                        ),
+                      );
                     },
                     child: Text(
                       '아이디/비밀번호 찾기',
