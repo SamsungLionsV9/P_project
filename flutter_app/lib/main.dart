@@ -507,8 +507,8 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  /// AI 추천 픽 클릭 시 상세 분석 모달 표시 (하드코딩된 데이터 사용)
-  void _showAiPickDetails() {
+  /// AI 추천 픽 클릭 시 상세 분석 모달 표시 (실제 추천 데이터 사용)
+  void _showAiPickDetails(RecommendedCar car) {
     // 최근 조회 Provider (모달에서 매물 클릭 시 기록 추가용)
     final recentViewsProvider = context.read<RecentViewsProvider>();
 
@@ -517,11 +517,11 @@ class _HomePageContentState extends State<HomePageContent> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => ModelDealsModal(
-        brand: "현대",
-        model: "그랜저 IG",
-        avgPrice: 2450,
-        medianPrice: 2380,
-        listings: 1240,
+        brand: car.brand,
+        model: car.model,
+        avgPrice: car.predictedPrice,
+        medianPrice: car.actualPrice,
+        listings: 0, // 실시간 매물 수는 모달에서 조회
         onCarViewed: (viewedCar) {
           recentViewsProvider.addRecentCar(viewedCar);
         },
