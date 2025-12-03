@@ -34,6 +34,13 @@ class _FindAccountPageState extends State<FindAccountPage> with SingleTickerProv
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // 탭 변경 시 비밀번호 찾기 PageView 초기화
+    _tabController.addListener(() {
+      if (_tabController.index == 1 && _pageController.hasClients) {
+        // 비밀번호 찾기 탭으로 돌아올 때 첫 페이지로 리셋
+        _pageController.jumpToPage(0);
+      }
+    });
   }
 
   @override
