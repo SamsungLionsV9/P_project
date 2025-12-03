@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'services/auth_service.dart';
 import 'signup_page.dart';
 import 'oauth_webview_page.dart';
+import 'main.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -43,7 +44,11 @@ class _LoginPageState extends State<LoginPage> {
     if (result['success'] == true) {
       _showMessage('로그인 성공!');
       if (mounted) {
-        Navigator.pop(context, true); // 로그인 성공 시 true 반환
+        // 메인 화면으로 이동 (스택 초기화)
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+          (route) => false,
+        );
       }
     } else {
       _showMessage(result['message'] ?? '로그인 실패', isError: true);
@@ -81,7 +86,11 @@ class _LoginPageState extends State<LoginPage> {
     if (result != null && result['success'] == true) {
       _showMessage('${_getProviderName(provider)} 로그인 성공!');
       if (mounted) {
-        Navigator.pop(context, true);
+        // 메인 화면으로 이동 (스택 초기화)
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+          (route) => false,
+        );
       }
     }
   }
