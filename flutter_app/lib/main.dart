@@ -16,6 +16,7 @@ import 'widgets/deal_analysis_modal.dart';
 import 'widgets/model_deals_modal.dart';
 import 'widgets/market_trend_card.dart';
 import 'widgets/ai_pick_card.dart';
+import 'utils/car_image_mapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -656,19 +657,14 @@ class CarCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 차량 이미지 영역 (플레이스홀더)
+            // 차량 이미지 영역
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.directions_car_filled,
-                    color: Colors.white.withOpacity(0.5),
-                    size: 48,
-                  ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CarImageWidget(
+                  model: name,
+                  placeholderColor: color,
+                  iconSize: 48,
                 ),
               ),
             ),

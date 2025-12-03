@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import '../config/environment.dart';
 
 /// 차량 모델 이미지 매핑 유틸리티
@@ -415,5 +416,79 @@ class CarImageMapper {
       // === 기타 희귀 모델들 ===
       '람보르기니 가야르도', '맥라렌 570S', '애스턴마틴 밴티지',
     ];
+  }
+}
+
+/// 차량 이미지 위젯
+/// CarImageMapper를 사용하여 이미지를 표시하고, 없으면 placeholder를 표시
+class CarImageWidget extends StatelessWidget {
+  final String model;
+  final String? imageUrl;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final Color? placeholderColor;
+  final double iconSize;
+
+  const CarImageWidget({
+    super.key,
+    required this.model,
+    this.imageUrl,
+    this.width,
+    this.height,
+    this.fit = BoxFit.contain,
+    this.placeholderColor,
+    this.iconSize = 60,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl ?? CarImageMapper.getImageUrl(model);
+    final bgColor = placeholderColor ?? const Color(0xFF3D3D3D);
+
+    if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        fit: fit,
+        width: width,
+        height: height,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholder(bgColor);
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: width,
+            height: height,
+            color: bgColor,
+            child: Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+                color: Colors.white54,
+                strokeWidth: 2,
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    return _buildPlaceholder(bgColor);
+  }
+
+  Widget _buildPlaceholder(Color bgColor) {
+    return Container(
+      width: width,
+      height: height,
+      color: bgColor,
+      child: Icon(
+        Icons.directions_car,
+        size: iconSize,
+        color: Colors.white.withOpacity(0.3),
+      ),
+    );
   }
 }

@@ -5,6 +5,7 @@ import 'services/api_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'providers/recent_views_provider.dart';
 import 'widgets/common/option_badges.dart';
+import 'utils/car_image_mapper.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -303,14 +304,15 @@ class _RecommendationPageState extends State<RecommendationPage>
         ),
         child: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF6C63FF).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: CarImageWidget(
+                model: car.model,
+                width: 48,
+                height: 48,
+                iconSize: 24,
+                placeholderColor: const Color(0xFF6C63FF).withOpacity(0.2),
               ),
-              child: const Icon(Icons.directions_car, color: Color(0xFF6C63FF)),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -699,22 +701,16 @@ class _RecommendationPageState extends State<RecommendationPage>
                         children: [
                           Row(
                             children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: car.isGoodDeal
+                                ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CarImageWidget(
+                                  model: car.model,
+                                  width: 48,
+                                  height: 48,
+                                  iconSize: 24,
+                                  placeholderColor: car.isGoodDeal
                                       ? Colors.green.withOpacity(0.1)
                                       : Colors.white10,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  car.isGoodDeal
-                                      ? Icons.thumb_up
-                                      : Icons.directions_car,
-                                  color: car.isGoodDeal
-                                      ? Colors.green
-                                      : Colors.white54,
                                 ),
                               ),
                               const SizedBox(width: 16),

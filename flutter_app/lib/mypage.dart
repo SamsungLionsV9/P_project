@@ -9,6 +9,7 @@ import 'comparison_page.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/common/option_badges.dart';
 import 'login_page.dart';
+import 'utils/car_image_mapper.dart';
 
 /// 마이페이지 - 백엔드 연동 버전
 /// 찜한 차량, 최근 분석, 가격 알림 모두 DB에서 관리
@@ -630,16 +631,16 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
       ),
       child: Row(
         children: [
-          // 차량 아이콘
-          Container(
-            width: 100,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0066FF).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+          // 차량 이미지
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: CarImageWidget(
+              model: fav.model,
+              width: 100,
+              height: 80,
+              iconSize: 40,
+              placeholderColor: const Color(0xFF0066FF).withOpacity(0.1),
             ),
-            child: const Icon(Icons.directions_car,
-                color: Color(0xFF0066FF), size: 40),
           ),
           const SizedBox(width: 16),
           Expanded(

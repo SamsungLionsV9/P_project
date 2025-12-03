@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'models/car_data.dart';
 import 'negotiation_page.dart';
 import 'providers/comparison_provider.dart';
+import 'utils/car_image_mapper.dart';
 
 class CarDetailPage extends StatelessWidget {
   final CarData car;
@@ -30,18 +31,13 @@ class CarDetailPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 1. 이미지 영역 (Custom AppBar)
-                    // 1. 이미지 영역 (Custom AppBar)
                     Stack(
                       children: [
                         Container(
                           width: double.infinity,
                           height: 300,
                           color: car.color,
-                          child: Icon(
-                            Icons.directions_car,
-                            size: 100,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
+                          child: _buildCarImage(car),
                         ),
                         // 뒤로가기 버튼
                         Positioned(
@@ -308,6 +304,48 @@ class CarDetailPage extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 차량 이미지 위젯 빌더
+Widget _buildCarImage(CarData car) {
+  final imageUrl = car.imageUrl ?? CarImageMapper.getImageUrl(car.name);
+  
+  if (imageUrl != null && imageUrl.isNotEmpty) {
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.contain,
+      width: double.infinity,
+      height: 300,
+      errorBuilder: (context, error, stackTrace) {
+        return _buildPlaceholderImage(car.color);
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                    loadingProgress.expectedTotalBytes!
+                : null,
+            color: Colors.white,
+          ),
+        );
+      },
+    );
+  }
+  
+  return _buildPlaceholderImage(car.color);
+}
+
+Widget _buildPlaceholderImage(Color color) {
+  return Container(
+    color: color,
+    child: Icon(
+      Icons.directions_car,
+      size: 100,
+      color: Colors.white.withOpacity(0.5),
+    ),
+  );
 }
 
 class _LikeButton extends StatefulWidget {
