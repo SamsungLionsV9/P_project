@@ -1,9 +1,9 @@
 """
 실제 데이터만 수집 (커뮤니티 감성 제외)
-- 한국은행 API (금리) ✅
-- Yahoo Finance (환율, 유가) ✅
-- 네이버 데이터랩 API (검색 트렌드) ✅
-- 신차 출시 일정 ✅
+- 한국은행 API (금리) [OK]
+- Yahoo Finance (환율, 유가) [OK]
+- 네이버 데이터랩 API (검색 트렌드) [OK]
+- 신차 출시 일정 [OK]
 """
 
 import requests
@@ -109,16 +109,16 @@ def collect_real_data_only(car_model):
     
     print()
     print("=" * 80)
-    print("✅ 실제 데이터 수집 완료!")
+    print("[OK] 실제 데이터 수집 완료!")
     print("=" * 80)
     print()
     
     print("📌 수집된 데이터:")
-    print(f"  ✅ 금리: {macro_data.get('interest_rate', 'N/A')}%")
-    print(f"  ✅ 환율: {macro_data.get('exchange_rate', 'N/A')}원")
-    print(f"  ✅ 유가: ${macro_data.get('oil_price', 'N/A')}")
-    print(f"  ✅ 검색 트렌드: {trend_data.get('trend_change', 'N/A')}% 변화")
-    print(f"  ✅ 신차 일정: {len(schedule_data.get('upcoming_releases', []))}개")
+    print(f"  [OK] 금리: {macro_data.get('interest_rate', 'N/A')}%")
+    print(f"  [OK] 환율: {macro_data.get('exchange_rate', 'N/A')}원")
+    print(f"  [OK] 유가: ${macro_data.get('oil_price', 'N/A')}")
+    print(f"  [OK] 검색 트렌드: {trend_data.get('trend_change', 'N/A')}% 변화")
+    print(f"  [OK] 신차 일정: {len(schedule_data.get('upcoming_releases', []))}개")
     print()
     
     return {
@@ -168,5 +168,5 @@ if __name__ == "__main__":
     
     print()
     print("=" * 80)
-    print("✅ 테스트 완료!")
+    print("[OK] 테스트 완료!")
     print("=" * 80)

@@ -4,7 +4,7 @@
     
     <application
         android:usesCleartextTraffic="true"
-        android:label="flutter_app"
+        android:label="언제 살까?"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

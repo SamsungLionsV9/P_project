@@ -169,7 +169,7 @@ class RecommendationService:
         
         conn.commit()
         conn.close()
-        print(f"✓ DB 초기화 완료: {self.db_path}")
+        print(f"[OK] DB 초기화 완료: {self.db_path}")
     
     def _load_data(self):
         """엔카 데이터 로드 (가격 이상치 필터링 적용)"""
@@ -185,9 +185,9 @@ class RecommendationService:
                     (self._domestic_df['Price'] >= self.PRICE_MIN) &
                     (self._domestic_df['Price'] <= self.PRICE_MAX)
                 ]
-                print(f"✓ 국산차 데이터: {len(self._domestic_df):,}건 (필터링: {original_count - len(self._domestic_df):,}건 제외)")
+                print(f"[OK] 국산차 데이터: {len(self._domestic_df):,}건 (필터링: {original_count - len(self._domestic_df):,}건 제외)")
         except Exception as e:
-            print(f"⚠️ 국산차 로드 실패: {e}")
+            print(f"[WARN] 국산차 로드 실패: {e}")
 
         try:
             imported_path = self.data_path / "encar_imported_data.csv"
@@ -201,9 +201,9 @@ class RecommendationService:
                     (self._imported_df['Price'] >= self.PRICE_MIN) &
                     (self._imported_df['Price'] <= self.PRICE_MAX)
                 ]
-                print(f"✓ 외제차 데이터: {len(self._imported_df):,}건 (필터링: {original_count - len(self._imported_df):,}건 제외)")
+                print(f"[OK] 외제차 데이터: {len(self._imported_df):,}건 (필터링: {original_count - len(self._imported_df):,}건 제외)")
         except Exception as e:
-            print(f"⚠️ 외제차 로드 실패: {e}")
+            print(f"[WARN] 외제차 로드 실패: {e}")
     
     def _load_car_details(self):
         """차량 상세 옵션 정보 로드 (car_id별 조회용)"""
@@ -226,7 +226,7 @@ class RecommendationService:
                             'has_heated_seat': bool(row.get('has_heated_seat', 0)),
                             'has_ventilated_seat': bool(row.get('has_ventilated_seat', 0)),
                         }
-                print(f"✓ 국산차 상세정보: {len(self._car_details):,}건")
+                print(f"[OK] 국산차 상세정보: {len(self._car_details):,}건")
             
             # 외제차 상세 정보
             imported_details_path = self.data_path / "complete_imported_details.csv"
@@ -246,9 +246,9 @@ class RecommendationService:
                             'has_heated_seat': bool(row.get('has_heated_seat', 0)),
                             'has_ventilated_seat': bool(row.get('has_ventilated_seat', 0)),
                         }
-                print(f"✓ 전체 차량 상세정보: {len(self._car_details):,}건")
+                print(f"[OK] 전체 차량 상세정보: {len(self._car_details):,}건")
         except Exception as e:
-            print(f"⚠️ 상세정보 로드 실패: {e}")
+            print(f"[WARN] 상세정보 로드 실패: {e}")
     
     def get_car_options(self, car_id: str) -> Optional[Dict]:
         """car_id로 차량 옵션 정보 조회"""
@@ -282,7 +282,7 @@ class RecommendationService:
                     'median_price': int(row['median_price'])
                 })
             
-            print(f"✓ 국산 인기 모델 분석: {len(self._popular_domestic)}개")
+            print(f"[OK] 국산 인기 모델 분석: {len(self._popular_domestic)}개")
         
         if self._imported_df is not None:
             # 외제차
@@ -306,7 +306,7 @@ class RecommendationService:
                     'median_price': int(row['median_price'])
                 })
             
-            print(f"✓ 외제 인기 모델 분석: {len(self._popular_imported)}개")
+            print(f"[OK] 외제 인기 모델 분석: {len(self._popular_imported)}개")
     
     # ========== 검색 이력 ==========
     
@@ -514,7 +514,7 @@ class RecommendationService:
                 from services.prediction_v12 import PredictionServiceV12
                 self._prediction_service = PredictionServiceV12()
             except Exception as e:
-                print(f"⚠️ 예측 서비스 로드 실패: {e}")
+                print(f"[WARN] 예측 서비스 로드 실패: {e}")
         
         # 샘플링 및 추천 점수 계산
         sample_size = min(100, len(df))

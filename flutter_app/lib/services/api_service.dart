@@ -110,6 +110,24 @@ class ApiService {
     }
   }
 
+  /// 시장 타이밍 요약 (홈화면용) - 차별화 포인트
+  Future<MarketTimingResult> getMarketTiming() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/market-timing'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return MarketTimingResult.fromJson(jsonDecode(response.body));
+      } else {
+        throw ApiException('시장 타이밍 조회 실패');
+      }
+    } catch (e) {
+      // 기본값 반환 (오류 시에도 앱이 동작하도록)
+      return MarketTimingResult.defaultValue();
+    }
+  }
+
   /// 통합 스마트 분석 (가격 + 타이밍 + AI)
   Future<SmartAnalysisResult> smartAnalysis({
     required String brand,
@@ -816,6 +834,72 @@ class TimingResult {
   }
 
   bool get isGoodTime => timingScore >= 70;
+}
+
+/// 시장 타이밍 요약 (홈화면용) - 차별화 포인트
+class MarketTimingResult {
+  final bool success;
+  final double score;
+  final String label;
+  final String color;
+  final String emoji;
+  final String action;
+  final List<Map<String, dynamic>> indicators;
+  final List<String> reasons;
+  final String message;
+
+  MarketTimingResult({
+    required this.success,
+    required this.score,
+    required this.label,
+    required this.color,
+    required this.emoji,
+    required this.action,
+    required this.indicators,
+    required this.reasons,
+    required this.message,
+  });
+
+  factory MarketTimingResult.fromJson(Map<String, dynamic> json) {
+    return MarketTimingResult(
+      success: json['success'] ?? true,
+      score: (json['score'] as num?)?.toDouble() ?? 60.0,
+      label: json['label'] ?? '분석 중',
+      color: json['color'] ?? 'gray',
+      emoji: json['emoji'] ?? '⏳',
+      action: json['action'] ?? '데이터 수집 중',
+      indicators: List<Map<String, dynamic>>.from(json['indicators'] ?? []),
+      reasons: List<String>.from(json['reasons'] ?? []),
+      message: json['message'] ?? '',
+    );
+  }
+
+  /// 기본값 (API 오류 시)
+  factory MarketTimingResult.defaultValue() {
+    return MarketTimingResult(
+      success: true,
+      score: 60.0,
+      label: '분석 중',
+      color: 'gray',
+      emoji: '⏳',
+      action: '데이터 수집 중',
+      indicators: [],
+      reasons: [],
+      message: '시장 데이터를 수집하고 있습니다',
+    );
+  }
+
+  bool get isGoodTime => score >= 70;
+  bool get isOkayTime => score >= 55 && score < 70;
+  bool get isNeutral => score >= 45 && score < 55;
+  bool get isBadTime => score < 45;
+
+  Color getScoreColor() {
+    if (score >= 70) return const Color(0xFF4CAF50); // green
+    if (score >= 55) return const Color(0xFF2196F3); // blue
+    if (score >= 45) return const Color(0xFFFFC107); // yellow
+    return const Color(0xFFF44336); // red
+  }
 }
 
 class SmartAnalysisResult {

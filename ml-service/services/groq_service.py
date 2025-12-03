@@ -102,7 +102,7 @@ class GroqService:
             )
             return result
         except Exception as e:
-            print(f"⚠️ Groq 허위매물 탐지 실패: {e}")
+            print(f"[WARN] Groq 허위매물 탐지 실패: {e}")
             return self._fallback_fraud_detection(dealer_description)
     
     def generate_negotiation_script(self, vehicle_data: Dict, prediction_data: Dict,
@@ -135,7 +135,7 @@ class GroqService:
             )
             return result
         except Exception as e:
-            print(f"⚠️ Groq 네고 대본 생성 실패: {e}")
+            print(f"[WARN] Groq 네고 대본 생성 실패: {e}")
             return self._fallback_negotiation_script(vehicle_data, prediction_data, issues)
     
     # ========== Fallback 메서드들 ==========
@@ -164,9 +164,9 @@ class GroqService:
                 message = "시장 상황을 조금 더 지켜보시기 바랍니다"
         
         signal_map = {
-            'buy': {'text': '매수', 'color': '🟢', 'emoji': '✅'},
-            'hold': {'text': '관망', 'color': '🟡', 'emoji': '⚠️'},
-            'avoid': {'text': '회피', 'color': '🔴', 'emoji': '❌'}
+            'buy': {'text': '매수', 'color': '[OK]', 'emoji': '[OK]'},
+            'hold': {'text': '관망', 'color': '[?]', 'emoji': '[WARN]'},
+            'avoid': {'text': '회피', 'color': '[!]', 'emoji': '[ERROR]'}
         }
         
         info = signal_map[signal]
@@ -194,7 +194,7 @@ class GroqService:
         
         for keyword in suspicious_keywords:
             if keyword in dealer_description:
-                warnings.append(f"⚠️ '{keyword}' 표현 발견 - 주의 필요")
+                warnings.append(f"[WARN] '{keyword}' 표현 발견 - 주의 필요")
                 sentences = dealer_description.split('.')
                 for sent in sentences:
                     if keyword in sent and sent.strip():

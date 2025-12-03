@@ -5,7 +5,8 @@ import {
   Users,
   BarChart3,
   Bot,
-  Settings
+  Settings,
+  TrendingUp
 } from "lucide-react";
 
 const menuItems = [
@@ -13,6 +14,7 @@ const menuItems = [
   { key: "vehicles", label: "차량 데이터 관리", icon: Car },
   { key: "users", label: "사용자 관리", icon: Users },
   { key: "history", label: "분석 이력", icon: BarChart3 },
+  { key: "insights", label: "경제지표 인사이트", icon: TrendingUp },
   { key: "aiLog", label: "AI 로그", icon: Bot },
   { key: "settings", label: "설정", icon: Settings },
 ];
@@ -22,7 +24,7 @@ function Sidebar({ activeMenu, setActiveMenu }) {
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="logo-box" />
-        <span className="service-name">Car-Sentix</span>
+        <span className="service-name">언제 살까?</span>
       </div>
 
       <nav className="sidebar-nav">

@@ -564,69 +564,109 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
     );
   }
 
-  // Tab 2: 구매 타이밍
+  // Tab 2: 구매 타이밍 - ★ 차별화 포인트 강조
   Widget _buildBuyingTimingTab(bool isDark, Color cardColor, Color textColor) {
+    final scoreColor = _getTimingColor(timing.timingScore);
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // 구매 적기 카드
+          // ★ 차별화 강조: 경제지표 기반 구매 타이밍 카드
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(30),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  scoreColor.withOpacity(0.15),
+                  scoreColor.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: scoreColor.withOpacity(0.3), width: 2),
             ),
             child: Column(
               children: [
+                // 헤더: 차별화 메시지
                 Container(
-                  width: 80,
-                  height: 80,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _getTimingColor(timing.timingScore),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _getTimingColor(timing.timingScore).withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
+                    color: scoreColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.access_time_filled, color: scoreColor, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        "경제지표 기반 분석",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: scoreColor,
+                        ),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Text(
-                      "${timing.timingScore.toStringAsFixed(0)}",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 20),
+                // 큰 점수 표시
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      "${timing.timingScore.toStringAsFixed(0)}",
+                      style: TextStyle(
+                        fontSize: 72,
+                        fontWeight: FontWeight.bold,
+                        color: scoreColor,
+                        height: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        " / 100",
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: textColor.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // 결정 텍스트
                 Text(
                   timing.decision,
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: _getTimingColor(timing.timingScore),
+                    color: scoreColor,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _getTimingDescription(timing.timingScore),
-                  style: const TextStyle(color: Colors.grey),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 20),
 
-          // 타이밍 지표
+          // ★ 경제지표 분석 (차별화 포인트)
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.circular(20),
@@ -634,29 +674,54 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "타이밍 지표",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                Row(
+                  children: [
+                    const Icon(Icons.trending_up, color: Color(0xFF0066FF), size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      "경제지표 분석",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0066FF).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        "경쟁사에 없는 기능",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0066FF),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildCircularIndicator(
+                    _buildEnhancedIndicator(
                       (timing.breakdown['macro'] ?? 70).toInt(),
-                      "거시경제",
+                      "금리·물가",
+                      Icons.account_balance,
                       isDark,
                       textColor,
                     ),
-                    _buildCircularIndicator(
+                    _buildEnhancedIndicator(
                       (timing.breakdown['trend'] ?? 70).toInt(),
-                      "트렌드",
+                      "유가·환율",
+                      Icons.local_gas_station,
                       isDark,
                       textColor,
                     ),
-                    _buildCircularIndicator(
-                      (timing.breakdown['new_car'] ?? 70).toInt(),
-                      "신차 일정",
+                    _buildEnhancedIndicator(
+                      (timing.breakdown['schedule'] ?? timing.breakdown['new_car'] ?? 70).toInt(),
+                      "신차일정",
+                      Icons.event_note,
                       isDark,
                       textColor,
                     ),
@@ -670,7 +735,7 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
           // 상세 분석
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cardColor,
               borderRadius: BorderRadius.circular(20),
@@ -678,12 +743,18 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "상세 분석",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                Row(
+                  children: [
+                    const Icon(Icons.lightbulb_outline, color: Colors.amber, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      "타이밍 인사이트",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
-                ...timing.reasons.map((reason) => _buildCheckItem(reason, textColor)),
+                ...timing.reasons.map((reason) => _buildEnhancedCheckItem(reason, textColor)),
               ],
             ),
           ),
@@ -691,53 +762,107 @@ class _ResultPageState extends State<ResultPage> with SingleTickerProviderStateM
       ),
     );
   }
-
-  Widget _buildCircularIndicator(int score, String label, bool isDark, Color textColor) {
-    final color = _getScoreColor(score);
+  
+  // 강화된 지표 위젯 (차별화)
+  Widget _buildEnhancedIndicator(int value, String label, IconData icon, bool isDark, Color textColor) {
+    final color = value >= 70 
+        ? const Color(0xFF4CAF50) 
+        : value >= 50 
+            ? const Color(0xFFFFC107) 
+            : const Color(0xFFF44336);
+    
     return Column(
       children: [
-        SizedBox(
-          width: 80,
-          height: 80,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 70,
-                height: 70,
-                child: CircularProgressIndicator(
-                  value: score / 100,
-                  strokeWidth: 6,
-                  backgroundColor: isDark ? Colors.grey[800] : Colors.grey[100],
-                  color: color,
-                ),
+        Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [color, color.withOpacity(0.7)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(height: 2),
               Text(
-                score.toString(),
-                style: TextStyle(
+                "$value",
+                style: const TextStyle(
+                  color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: color,
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 8),
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: textColor)),
-        const Text("/ 100", style: TextStyle(color: Colors.grey, fontSize: 10)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: textColor.withOpacity(0.7),
+          ),
+        ),
       ],
     );
   }
-
-  Widget _buildCheckItem(String text, Color textColor) {
+  
+  // 강화된 체크 아이템
+  Widget _buildEnhancedCheckItem(String text, Color textColor) {
+    final isPositive = text.contains('✅') || text.contains('🟢') || text.contains('좋') || text.contains('추천');
+    final isNegative = text.contains('❌') || text.contains('🔴') || text.contains('주의') || text.contains('위험');
+    
+    final color = isPositive 
+        ? const Color(0xFF4CAF50) 
+        : isNegative 
+            ? const Color(0xFFF44336) 
+            : const Color(0xFFFFC107);
+    final icon = isPositive 
+        ? Icons.check_circle 
+        : isNegative 
+            ? Icons.warning 
+            : Icons.info;
+    
+    // 이모지 제거
+    final cleanText = text.replaceAll(RegExp(r'[✅❌🟢🟡🔴⚠️]'), '').trim();
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check, color: Color(0xFF00C853), size: 20),
-          const SizedBox(width: 8),
-          Text(text, style: TextStyle(fontSize: 14, color: textColor)),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              cleanText,
+              style: TextStyle(
+                fontSize: 14,
+                color: textColor,
+                height: 1.4,
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -18,6 +18,8 @@ import 'providers/popular_cars_provider.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/model_deals_modal.dart';
 import 'widgets/common/bottom_nav_bar.dart';
+import 'widgets/market_trend_card.dart';
+import 'widgets/ai_pick_card.dart';
 import 'utils/car_image_mapper.dart';
 
 void main() async {
@@ -56,7 +58,7 @@ class CarPriceApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          title: '중고차 시세 예측',
+          title: '언제 살까?',  // 차별화: 시세가 아닌 타이밍
           debugShowCheckedModeBanner: false,
           themeMode: themeProvider.themeMode,
           // 라이트 테마 정의
@@ -207,15 +209,51 @@ class HomePageContent extends StatefulWidget {
 
 class _HomePageContentState extends State<HomePageContent> {
   final AuthService _authService = AuthService();
+  final ApiService _apiService = ApiService();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isLoggedIn = false;
+  
+  // 차별화: 시장 타이밍 상태
+  MarketTimingResult? _marketTiming;
+  bool _isLoadingTiming = true;
 
   @override
   void initState() {
     super.initState();
     _isLoggedIn = _authService.isLoggedIn;
+    _loadMarketTiming();
+  }
+
+  /// 시장 타이밍 데이터 로드 (차별화 포인트)
+  Future<void> _loadMarketTiming() async {
+    try {
+      final timing = await _apiService.getMarketTiming();
+      if (mounted) {
+        setState(() {
+          _marketTiming = timing;
+          _isLoadingTiming = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _marketTiming = MarketTimingResult.defaultValue();
+          _isLoadingTiming = false;
+        });
+      }
+    }
+  }
+
+  /// 로그인 상태 확인
+  Future<void> _checkLoginStatus() async {
+    final isLoggedIn = _authService.isLoggedIn;
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = isLoggedIn;
+      });
+    }
   }
 
   @override
@@ -337,6 +375,147 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
+  /// AI 추천 픽 상세 모달 표시
+  void _showAiPickDetails() {
+    final recentViewsProvider = context.read<RecentViewsProvider>();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ModelDealsModal(
+        brand: "현대",
+        model: "그랜저",
+        avgPrice: 2450,
+        medianPrice: 2380,
+        listings: 1240,
+        onCarViewed: (viewedCar) {
+          recentViewsProvider.addRecentCar(viewedCar);
+        },
+      ),
+    );
+  }
+
+  /// Hero Section (GitHub 스타일 - 언제 살까? 테마)
+  Widget _buildHeroSection(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 40),
+      decoration: const BoxDecoration(
+        color: Color(0xFF001F3F), // 딥 블루 배경
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "AI 기반 중고차 구매 타이밍 분석",
+            style: TextStyle(
+              color: Color(0xFF4DA8DA),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "언제 살까?\n지금이 적기인지 확인하세요",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // 시세 조회 버튼
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: () => widget.onNavigateToSearch?.call(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0066FF),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 8,
+                shadowColor: const Color(0xFF0066FF).withOpacity(0.5),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "구매 타이밍 분석하기",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // 로그인 상태에 따른 UI
+          if (!_isLoggedIn)
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    "로그인하고 맞춤 알림을 받아보세요!",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SignupPage()),
+                      );
+                      _checkLoginStatus();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white, width: 1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    child: const Text(
+                      "로그인 / 회원가입",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Center(
+              child: Text(
+                "환영합니다, ${_authService.userEmail ?? '사용자'}님!",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -348,66 +527,28 @@ class _HomePageContentState extends State<HomePageContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
-            
-            // 1. 메인 로그인 카드 영역
+            // 1. Hero Section (GitHub 스타일 - 언제 살까? 테마)
+            _buildHeroSection(isDark),
+
+            const SizedBox(height: 24),
+
+            // 2. 구매 지수 & AI 추천 픽 (듀얼 카드)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: _isLoggedIn 
-                  ? _buildLoggedInView(textColor)
-                  : _buildLoginForm(isDark, textColor),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // 2. 바로가기 버튼 (로그인 없이 조회) - 탭 전환 방식
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: () {
-                    // Navigator.push 대신 탭 전환 (BottomNavigationBar 유지)
-                    widget.onNavigateToSearch?.call();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF0066FF)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: MarketTrendCard(
+                      onTap: () => widget.onNavigateToSearch?.call(),
                     ),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search, color: Color(0xFF0066FF), size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        "바로 시세 조회하기",
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0066FF),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AiPickCard(
+                      onTap: () => _showAiPickDetails(),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
 
@@ -488,12 +629,21 @@ class _HomePageContentState extends State<HomePageContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 브랜드 강조: 차별화된 가치 제안
         Text(
-          "중고차 시세 예측 AI",
+          "언제 살까?",
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: textColor,
+            color: const Color(0xFF0066FF),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          "경제지표 기반 구매 타이밍 어드바이저",
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[500],
           ),
         ),
         const SizedBox(height: 20),
@@ -658,6 +808,155 @@ class _HomePageContentState extends State<HomePageContent> {
               fontSize: 18,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ★ 차별화 위젯: 오늘의 구매 타이밍 카드
+  Widget _buildMarketTimingCard(bool isDark, Color cardColor, Color textColor) {
+    if (_isLoadingTiming) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          height: 140,
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    final timing = _marketTiming ?? MarketTimingResult.defaultValue();
+    final scoreColor = timing.getScoreColor();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scoreColor.withOpacity(0.15),
+              scoreColor.withOpacity(0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: scoreColor.withOpacity(0.3), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 헤더
+            Row(
+              children: [
+                Icon(Icons.access_time_filled, color: scoreColor, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  "오늘의 구매 타이밍",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scoreColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    timing.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: scoreColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // 점수 표시
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  "${timing.score.toInt()}",
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: scoreColor,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    "/ 100",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: textColor.withOpacity(0.5),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // 경제지표 요약
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: timing.indicators.take(3).map((indicator) {
+                    final status = indicator['status'] as String;
+                    final icon = status == 'positive' 
+                        ? Icons.arrow_upward 
+                        : status == 'negative' 
+                            ? Icons.arrow_downward 
+                            : Icons.remove;
+                    final color = status == 'positive' 
+                        ? Colors.green 
+                        : status == 'negative' 
+                            ? Colors.red 
+                            : Colors.grey;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            indicator['name'] as String,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: textColor.withOpacity(0.6),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(icon, size: 12, color: color),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 한 줄 요약
+            Text(
+              timing.action,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: textColor,
+              ),
+            ),
+          ],
         ),
       ),
     );

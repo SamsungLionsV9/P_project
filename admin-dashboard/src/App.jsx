@@ -7,12 +7,14 @@ import { Sidebar, PlaceholderPage } from "./components";
 import { DashboardPage, VehiclePage, UserPage, HistoryPage } from "./pages";
 import AILogPage from "./pages/AILogPage";
 import SettingsPage from "./pages/SettingsPage";
+import EconomicInsightsPage from "./pages/EconomicInsightsPage";
 
 const pageTitleMap = {
   dashboard: "DashBoard",
   vehicles: "차량 데이터 관리",
   users: "사용자 관리",
   history: "분석 이력",
+  insights: "경제지표 인사이트",
   aiLog: "AI 로그",
   settings: "설정",
 };
@@ -88,6 +90,8 @@ function App({ user, onLogout }) {
         return <UserPage />;
       case "history":
         return <HistoryPage />;
+      case "insights":
+        return <EconomicInsightsPage />;
       case "aiLog":
         return <AILogPage />;
       case "settings":

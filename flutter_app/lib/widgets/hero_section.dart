@@ -23,13 +23,13 @@ class HeroSection extends StatelessWidget {
       child: Column(
         children: [
           const Icon(
-            Icons.directions_car_filled_rounded,
+            Icons.access_time_filled,
             size: 64,
             color: AppTheme.primaryBlue,
           ),
           const SizedBox(height: 24),
           const Text(
-            "중고차,\n데이터로 현명하게 사세요",
+            "지금 사면\n손해일까?",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 32,
@@ -40,7 +40,7 @@ class HeroSection extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            "AI 가격 예측 + 시장 타이밍 분석 + Groq AI 자문\n단 한 번의 분석으로 모든 것을 확인하세요.",
+            "경제지표 기반 구매 타이밍 분석\n금리·유가·환율을 분석해 최적의 구매 시점을 알려드립니다.",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
@@ -58,7 +58,7 @@ class HeroSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 20),
               ),
               child: const Text(
-                "지금 무료로 분석하기",
+                "지금이 살 때인지 확인하기",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -67,9 +67,11 @@ class HeroSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildBadge("119K 데이터"),
+              _buildBadge("경제지표 연동"),
               const SizedBox(width: 12),
-              _buildBadge("R² 0.87 정확도"),
+              _buildBadge("타이밍 분석"),
+              const SizedBox(width: 12),
+              _buildBadge("AI 시세"),
             ],
           ),
         ],

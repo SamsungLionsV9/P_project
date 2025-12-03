@@ -42,7 +42,7 @@ class DatabaseService:
         self.db_path = db_path
         self._create_tables()
         self._initialized = True
-        print(f"✓ DB 초기화 완료: {db_path}")
+        print(f"[OK] DB 초기화 완료: {db_path}")
     
     def _get_conn(self) -> sqlite3.Connection:
         """스레드별 DB 연결"""

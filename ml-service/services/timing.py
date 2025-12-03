@@ -100,7 +100,7 @@ class TimingService:
             }
             
         except Exception as e:
-            print(f"⚠️ 타이밍 분석 중 오류: {e}")
+            print(f"[WARN] 타이밍 분석 중 오류: {e}")
             return self._fallback_timing_analysis(car_model)
     
     def _get_label(self, score: float, decision: str) -> str:
@@ -119,11 +119,11 @@ class TimingService:
         factors = []
         for reason in reasons:
             # 이모지와 키워드로 상태 판단
-            clean_reason = reason.replace('✅ ', '').replace('⚠️ ', '').replace('❌ ', '').replace('🟢 ', '').replace('🟡 ', '').replace('🔴 ', '')
+            clean_reason = reason.replace('[OK] ', '').replace('[WARN] ', '').replace('[ERROR] ', '').replace('[OK] ', '').replace('[?] ', '').replace('[!] ', '')
             
-            if '✅' in reason or '🟢' in reason or '좋' in reason or '추천' in reason or '상승' in reason:
+            if '[OK]' in reason or '[OK]' in reason or '좋' in reason or '추천' in reason or '상승' in reason:
                 status = 'positive'
-            elif '❌' in reason or '🔴' in reason or '주의' in reason or '하락' in reason or '위험' in reason:
+            elif '[ERROR]' in reason or '[!]' in reason or '주의' in reason or '하락' in reason or '위험' in reason:
                 status = 'negative'
             else:
                 status = 'neutral'
@@ -146,9 +146,9 @@ class TimingService:
             dict: 기본 타이밍 분석 결과
         """
         reasons = [
-            "⚠️ 실시간 데이터를 불러올 수 없습니다",
-            "⚠️ 기본 분석 결과를 제공합니다",
-            "⚠️ 자세한 분석을 위해 시스템 관리자에게 문의하세요"
+            "[WARN] 실시간 데이터를 불러올 수 없습니다",
+            "[WARN] 기본 분석 결과를 제공합니다",
+            "[WARN] 자세한 분석을 위해 시스템 관리자에게 문의하세요"
         ]
         
         # 기본값 반환 (앱 호환 필드 포함)
@@ -156,7 +156,7 @@ class TimingService:
             'timing_score': 60.0,
             'decision': '관망',
             'label': '보통',
-            'color': '🟡',
+            'color': '[?]',
             'breakdown': {
                 'macro': 60.0,
                 'trend': 60.0,

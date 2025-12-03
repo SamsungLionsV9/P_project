@@ -5,6 +5,7 @@ import sys
 import os
 import logging
 import time
+from datetime import datetime
 from functools import lru_cache
 from dotenv import load_dotenv
 
@@ -384,9 +385,93 @@ async def timing(request: TimingRequest):
     result = timing_service.analyze_timing(request.model)
     return result
 
+@app.get("/api/market-timing")
+async def get_market_timing():
+    """
+    오늘의 시장 타이밍 요약 (홈화면용)
+    차별화 포인트: 경제지표 기반 구매 타이밍 분석
+    """
+    try:
+        # 일반적인 시장 타이밍 분석 (특정 모델 없이)
+        result = timing_service.analyze_timing("중고차")  # 일반 시장 분석
+        
+        # 홈화면 표시용 요약 데이터
+        score = result.get('timing_score', 60)
+        
+        # 점수별 라벨 및 색상
+        if score >= 70:
+            label = "지금이 적기!"
+            color = "green"
+            emoji = "🟢"
+            action = "적극 매수 추천"
+        elif score >= 55:
+            label = "괜찮은 시기"
+            color = "blue"
+            emoji = "🔵"
+            action = "매수 고려"
+        elif score >= 45:
+            label = "보통"
+            color = "yellow"
+            emoji = "🟡"
+            action = "시장 관망"
+        else:
+            label = "대기 권장"
+            color = "red"
+            emoji = "🔴"
+            action = "구매 보류"
+        
+        # 경제지표 요약 (차별화 포인트 강조)
+        breakdown = result.get('breakdown', {})
+        indicators = []
+        
+        macro_score = breakdown.get('macro', 60)
+        if macro_score >= 60:
+            indicators.append({"name": "금리", "status": "positive", "desc": "낮은 금리"})
+        else:
+            indicators.append({"name": "금리", "status": "negative", "desc": "높은 금리"})
+            
+        trend_score = breakdown.get('trend', 60)
+        if trend_score >= 60:
+            indicators.append({"name": "유가", "status": "positive", "desc": "안정세"})
+        else:
+            indicators.append({"name": "유가", "status": "negative", "desc": "상승세"})
+            
+        schedule_score = breakdown.get('schedule', 60)
+        if schedule_score >= 60:
+            indicators.append({"name": "신차출시", "status": "neutral", "desc": "영향 적음"})
+        else:
+            indicators.append({"name": "신차출시", "status": "negative", "desc": "출시 임박"})
+        
+        return {
+            "success": True,
+            "score": score,
+            "label": label,
+            "color": color,
+            "emoji": emoji,
+            "action": action,
+            "indicators": indicators,
+            "reasons": result.get('reasons', [])[:3],  # 상위 3개 이유만
+            "updated_at": datetime.now().isoformat(),
+            "message": f"경제지표 분석 결과, {label.lower()}"
+        }
+    except Exception as e:
+        logger.error(f"시장 타이밍 분석 오류: {e}")
+        return {
+            "success": True,
+            "score": 60,
+            "label": "분석 중",
+            "color": "gray",
+            "emoji": "⏳",
+            "action": "데이터 수집 중",
+            "indicators": [],
+            "reasons": [],
+            "updated_at": datetime.now().isoformat(),
+            "message": "시장 데이터를 수집하고 있습니다"
+        }
+
 @app.post("/api/smart-analysis")
 async def smart_analysis(request: SmartAnalysisRequest, user_id: str = "guest"):
-    # 옵션 딕셔너리 구성
+    """통합 스마트 분석 (가격 + 타이밍 + AI)"""
     options = {
         'has_sunroof': request.has_sunroof or False,
         'has_navigation': request.has_navigation or False,
@@ -398,13 +483,10 @@ async def smart_analysis(request: SmartAnalysisRequest, user_id: str = "guest"):
         'has_led_lamp': request.has_led_lamp or False,
     }
 
-    # 성능점검 등급 매핑 (별표 개수 → 등급)
     grade = request.inspection_grade or "normal"
-
     accident_free = request.is_accident_free if request.is_accident_free is not None else True
     logger.info(f"smart-analysis: model={request.model}, fuel={request.fuel}, grade={grade}, accident_free={accident_free}")
 
-    # 가격 예측 (옵션 + 연료 + 성능점검 포함)
     pred = prediction_service.predict(
         brand=request.brand,
         model_name=request.model,
@@ -922,14 +1004,18 @@ async def get_ai_status():
     """AI 엔진 상태 확인 (Groq API 연결 여부)"""
     return {
         'groq_available': groq_service.is_available(),
-        'model': 'Llama 3.3 70B' if groq_service.is_available() else None,
+        'model': GROQ_MODEL if groq_service.is_available() else None,
         'status': 'connected' if groq_service.is_available() else 'disconnected'
     }
 
 # ========== 관리자 대시보드 API ==========
 
-# Spring Boot User Service URL
-SPRING_BOOT_URL = "http://localhost:8080"
+try:
+    from config.server_config import SPRING_BOOT_URL, DEFAULT_USERS, ADMIN_ACCOUNTS
+except ImportError:
+    SPRING_BOOT_URL = "http://localhost:8080"
+    DEFAULT_USERS = []
+    ADMIN_ACCOUNTS = {}
 
 @app.get("/api/admin/users", tags=["Admin"])
 async def get_admin_users(page: int = 1, limit: int = 20):
@@ -953,11 +1039,10 @@ async def get_admin_users(page: int = 1, limit: int = 20):
     except Exception as e:
         logger.warning(f"Spring Boot 사용자 조회 실패: {e}")
     
-    # 2. Spring Boot 실패 시 기본 사용자 목록
+    # 2. Spring Boot 실패 시 기본 사용자 목록 (설정 파일에서 로드)
     if not spring_boot_available:
-        users = [
-            {"id": 1, "email": "admin@car-sentix.com", "username": "관리자", "phoneNumber": "010-1234-5678", "role": "ADMIN", "provider": "LOCAL", "isActive": True},
-            {"id": 3, "email": "guest", "username": "게스트", "phoneNumber": "-", "role": "GUEST", "provider": "LOCAL", "isActive": True},
+        users = DEFAULT_USERS if DEFAULT_USERS else [
+            {"id": 1, "email": "admin@car-sentix.com", "username": "관리자", "role": "ADMIN", "isActive": True},
         ]
     
     # 3. 분석 이력 및 AI 로그에서 사용자 ID 수집하여 병합
@@ -1071,17 +1156,12 @@ class AdminLoginRequest(BaseModel):
 
 @app.post("/api/admin/login", tags=["Admin"])
 async def admin_login(request: AdminLoginRequest):
-    """관리자 로그인 (목업 - User Service 연동 전)"""
-    # 기본 관리자 계정 (목업)
-    ADMIN_ACCOUNTS = {
-        "admin@carsentix.com": {"password": "admin1234!", "id": 1, "username": "관리자", "role": "ADMIN"},
-        "admin@car-sentix.com": {"password": "admin1234!", "id": 1, "username": "관리자", "role": "ADMIN"},
-    }
-    
+    """관리자 로그인 (설정 파일 연동)"""
     email = request.email.lower().strip()
     password = request.password
     
-    if email in ADMIN_ACCOUNTS and ADMIN_ACCOUNTS[email]["password"] == password:
+    # 설정 파일에서 로드된 ADMIN_ACCOUNTS 사용
+    if email in ADMIN_ACCOUNTS and ADMIN_ACCOUNTS[email].get("password") == password:
         account = ADMIN_ACCOUNTS[email]
         # 간단한 토큰 생성 (실제 구현 시 JWT 사용)
         import hashlib

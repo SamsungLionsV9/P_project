@@ -34,12 +34,12 @@ class SimilarVehicleService:
                 df = df[(df['price'] >= self.PRICE_MIN) & (df['price'] <= self.PRICE_MAX)]
                 df = df[~df['price'].isin(self.SPECIAL_PRICES)]  # 특수 가격 제거 (9999 등)
                 self._combined_df = df
-                print(f"✓ 전처리 데이터 로드: {len(df):,}건 (이상치 제거됨)")
+                print(f"[OK] 전처리 데이터 로드: {len(df):,}건 (이상치 제거됨)")
             else:
-                print(f"⚠️ 전처리 데이터 없음, 원본 데이터 사용")
+                print(f"[WARN] 전처리 데이터 없음, 원본 데이터 사용")
                 self._load_raw_data()
         except Exception as e:
-            print(f"⚠️ 데이터 로드 실패: {e}")
+            print(f"[WARN] 데이터 로드 실패: {e}")
             self._load_raw_data()
     
     def _load_raw_data(self):
@@ -54,9 +54,9 @@ class SimilarVehicleService:
                 df = df.rename(columns={'Manufacturer': 'brand', 'Model': 'model_name', 
                                         'Year': 'year', 'Mileage': 'mileage', 'Price': 'price'})
                 self._combined_df = df
-                print(f"✓ 원본 데이터 로드: {len(df):,}건")
+                print(f"[OK] 원본 데이터 로드: {len(df):,}건")
         except Exception as e:
-            print(f"⚠️ 원본 데이터 로드 실패: {e}")
+            print(f"[WARN] 원본 데이터 로드 실패: {e}")
     
     def get_similar_distribution(self, brand: str, model: str, year: int, 
                                   mileage: int, predicted_price: float) -> Dict:
@@ -93,7 +93,7 @@ class SimilarVehicleService:
                     (df_year.between(year - 3, year + 3))
                 ].copy()
         except Exception as e:
-            print(f"⚠️ 필터링 오류: {e}")
+            print(f"[WARN] 필터링 오류: {e}")
             return self._empty_result()
         
         if len(similar) == 0:

@@ -13,9 +13,9 @@ class LandingScreen extends StatelessWidget {
       appBar: AppBar(
         title: Row(
           children: const [
-            Icon(Icons.directions_car, color: AppTheme.primaryBlue),
+            Icon(Icons.access_time_filled, color: AppTheme.primaryBlue),
             SizedBox(width: 8),
-            Text("Car-Sentix"),
+            Text("언제 살까?"),
           ],
         ),
         actions: [
@@ -53,7 +53,7 @@ class LandingScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "🎯 3가지 핵심 기능",
+                    "🎯 차별화된 3가지 기능",
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -61,18 +61,19 @@ class LandingScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  // 타이밍 분석을 가장 먼저 배치 (차별화 포인트)
                   const FeatureCard(
-                    icon: Icons.attach_money,
-                    title: "AI 가격 예측",
-                    description: "119,343대 데이터를 학습한 AI가 R² 0.87 정확도로 적정 시세를 알려드립니다.",
-                    iconColor: AppTheme.primaryBlue,
+                    icon: Icons.access_time_filled,
+                    title: "구매 타이밍 분석",
+                    description: "금리·유가·환율 등 경제지표를 분석해 '지금이 살 때인지' 알려드립니다.",
+                    iconColor: AppTheme.secondaryGreen,
                   ),
                   const SizedBox(height: 16),
                   const FeatureCard(
-                    icon: Icons.timeline,
-                    title: "시장 타이밍 분석",
-                    description: "금리, 유가, 신차 출시일 등 거시 데이터를 분석해 '살 때'를 알려드립니다.",
-                    iconColor: AppTheme.secondaryGreen,
+                    icon: Icons.attach_money,
+                    title: "AI 시세 예측",
+                    description: "119,343대 데이터 학습 AI가 R² 0.87 정확도로 적정 가격을 산정합니다.",
+                    iconColor: AppTheme.primaryBlue,
                   ),
                   const SizedBox(height: 16),
                   const FeatureCard(
@@ -114,7 +115,7 @@ class LandingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 40),
                   const Text(
-                    "© 2025 Car-Sentix. Built with Flutter & Python",
+                    "© 2025 언제 살까? - 경제지표 기반 구매 타이밍 어드바이저",
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
