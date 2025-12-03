@@ -1,0 +1,92 @@
+{
+  "name": "Car-Sentix Development",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.devcontainer.yml"
+  ],
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
+
+  // VS Code 설정
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        },
+        "[java]": {
+          "editor.defaultFormatter": "redhat.java"
+        },
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.watcherExclude": {
+          "**/target/**": true,
+          "**/node_modules/**": true,
+          "**/.git/**": true,
+          "**/build/**": true,
+          "**/__pycache__/**": true
+        }
+      },
+      "extensions": [
+        // Python
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.debugpy",
+        
+        // Java/Spring
+        "redhat.java",
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "vscjava.vscode-spring-initializr",
+        
+        // JavaScript/React
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "dsznajder.es7-react-js-snippets",
+        
+        // Docker
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers",
+        
+        // Git
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        
+        // Utilities
+        "streetsidesoftware.code-spell-checker",
+        "usernamehw.errorlens",
+        "gruntfuggly.todo-tree",
+        "PKief.material-icon-theme"
+      ]
+    }
+  },
+
+  // 컨테이너 생성 후 실행할 명령
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  // 포트 포워딩
+  "forwardPorts": [8000, 8080, 3001],
+
+  // 환경 변수
+  "remoteEnv": {
+    "PYTHONPATH": "/workspace:/workspace/ml-service",
+    "PATH": "${containerEnv:PATH}:/workspace/scripts"
+  },
+
+  // 기능 추가
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  // 컨테이너 시작 시 자동 실행할 서비스
+  "runServices": ["ml-service", "user-service", "admin-dashboard"]
+}

@@ -1,0 +1,87 @@
+# ============================================================
+# Docker Ignore
+# Docker 빌드 시 제외할 파일/디렉토리
+# ============================================================
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+.eggs
+*.egg
+.pytest_cache
+.mypy_cache
+.tox
+.coverage
+htmlcov
+
+# Node.js
+node_modules
+npm-debug.log
+yarn-error.log
+.pnpm-store
+
+# Java/Gradle
+.gradle
+build
+target
+*.class
+*.jar
+!gradle-wrapper.jar
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE specific
+*.iml
+.project
+.classpath
+.settings
+
+# Large files
+*.csv
+*.json
+!package.json
+!package-lock.json
+*.zip
+*.tar.gz
+
+# Data directories (mount as volumes instead)
+data/
+models/*.pkl
+models/*.joblib
+
+# Flutter (별도 빌드)
+flutter/
+flutter_app/
+
+# Archive
+_archive/
+
+# Temporary
+tmp/
+temp/
+*.tmp

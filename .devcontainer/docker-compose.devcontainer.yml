@@ -1,0 +1,49 @@
+version: '3.8'
+
+# ============================================================
+# Dev Container 전용 Docker Compose 오버라이드
+# VS Code Dev Container에서 사용됨
+# ============================================================
+
+services:
+  # 메인 개발 컨테이너
+  devcontainer:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: carsentix-devcontainer
+    volumes:
+      - ..:/workspace:cached
+      - ~/.ssh:/home/vscode/.ssh:ro
+      - ~/.gitconfig:/home/vscode/.gitconfig:ro
+    command: sleep infinity
+    networks:
+      - carsentix-network
+    environment:
+      - PYTHONPATH=/workspace:/workspace/ml-service
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - BOK_API_KEY=${BOK_API_KEY:-}
+      - SPRING_BOOT_URL=http://user-service:8080
+
+  # ML Service 오버라이드 (개발 모드)
+  ml-service:
+    volumes:
+      - ..:/workspace:cached
+    working_dir: /workspace
+    command: python run_server.py
+    environment:
+      - PYTHONPATH=/workspace:/workspace/ml-service
+      - SPRING_BOOT_URL=http://user-service:8080
+
+  # User Service 오버라이드
+  user-service:
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker,dev
+
+  # Admin Dashboard 오버라이드 (핫 리로드)
+  admin-dashboard:
+    volumes:
+      - ../admin-dashboard:/app:cached
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000/api

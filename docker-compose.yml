@@ -1,0 +1,116 @@
+version: '3.8'
+
+# ============================================================
+# Car-Sentix 마이크로서비스 Docker Compose
+# 
+# 사용법:
+#   개발 모드: docker-compose up -d
+#   프로덕션:  docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   중지:      docker-compose down
+#   로그:      docker-compose logs -f [service_name]
+# ============================================================
+
+services:
+  # ========== ML Service (Python/FastAPI) ==========
+  ml-service:
+    build:
+      context: .
+      dockerfile: docker/ml-service.Dockerfile
+    container_name: carsentix-ml-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml-service:/app/ml-service:cached
+      - ./src:/app/src:cached
+      - ./data:/app/data:cached
+      - ./models:/app/models:cached
+      - ./config:/app/config:cached
+      - ./run_server.py:/app/run_server.py:cached
+      - ./.env:/app/.env:cached
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - BOK_API_KEY=${BOK_API_KEY:-}
+      - SPRING_BOOT_URL=http://user-service:8080
+    depends_on:
+      - user-service
+    networks:
+      - carsentix-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ========== User Service (Spring Boot) ==========
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: ../docker/user-service.Dockerfile
+    container_name: carsentix-user-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./user-service/src:/app/src:cached
+      - ./user-service/data:/app/data
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:h2:file:/app/data/userdb;DB_CLOSE_ON_EXIT=FALSE
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+    networks:
+      - carsentix-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # ========== Admin Dashboard (React/Vite) ==========
+  admin-dashboard:
+    build:
+      context: ./admin-dashboard
+      dockerfile: ../docker/admin-dashboard.Dockerfile
+    container_name: carsentix-admin-dashboard
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./admin-dashboard/src:/app/src:cached
+      - ./admin-dashboard/public:/app/public:cached
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000/api
+    depends_on:
+      - ml-service
+    networks:
+      - carsentix-network
+    restart: unless-stopped
+
+  # ========== Nginx (Reverse Proxy - Optional) ==========
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: carsentix-nginx
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+  #   depends_on:
+  #     - ml-service
+  #     - user-service
+  #     - admin-dashboard
+  #   networks:
+  #     - carsentix-network
+  #   restart: unless-stopped
+
+networks:
+  carsentix-network:
+    driver: bridge
+    name: carsentix-network
+
+volumes:
+  ml-data:
+  user-data:
