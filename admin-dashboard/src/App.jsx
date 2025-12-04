@@ -108,8 +108,9 @@ function App({ user, onLogout }) {
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
 
       {/* 메인 영역 */}
-      <main className="main">
-        {/* 상단 바 */}
+      <main className={`main ${activeMenu === 'b2b' ? 'no-padding' : ''}`}>
+        {/* 상단 바 - B2B 페이지에서는 숨김 (자체 헤더 사용) */}
+        {activeMenu !== 'b2b' && (
         <header className="topbar">
           <h1 className="page-title">{pageTitleMap[activeMenu]}</h1>
           <div className="topbar-right">
@@ -169,6 +170,7 @@ function App({ user, onLogout }) {
             </button>
           </div>
         </header>
+        )}
 
         {/* 메인 컨텐츠 */}
         {renderPage()}

@@ -489,9 +489,7 @@ function B2BMarketIntelligencePage() {
         .b2b-dashboard {
           background: #f8fafc;
           min-height: 100vh;
-          margin: -24px -32px 0 -32px;
-          padding: 16px 24px;
-          width: calc(100% + 64px);
+          padding: 20px 24px;
         }
         .dashboard-header {
           display: flex;
