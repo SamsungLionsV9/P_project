@@ -8,13 +8,14 @@ import { DashboardPage, VehiclePage, UserPage, HistoryPage } from "./pages";
 import AILogPage from "./pages/AILogPage";
 import SettingsPage from "./pages/SettingsPage";
 import EconomicInsightsPage from "./pages/EconomicInsightsPage";
+import B2BMarketIntelligencePage from "./pages/B2BMarketIntelligencePage";
 
 const pageTitleMap = {
   dashboard: "DashBoard",
   vehicles: "차량 데이터 관리",
   users: "사용자 관리",
   history: "분석 이력",
-  insights: "경제지표 인사이트",
+  insights: "B2B 인사이트",
   aiLog: "AI 로그",
   settings: "설정",
 };
@@ -91,7 +92,7 @@ function App({ user, onLogout }) {
       case "history":
         return <HistoryPage />;
       case "insights":
-        return <EconomicInsightsPage />;
+        return <B2BMarketIntelligencePage />;
       case "aiLog":
         return <AILogPage />;
       case "settings":

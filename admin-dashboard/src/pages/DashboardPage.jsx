@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Eye, FolderOpen, CheckCircle, RefreshCw, AlertTriangle } from "lucide-react";
+import { motion } from "framer-motion";
+import { Eye, FolderOpen, CheckCircle, RefreshCw, AlertTriangle, TrendingUp, Clock, DollarSign, Fuel, Percent, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 function DashboardPage() {
   const [stats, setStats] = useState({
@@ -102,9 +104,15 @@ function DashboardPage() {
 
   return (
     <>
-      {/* 통계 카드 3개 */}
+      {/* 통계 카드 3개 - Framer Motion 애니메이션 적용 */}
       <section className="stat-cards">
-        <div className="stat-card">
+        <motion.div 
+          className="stat-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          whileHover={{ y: -4, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}
+        >
           <div className="stat-card-header">
             <div className="stat-icon stat-icon-green"><Eye size={20} /></div>
             <span className="stat-label">오늘 전체 조회</span>
@@ -115,9 +123,15 @@ function DashboardPage() {
           <div className="stat-detail" style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
             시세예측 {stats.todayPredictions || 0}건 / 매물조회 {stats.todayViews || 0}건
           </div>
-        </div>
+        </motion.div>
 
-        <div className="stat-card">
+        <motion.div 
+          className="stat-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          whileHover={{ y: -4, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}
+        >
           <div className="stat-card-header">
             <div className="stat-icon stat-icon-yellow"><FolderOpen size={20} /></div>
             <span className="stat-label">전체 누적 조회</span>
@@ -128,9 +142,15 @@ function DashboardPage() {
           <div className="stat-detail" style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
             예측 {stats.totalPredictions || 0} / 조회 {stats.totalViews || 0}
           </div>
-        </div>
+        </motion.div>
 
-        <div className="stat-card">
+        <motion.div 
+          className="stat-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+          whileHover={{ y: -4, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}
+        >
           <div className="stat-card-header">
             <div className="stat-icon stat-icon-blue"><CheckCircle size={20} /></div>
             <span className="stat-label">평균 신뢰도</span>
@@ -138,87 +158,98 @@ function DashboardPage() {
           <div className="stat-value">
             {stats.avgConfidence > 0 ? `${stats.avgConfidence}%` : "-"}
           </div>
-        </div>
+        </motion.div>
       </section>
 
-      {/* 차트 1: 인기 많은 모델 조회수 */}
+      {/* 차트 1: 인기 많은 모델 조회수 (Recharts) */}
       <section className="chart-section">
         <h2 className="chart-title">인기 많은 모델 조회수</h2>
-        <div className="chart-card">
+        <div className="chart-card" style={{ padding: '24px' }}>
           {stats.popularModels.length === 0 ? (
             <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
               아직 조회 데이터가 없습니다
             </div>
           ) : (
-            <div className="bar-chart">
-              {stats.popularModels.map((m, idx) => (
-                <div key={m.name || idx} className="bar-item">
-                  <div
-                    className="bar"
-                    data-value={m.value || 0}
-                    style={{
-                      height: `${Math.max((m.value / maxModelValue) * 100, 5)}%`,
-                    }}
-                  />
-                  <span className="bar-label" title={m.name || "기타"}>
-                    {m.name || "기타"}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart 
+                data={stats.popularModels} 
+                margin={{ top: 30, right: 30, left: 20, bottom: 20 }}
+                barCategoryGap="20%"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 11, fill: '#555' }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#e0e0e0' }}
+                  interval={0}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: '#666' }} 
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: 'white', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                    padding: '12px 16px'
+                  }}
+                  formatter={(value) => [`${value}건`, '조회수']}
+                  cursor={{ fill: 'rgba(0,0,0,0.03)' }}
+                />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                  {stats.popularModels.map((entry, index) => (
+                    <Cell key={index} fill={`hsl(${240 - index * 25}, 70%, 55%)`} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
       </section>
 
-      {/* 차트 2: 일별 시세 분석 요청 수 */}
+      {/* 차트 2: 일별 시세 분석 요청 수 (Recharts) */}
       <section className="chart-section">
         <h2 className="chart-title">일별 시세 분석 요청 수</h2>
-        <div className="chart-card">
-          {dailyValues.length === 0 || dailyValues.every((v) => v === 0) ? (
+        <div className="chart-card" style={{ padding: '20px' }}>
+          {dailyData.length === 0 ? (
             <div style={{ padding: "40px", textAlign: "center", color: "#888" }}>
               최근 7일간 조회 데이터가 없습니다
             </div>
           ) : (
-            <div className="line-chart-wrapper">
-              <svg
-                className="line-chart"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-              >
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={dailyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                 <defs>
-                  <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2f57ff" stopOpacity="0.3" />
-                    <stop offset="100%" stopColor="#2f57ff" stopOpacity="0" />
+                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-
-                <polygon
-                  fill="url(#areaGradient)"
-                  points={`0,100 ${getLinePoints(dailyValues)} 100,100`}
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#666' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#666' }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    background: 'white', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)' 
+                  }}
+                  formatter={(value) => [`${value}건`, '분석 요청']}
                 />
-
-                <polyline
-                  fill="none"
-                  stroke="#2f57ff"
-                  strokeWidth="1.5"
-                  points={getLinePoints(dailyValues)}
+                <Area 
+                  type="monotone" 
+                  dataKey="count" 
+                  stroke="#3B82F6" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorCount)" 
                 />
-
-                {dailyValues.map((v, i) => {
-                  const max = Math.max(...dailyValues, 1);
-                  const x =
-                    dailyValues.length > 1 ? (i / (dailyValues.length - 1)) * 100 : 50;
-                  const y = 100 - (v / max) * 100;
-                  return <circle key={i} cx={x} cy={y} r="1.3" fill="#2f57ff" />;
-                })}
-              </svg>
-
-              <div className="line-x-labels">
-                {dailyLabels.map((l, i) => (
-                  <span key={i}>{l}</span>
-                ))}
-              </div>
-            </div>
+              </AreaChart>
+            </ResponsiveContainer>
           )}
         </div>
       </section>

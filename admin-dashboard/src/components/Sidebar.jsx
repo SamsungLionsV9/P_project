@@ -6,7 +6,7 @@ import {
   BarChart3,
   Bot,
   Settings,
-  TrendingUp
+  Rocket
 } from "lucide-react";
 
 const menuItems = [
@@ -14,7 +14,7 @@ const menuItems = [
   { key: "vehicles", label: "차량 데이터 관리", icon: Car },
   { key: "users", label: "사용자 관리", icon: Users },
   { key: "history", label: "분석 이력", icon: BarChart3 },
-  { key: "insights", label: "경제지표 인사이트", icon: TrendingUp },
+  { key: "insights", label: "B2B 인사이트", icon: Rocket },
   { key: "aiLog", label: "AI 로그", icon: Bot },
   { key: "settings", label: "설정", icon: Settings },
 ];

@@ -1,3 +1,8 @@
+/* Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ========== 전역 스타일 ========== */
 * {
   margin: 0;
@@ -6,7 +11,7 @@
 }
 
 body {
-  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
   background: #f5f7fa;
   color: #1a1a2e;
 }
@@ -154,6 +159,15 @@ body {
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-color: rgba(99, 102, 241, 0.2);
 }
 
 .stat-card-header {
@@ -173,10 +187,26 @@ body {
   font-size: 22px;
 }
 
-.stat-icon-green { background: #e8f5e9; color: #4caf50; }
-.stat-icon-yellow { background: #fff8e1; color: #ff9800; }
-.stat-icon-blue { background: #e3f2fd; color: #2196f3; }
-.stat-icon-red { background: #ffebee; color: #f44336; }
+.stat-icon-green { 
+  background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+.stat-icon-yellow { 
+  background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+.stat-icon-blue { 
+  background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.stat-icon-red { 
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
 
 .stat-label {
   font-size: 14px;
@@ -184,9 +214,13 @@ body {
 }
 
 .stat-value {
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 36px;
+  font-weight: 800;
   color: #1a1a2e;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #4f46e5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 /* ========== 차트 섹션 ========== */
