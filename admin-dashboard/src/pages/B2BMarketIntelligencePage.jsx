@@ -561,8 +561,8 @@ function B2BMarketIntelligencePage() {
         /* KPI Section - 컴팩트 버전 */
         .kpi-section {
           display: grid;
-          grid-template-columns: 1.2fr 1fr 1fr 1fr;
-          gap: 10px;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
           margin-bottom: 12px;
           margin-top: 0;
         }
@@ -586,12 +586,13 @@ function B2BMarketIntelligencePage() {
         }
         .moi-combined {
           display: flex;
-          gap: 16px;
+          gap: 12px;
+          width: 100%;
         }
         .macro-indicators {
-          flex: 1;
+          flex: 0 0 auto;
           border-right: 1px solid #e2e8f0;
-          padding-right: 16px;
+          padding-right: 12px;
         }
         .macro-title {
           font-size: 11px;
