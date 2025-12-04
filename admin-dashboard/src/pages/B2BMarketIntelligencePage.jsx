@@ -579,10 +579,11 @@ function B2BMarketIntelligencePage() {
           box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .kpi-card.main {
-          border-left: 3px solid;
+          border-left: none;
         }
         .kpi-card.combined {
           padding: 12px;
+          border-top: 3px solid;
         }
         .moi-combined {
           display: flex;
