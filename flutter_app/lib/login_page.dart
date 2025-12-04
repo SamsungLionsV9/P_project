@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/auth_service.dart';
 import 'signup_page.dart';
 import 'oauth_webview_page.dart';
 import 'find_account_page.dart';
 import 'main.dart';
+import 'providers/recent_views_provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -45,6 +47,14 @@ class _LoginPageState extends State<LoginPage> {
     if (result['success'] == true) {
       _showMessage('로그인 성공!');
       if (mounted) {
+        // 계정별 데이터 로드
+        try {
+          final provider = context.read<RecentViewsProvider>();
+          await provider.reloadForCurrentUser();
+        } catch (e) {
+          debugPrint('Failed to reload recent views after login: $e');
+        }
+        
         // 메인 화면으로 이동 (스택 초기화)
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -87,6 +97,14 @@ class _LoginPageState extends State<LoginPage> {
     if (result != null && result['success'] == true) {
       _showMessage('${_getProviderName(provider)} 로그인 성공!');
       if (mounted) {
+        // 계정별 데이터 로드
+        try {
+          final provider = context.read<RecentViewsProvider>();
+          await provider.reloadForCurrentUser();
+        } catch (e) {
+          debugPrint('Failed to reload recent views after OAuth login: $e');
+        }
+        
         // 메인 화면으로 이동 (스택 초기화)
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const MainScreen()),

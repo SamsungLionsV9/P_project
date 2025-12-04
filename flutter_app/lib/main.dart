@@ -98,10 +98,29 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    // 로그인 상태 변경 시 계정별 데이터 로드
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reloadRecentViewsForCurrentUser();
+    });
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  /// 현재 사용자의 최근 조회 데이터 로드
+  Future<void> _reloadRecentViewsForCurrentUser() async {
+    try {
+      final provider = context.read<RecentViewsProvider>();
+      await provider.reloadForCurrentUser();
+    } catch (e) {
+      debugPrint('Failed to reload recent views: $e');
+    }
   }
 
   @override

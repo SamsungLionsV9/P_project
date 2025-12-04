@@ -46,6 +46,18 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _loadData() async {
+    // 로그인 상태 확인
+    final authService = AuthService();
+    if (!authService.isLoggedIn) {
+      setState(() {
+        _favorites = [];
+        _alerts = [];
+        _isLoading = false;
+        _error = null;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -115,6 +127,13 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _handleLogout() async {
+    final authService = AuthService();
+    
+    // 비로그인 상태에서는 아무 동작도 하지 않음
+    if (!authService.isLoggedIn) {
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -134,15 +153,22 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     );
 
     if (confirmed == true) {
-      final authService = AuthService();
       await authService.logout();
       
       if (mounted) {
-        // 로그인 페이지로 이동 (스택 초기화)
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-          (route) => false,
-        );
+        // 계정별 데이터 로드 (guest 계정으로 전환)
+        try {
+          final provider = Provider.of<RecentViewsProvider>(context, listen: false);
+          await provider.reloadForCurrentUser();
+        } catch (e) {
+          debugPrint('Failed to reload recent views after logout: $e');
+        }
+        
+        // 메인 화면으로 돌아가기 (로그인 페이지로 이동하지 않음)
+        // 이미 비로그인 상태이므로 메인 화면에 그대로 유지
+        setState(() {
+          // 상태 갱신을 위해 빌드 재실행
+        });
       }
     }
   }
@@ -160,6 +186,8 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final authService = AuthService();
+    final isLoggedIn = authService.isLoggedIn;
 
     return Scaffold(
       appBar: AppBar(
@@ -179,11 +207,13 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
             icon: Icon(Icons.refresh, color: textColor),
             onPressed: _loadData,
           ),
-          IconButton(
-            icon: Icon(Icons.logout, color: textColor),
-            onPressed: _handleLogout,
-            tooltip: '로그아웃',
-          ),
+          // 로그인 상태일 때만 로그아웃 버튼 표시
+          if (isLoggedIn)
+            IconButton(
+              icon: Icon(Icons.logout, color: textColor),
+              onPressed: _handleLogout,
+              tooltip: '로그아웃',
+            ),
         ],
       ),
       body: _isLoading
@@ -240,6 +270,42 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
 
   // 1. 찜한 차량 탭 (DB 기반)
   Widget _buildFavoritesTab(bool isDark, Color cardColor, Color textColor) {
+    final authService = AuthService();
+    
+    // 비로그인 상태 확인
+    if (!authService.isLoggedIn) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.login, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text("로그인이 필요합니다",
+                style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+            const SizedBox(height: 8),
+            Text("로그인 후 찜한 차량을 확인할 수 있습니다",
+                style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              },
+              icon: const Icon(Icons.login),
+              label: const Text("로그인하기"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0066FF),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final comparisonProvider = Provider.of<ComparisonProvider>(context);
 
     if (_favorites.isEmpty) {
@@ -308,6 +374,42 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
 
   // 2. 최근 분석 탭 (분석 페이지에서 클릭한 매물들)
   Widget _buildHistoryTab(bool isDark, Color cardColor, Color textColor) {
+    final authService = AuthService();
+    
+    // 비로그인 상태 확인
+    if (!authService.isLoggedIn) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.login, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text("로그인이 필요합니다",
+                style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+            const SizedBox(height: 8),
+            Text("로그인 후 최근 분석 기록을 확인할 수 있습니다",
+                style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              },
+              icon: const Icon(Icons.login),
+              label: const Text("로그인하기"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0066FF),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Consumer<RecentViewsProvider>(
       builder: (context, provider, child) {
         // 분석 페이지에서 클릭한 매물만 표시

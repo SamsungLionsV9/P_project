@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'services/api_service.dart';
+import 'services/auth_service.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'providers/recent_views_provider.dart';
 import 'widgets/common/option_badges.dart';
 import 'utils/car_image_mapper.dart';
+import 'login_page.dart';
 
 /// 차량 추천 페이지
 /// 엔카 데이터 기반 인기 모델 및 가성비 차량 추천
@@ -38,6 +40,7 @@ class _RecommendationPageState extends State<RecommendationPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_handleTabChange);
     _loadData();
     _loadFavorites(); // 찜 목록 로드
     // Provider 초기화
@@ -46,8 +49,37 @@ class _RecommendationPageState extends State<RecommendationPage>
     });
   }
 
+  /// 탭 변경 시 비로그인 상태에서 최근 조회 탭 접근 방지
+  void _handleTabChange() {
+    if (!_tabController.indexIsChanging) {
+      final authService = AuthService();
+      // 최근 조회 탭(index 2)으로 이동하려고 할 때 비로그인 상태인 경우
+      if (_tabController.index == 2 && !authService.isLoggedIn) {
+        // 로그인 페이지로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+        // 탭을 첫 번째 탭으로 되돌림
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            _tabController.animateTo(0);
+          }
+        });
+      }
+    }
+  }
+
   /// 찜 목록 로드
   Future<void> _loadFavorites() async {
+    final authService = AuthService();
+    if (!authService.isLoggedIn) {
+      if (mounted) {
+        setState(() => _favorites = []);
+      }
+      return;
+    }
+
     try {
       final favorites = await _api.getFavorites();
       if (mounted) {
@@ -123,6 +155,7 @@ class _RecommendationPageState extends State<RecommendationPage>
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     super.dispose();
   }
@@ -166,6 +199,9 @@ class _RecommendationPageState extends State<RecommendationPage>
 
   @override
   Widget build(BuildContext context) {
+    final authService = AuthService();
+    final isLoggedIn = authService.isLoggedIn;
+    
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
       appBar: AppBar(
@@ -179,10 +215,32 @@ class _RecommendationPageState extends State<RecommendationPage>
           indicatorColor: const Color(0xFF6C63FF),
           labelColor: Colors.white,
           unselectedLabelColor: Colors.grey,
-          tabs: const [
-            Tab(text: '인기 모델', icon: Icon(Icons.trending_up)),
-            Tab(text: '추천 차량', icon: Icon(Icons.recommend)),
-            Tab(text: '최근 조회', icon: Icon(Icons.history)),
+          onTap: (index) {
+            // 최근 조회 탭(index 2)을 클릭했는데 비로그인 상태인 경우
+            if (index == 2 && !isLoggedIn) {
+              // 로그인 페이지로 이동
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+              );
+              // 탭을 원래 위치로 되돌림
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (mounted) {
+                  _tabController.animateTo(0);
+                }
+              });
+            }
+          },
+          tabs: [
+            const Tab(text: '인기 모델', icon: Icon(Icons.trending_up)),
+            const Tab(text: '추천 차량', icon: Icon(Icons.recommend)),
+            Tab(
+              text: '최근 조회',
+              icon: Icon(
+                Icons.history,
+                color: isLoggedIn ? Colors.white : Colors.grey[600],
+              ),
+            ),
           ],
         ),
         actions: [
@@ -199,6 +257,9 @@ class _RecommendationPageState extends State<RecommendationPage>
               ? _buildErrorView()
               : TabBarView(
                   controller: _tabController,
+                  physics: isLoggedIn
+                      ? null
+                      : const NeverScrollableScrollPhysics(), // 비로그인 시 스와이프 비활성화
                   children: [
                     _buildPopularTab(),
                     _buildRecommendationTab(),
@@ -625,6 +686,47 @@ class _RecommendationPageState extends State<RecommendationPage>
 
   /// 최근 조회 탭 (Provider 기반 - 추천 탭에서 클릭한 매물만)
   Widget _buildHistoryTab() {
+    final authService = AuthService();
+    
+    // 비로그인 상태 확인
+    if (!authService.isLoggedIn) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.login, size: 64, color: Colors.grey[700]),
+            const SizedBox(height: 16),
+            Text(
+              '로그인이 필요합니다',
+              style: TextStyle(color: Colors.grey[500], fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '로그인 후 최근 조회 기록을 확인할 수 있습니다',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              },
+              icon: const Icon(Icons.login),
+              label: const Text("로그인하기"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0066FF),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Consumer<RecentViewsProvider>(
       builder: (context, provider, child) {
         // 추천 탭에서 조회한 차량만 표시 (분석 페이지 매물 제외)

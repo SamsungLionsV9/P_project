@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'theme/theme_provider.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
-import 'login_page.dart';
+import 'providers/recent_views_provider.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -130,7 +130,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     children: [
                       _buildListTile(
                         title: "기록 삭제",
-                        onTap: () {},
+                        onTap: _handleClearHistory,
                         textColor: textColor,
                         iconColor: iconColor,
                         isDestructive: true,
@@ -154,16 +154,19 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
-                _buildSectionHeader("계정", subTextColor),
-                const SizedBox(height: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(16),
+                // 로그인 상태일 때만 계정 섹션 표시
+                if (AuthService().isLoggedIn) ...[
+                  const SizedBox(height: 32),
+                  _buildSectionHeader("계정", subTextColor),
+                  const SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: _buildLogoutTile(textColor),
                   ),
-                  child: _buildLogoutTile(textColor),
-                ),
+                ],
                 const SizedBox(height: 40),
               ],
             ),
@@ -207,7 +210,92 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _handleClearHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('기록 삭제'),
+        content: const Text('모든 검색 이력과 최근 조회 기록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // 로딩 표시
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        // 1. 서버의 검색 이력 삭제
+        try {
+          final deletedCount = await _api.clearHistory();
+          debugPrint('서버 검색 이력 삭제 완료: $deletedCount개');
+        } catch (e) {
+          debugPrint('서버 검색 이력 삭제 실패: $e');
+          // 서버 삭제 실패해도 로컬 삭제는 진행
+        }
+
+        // 2. 로컬의 최근 조회 기록 삭제
+        final recentViewsProvider = Provider.of<RecentViewsProvider>(context, listen: false);
+        await recentViewsProvider.clearAll();
+
+        // 로딩 다이얼로그 닫기
+        if (mounted) {
+          Navigator.pop(context);
+        }
+
+        // 성공 메시지 표시
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('모든 기록이 삭제되었습니다.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        // 로딩 다이얼로그 닫기
+        if (mounted) {
+          Navigator.pop(context);
+        }
+
+        // 에러 메시지 표시
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('기록 삭제 중 오류가 발생했습니다: $e'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _handleLogout() async {
+    final authService = AuthService();
+    
+    // 비로그인 상태에서는 아무 동작도 하지 않음
+    if (!authService.isLoggedIn) {
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -227,14 +315,20 @@ class _SettingsPageState extends State<SettingsPage> {
     );
 
     if (confirmed == true) {
-      final authService = AuthService();
       await authService.logout();
       
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-          (route) => false,
-        );
+        // 계정별 데이터 로드 (guest 계정으로 전환)
+        try {
+          final provider = Provider.of<RecentViewsProvider>(context, listen: false);
+          await provider.reloadForCurrentUser();
+        } catch (e) {
+          debugPrint('Failed to reload recent views after logout: $e');
+        }
+        
+        // 메인 화면으로 돌아가기 (로그인 페이지로 이동하지 않음)
+        // 이미 비로그인 상태이므로 메인 화면에 그대로 유지
+        // Navigator를 사용하지 않고 상태만 갱신
       }
     }
   }

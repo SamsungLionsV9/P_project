@@ -2,18 +2,28 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
 /// 최근 조회 차량 Provider
 /// - 개별 매물 클릭 시 저장 (추천 탭 + 결과 페이지 모두)
 /// - SharedPreferences를 통해 로컬 캐시 사용
 /// - source 필드로 'analysis' (분석) vs 'recommendation' (추천) 구분
+/// - 계정별로 데이터 분리 (사용자 ID 기반 키 사용)
 class RecentViewsProvider extends ChangeNotifier {
-  static const String _localCacheKey = 'recent_viewed_cars_v4';  // 버전 업 (carId 필드 추가)
+  static const String _localCacheKeyPrefix = 'recent_viewed_cars_v4';  // 버전 업 (carId 필드 추가)
   static const int _maxItems = 30;
+  
+  final AuthService _authService = AuthService();
   
   List<RecommendedCar> _recentViewedCars = [];
   bool _isLoading = false;
   String? _error;
+  
+  /// 현재 사용자 ID 기반 캐시 키 생성
+  String get _localCacheKey {
+    final userId = _authService.userEmail ?? _authService.userId ?? 'guest';
+    return '${_localCacheKeyPrefix}_$userId';
+  }
   
   // Getters
   /// 전체 최근 조회 차량 (홈 화면용 - 분석 + 추천 모두)
@@ -31,7 +41,7 @@ class RecentViewsProvider extends ChangeNotifier {
   String? get error => _error;
   int get count => _recentViewedCars.length;
   
-  /// 초기 데이터 로드
+  /// 초기 데이터 로드 (계정별 데이터 로드)
   Future<void> loadRecentViews() async {
     _isLoading = true;
     _error = null;
@@ -46,6 +56,12 @@ class RecentViewsProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+  
+  /// 계정 변경 시 데이터 다시 로드 (로그인/로그아웃 시 호출)
+  Future<void> reloadForCurrentUser() async {
+    // 현재 사용자의 데이터로 전환
+    await loadRecentViews();
   }
   
   /// 매물 조회 기록 추가 (RecommendedCar)
