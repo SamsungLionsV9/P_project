@@ -29,7 +29,7 @@ public class AdminController {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
-    
+
     /**
      * 관리자 로그인
      * POST /api/admin/login
@@ -105,19 +105,19 @@ public class AdminController {
     @GetMapping("/users-public")
     public ResponseEntity<?> getAllUsersPublic() {
         List<User> users = userRepository.findAll();
-        
+
         List<Map<String, Object>> userList = users.stream()
                 .map(this::convertUserToMap)
                 .collect(Collectors.toList());
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("users", userList);
         response.put("total", userList.size());
-        
+
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * 전체 사용자 목록 조회
      * GET /api/admin/users
@@ -126,19 +126,19 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllUsers() {
         List<User> users = userRepository.findAll();
-        
+
         List<Map<String, Object>> userList = users.stream()
                 .map(this::convertUserToMap)
                 .collect(Collectors.toList());
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("users", userList);
         response.put("total", userList.size());
-        
+
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * 사용자 정보 수정
      * PUT /api/admin/users/{id}
@@ -147,8 +147,8 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
         Map<String, Object> response = new HashMap<>();
-        
-        return userRepository.findById(id)
+
+        return userRepository.findById(java.util.Objects.requireNonNull(id))
                 .map(user -> {
                     if (updates.containsKey("username")) {
                         user.setUsername((String) updates.get("username"));
@@ -160,13 +160,13 @@ public class AdminController {
                         String roleStr = (String) updates.get("role");
                         user.setRole(User.Role.valueOf(roleStr));
                     }
-                    
-                    userRepository.save(user);
-                    
+
+                    userRepository.save(java.util.Objects.requireNonNull(user));
+
                     response.put("success", true);
                     response.put("message", "사용자 정보가 수정되었습니다");
                     response.put("user", convertUserToMap(user));
-                    
+
                     return ResponseEntity.ok(response);
                 })
                 .orElseGet(() -> {
@@ -175,7 +175,7 @@ public class AdminController {
                     return ResponseEntity.badRequest().body(response);
                 });
     }
-    
+
     /**
      * 사용자 삭제
      * DELETE /api/admin/users/{id}
@@ -184,14 +184,14 @@ public class AdminController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
-        
-        return userRepository.findById(id)
+
+        return userRepository.findById(java.util.Objects.requireNonNull(id))
                 .map(user -> {
-                    userRepository.delete(user);
-                    
+                    userRepository.delete(java.util.Objects.requireNonNull(user));
+
                     response.put("success", true);
                     response.put("message", "사용자가 삭제되었습니다");
-                    
+
                     return ResponseEntity.ok(response);
                 })
                 .orElseGet(() -> {
@@ -200,7 +200,7 @@ public class AdminController {
                     return ResponseEntity.badRequest().body(response);
                 });
     }
-    
+
     /**
      * 사용자 활성화
      * PUT /api/admin/users/{id}/activate
@@ -210,7 +210,7 @@ public class AdminController {
     public ResponseEntity<?> activateUser(@PathVariable Long id) {
         return toggleUserActive(id, true);
     }
-    
+
     /**
      * 사용자 비활성화
      * PUT /api/admin/users/{id}/deactivate
@@ -220,19 +220,19 @@ public class AdminController {
     public ResponseEntity<?> deactivateUser(@PathVariable Long id) {
         return toggleUserActive(id, false);
     }
-    
+
     private ResponseEntity<?> toggleUserActive(Long id, boolean active) {
         Map<String, Object> response = new HashMap<>();
-        
-        return userRepository.findById(id)
+
+        return userRepository.findById(java.util.Objects.requireNonNull(id))
                 .map(user -> {
                     user.setIsActive(active);
                     userRepository.save(user);
-                    
+
                     response.put("success", true);
                     response.put("message", active ? "사용자가 활성화되었습니다" : "사용자가 비활성화되었습니다");
                     response.put("user", convertUserToMap(user));
-                    
+
                     return ResponseEntity.ok(response);
                 })
                 .orElseGet(() -> {
@@ -241,7 +241,7 @@ public class AdminController {
                     return ResponseEntity.badRequest().body(response);
                 });
     }
-    
+
     /**
      * User 엔티티를 Map으로 변환 (비밀번호 제외)
      */
@@ -259,4 +259,3 @@ public class AdminController {
         return map;
     }
 }
-

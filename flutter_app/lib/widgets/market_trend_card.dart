@@ -11,7 +11,7 @@ class MarketTrendCard extends StatefulWidget {
 
 class _MarketTrendCardState extends State<MarketTrendCard> {
   final ApiService _apiService = ApiService();
-  
+
   int _score = 0;
   String _label = '분석 중...';
   String _description = '시장 데이터를 분석하고 있습니다';
@@ -29,7 +29,7 @@ class _MarketTrendCardState extends State<MarketTrendCard> {
       // 인기 차종들의 타이밍 점수 평균으로 시장 지수 계산
       final popularModels = ['아반떼', '소나타', 'K5', 'G80', '그랜저'];
       List<int> scores = [];
-      
+
       for (final model in popularModels) {
         try {
           final timing = await _apiService.analyzeTiming(model);
@@ -38,10 +38,11 @@ class _MarketTrendCardState extends State<MarketTrendCard> {
           // 개별 모델 에러는 무시
         }
       }
-      
+
       if (scores.isNotEmpty) {
-        final avgScore = (scores.reduce((a, b) => a + b) / scores.length).round();
-        
+        final avgScore =
+            (scores.reduce((a, b) => a + b) / scores.length).round();
+
         if (mounted) {
           setState(() {
             _score = avgScore;
@@ -67,7 +68,7 @@ class _MarketTrendCardState extends State<MarketTrendCard> {
         final goodDeals = recommendations.where((c) => c.isGoodDeal).length;
         final ratio = goodDeals / recommendations.length;
         final calculatedScore = (ratio * 100).round().clamp(30, 95);
-        
+
         if (mounted) {
           setState(() {
             _score = calculatedScore;
@@ -125,7 +126,8 @@ class _MarketTrendCardState extends State<MarketTrendCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final subTextColor = isDark ? Colors.grey[400] : Colors.grey[600];
-    final accentColor = _isLoading ? const Color(0xFF0066FF) : _getScoreColor(_score);
+    final accentColor =
+        _isLoading ? const Color(0xFF0066FF) : _getScoreColor(_score);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -175,7 +177,7 @@ class _MarketTrendCardState extends State<MarketTrendCard> {
                   ),
                 )
               else if (_hasError)
-                Icon(Icons.error_outline, size: 16, color: Colors.orange)
+                const Icon(Icons.error_outline, size: 16, color: Colors.orange)
               else
                 Icon(Icons.trending_up, size: 16, color: accentColor),
             ],
@@ -189,14 +191,17 @@ class _MarketTrendCardState extends State<MarketTrendCard> {
                 child: _isLoading
                     ? CircularProgressIndicator(
                         strokeWidth: 4,
-                        backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(accentColor.withOpacity(0.3)),
+                        backgroundColor:
+                            isDark ? Colors.grey[800] : Colors.grey[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            accentColor.withOpacity(0.3)),
                         strokeCap: StrokeCap.round,
                       )
                     : CircularProgressIndicator(
                         value: _score / 100,
                         strokeWidth: 4,
-                        backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+                        backgroundColor:
+                            isDark ? Colors.grey[800] : Colors.grey[200],
                         valueColor: AlwaysStoppedAnimation<Color>(accentColor),
                         strokeCap: StrokeCap.round,
                       ),

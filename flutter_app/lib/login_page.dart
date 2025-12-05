@@ -54,7 +54,9 @@ class _LoginPageState extends State<LoginPage> {
         } catch (e) {
           debugPrint('Failed to reload recent views after login: $e');
         }
-        
+
+        if (!mounted) return;
+
         // 메인 화면으로 이동 (스택 초기화)
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -104,7 +106,9 @@ class _LoginPageState extends State<LoginPage> {
         } catch (e) {
           debugPrint('Failed to reload recent views after OAuth login: $e');
         }
-        
+
+        if (!mounted) return;
+
         // 메인 화면으로 이동 (스택 초기화)
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const MainScreen()),

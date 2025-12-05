@@ -25,25 +25,25 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService implements UserDetailsService {
-    
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final EmailVerificationService emailVerificationService;
-    
+
     public UserService(UserRepository userRepository,
-                      PasswordEncoder passwordEncoder,
-                      @Lazy AuthenticationManager authenticationManager,
-                      JwtService jwtService,
-                      EmailVerificationService emailVerificationService) {
+            PasswordEncoder passwordEncoder,
+            @Lazy AuthenticationManager authenticationManager,
+            JwtService jwtService,
+            EmailVerificationService emailVerificationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.emailVerificationService = emailVerificationService;
     }
-    
+
     /**
      * 회원가입
      */
@@ -53,7 +53,7 @@ public class UserService implements UserDetailsService {
         if (!emailVerificationService.isEmailVerified(dto.getEmail())) {
             throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다. 먼저 이메일 인증을 완료해주세요.");
         }
-        
+
         // 기존 사용자 확인 (비활성화된 사용자 포함)
         Optional<User> existingUserByEmail = userRepository.findByEmail(dto.getEmail());
         if (existingUserByEmail.isPresent()) {
@@ -65,9 +65,9 @@ public class UserService implements UserDetailsService {
                 userRepository.delete(existingUser);
             }
         }
-        
+
         // 참고: 사용자명(이름)은 중복 허용, 이메일만 고유해야 함
-        
+
         // 사용자 생성
         User user = User.builder()
                 .username(dto.getUsername())
@@ -77,12 +77,12 @@ public class UserService implements UserDetailsService {
                 .role(User.Role.USER)
                 .isActive(true)
                 .build();
-        
-        User savedUser = userRepository.save(user);
-        
+
+        User savedUser = userRepository.save(java.util.Objects.requireNonNull(user));
+
         return UserResponseDto.from(savedUser);
     }
-    
+
     /**
      * OAuth 회원가입 (이메일 인증 불필요)
      */
@@ -95,7 +95,7 @@ public class UserService implements UserDetailsService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("지원하지 않는 OAuth 제공자입니다: " + dto.getProvider());
         }
-        
+
         // 기존 사용자 확인 (비활성화된 사용자 포함)
         Optional<User> existingUserByEmail = userRepository.findByEmail(dto.getEmail());
         if (existingUserByEmail.isPresent()) {
@@ -107,20 +107,21 @@ public class UserService implements UserDetailsService {
                 userRepository.delete(existingUser);
             }
         }
-        
+
         // 참고: 사용자명(이름)은 중복 허용, 이메일만 고유해야 함
-        
+
         // Provider ID 중복 체크
-        Optional<User> existingUserByProviderId = userRepository.findByProviderAndProviderId(provider, dto.getProviderId());
+        Optional<User> existingUserByProviderId = userRepository.findByProviderAndProviderId(provider,
+                dto.getProviderId());
         if (existingUserByProviderId.isPresent() && existingUserByProviderId.get().getIsActive()) {
             throw new IllegalArgumentException("이미 가입된 소셜 계정입니다");
         }
-        
+
         // 사용자 생성 (비밀번호 없음)
         User user = User.builder()
                 .username(dto.getUsername())
                 .email(dto.getEmail())
-                .password(null)  // OAuth 사용자는 비밀번호 없음
+                .password(null) // OAuth 사용자는 비밀번호 없음
                 .phoneNumber(dto.getPhoneNumber())
                 .provider(provider)
                 .providerId(dto.getProviderId())
@@ -128,12 +129,12 @@ public class UserService implements UserDetailsService {
                 .role(User.Role.USER)
                 .isActive(true)
                 .build();
-        
-        User savedUser = userRepository.save(user);
-        
+
+        User savedUser = userRepository.save(java.util.Objects.requireNonNull(user));
+
         return UserResponseDto.from(savedUser);
     }
-    
+
     /**
      * 사용자 이메일로 JWT 토큰 생성 (OAuth 회원가입 후 사용)
      */
@@ -142,21 +143,20 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
         return jwtService.generateToken(user);
     }
-    
+
     /**
      * 로그인
      */
     public String login(UserLoginDto dto) {
         // 인증
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
-        );
-        
+                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword()));
+
         // JWT 토큰 생성
         User user = (User) authentication.getPrincipal();
         return jwtService.generateToken(user);
     }
-    
+
     /**
      * 회원 정보 조회
      */
@@ -164,10 +164,10 @@ public class UserService implements UserDetailsService {
     public UserResponseDto getUserInfo(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다"));
-        
+
         return UserResponseDto.from(user);
     }
-    
+
     /**
      * 회원 탈퇴
      */
@@ -175,23 +175,23 @@ public class UserService implements UserDetailsService {
     public void deleteUser(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다"));
-        
+
         // 소프트 삭제 (isActive = false)
         user.setIsActive(false);
         userRepository.save(user);
-        
+
         // 하드 삭제 (완전 삭제)를 원하면:
         // userRepository.delete(user);
     }
-    
+
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
     }
-    
+
     // ========== 관리자 전용 메서드 ==========
-    
+
     /**
      * 전체 사용자 목록 조회
      */
@@ -201,81 +201,81 @@ public class UserService implements UserDetailsService {
                 .map(UserResponseDto::from)
                 .collect(Collectors.toList());
     }
-    
+
     /**
      * 사용자 역할 변경
      */
     @Transactional
     public void updateUserRole(Long userId, User.Role newRole) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(java.util.Objects.requireNonNull(userId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
-        
+
         user.setRole(newRole);
         userRepository.save(user);
     }
-    
+
     /**
      * 사용자 비활성화
      */
     @Transactional
     public void deactivateUser(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(java.util.Objects.requireNonNull(userId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
-        
+
         user.setIsActive(false);
         userRepository.save(user);
     }
-    
+
     /**
      * 사용자 활성화
      */
     @Transactional
     public void activateUser(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(java.util.Objects.requireNonNull(userId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
-        
+
         user.setIsActive(true);
         userRepository.save(user);
     }
-    
+
     /**
      * 대시보드 통계
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardStats() {
         Map<String, Object> stats = new HashMap<>();
-        
+
         long totalUsers = userRepository.count();
         long activeUsers = userRepository.countByIsActive(true);
         long adminCount = userRepository.countByRole(User.Role.ADMIN);
-        
+
         stats.put("totalUsers", totalUsers);
         stats.put("activeUsers", activeUsers);
         stats.put("inactiveUsers", totalUsers - activeUsers);
         stats.put("adminCount", adminCount);
         stats.put("userCount", totalUsers - adminCount);
-        
+
         return stats;
     }
-    
+
     /**
      * 관리자용 사용자 정보 수정
      */
     @Transactional
     public UserResponseDto updateUserByAdmin(Long userId, String username, String phoneNumber, String role) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(java.util.Objects.requireNonNull(userId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
-        
+
         // 사용자명(닉네임) 변경 (중복 허용)
         if (username != null && !username.trim().isEmpty() && !username.equals(user.getDisplayName())) {
             user.setDisplayName(username);
         }
-        
+
         // 전화번호 변경
         if (phoneNumber != null) {
             user.setPhoneNumber(phoneNumber.trim().isEmpty() ? null : phoneNumber);
         }
-        
+
         // 역할 변경
         if (role != null && !role.trim().isEmpty()) {
             try {
@@ -284,33 +284,33 @@ public class UserService implements UserDetailsService {
                 throw new IllegalArgumentException("유효하지 않은 역할입니다: " + role);
             }
         }
-        
-        User savedUser = userRepository.save(user);
+
+        User savedUser = userRepository.save(java.util.Objects.requireNonNull(user));
         return UserResponseDto.from(savedUser);
     }
-    
+
     /**
      * 관리자용 사용자 삭제 (완전 삭제)
      */
     @Transactional
     public void deleteUserByAdmin(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(java.util.Objects.requireNonNull(userId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
-        
-        userRepository.delete(user);
+
+        userRepository.delete(java.util.Objects.requireNonNull(user));
     }
-    
+
     /**
      * ID로 사용자 조회
      */
     @Transactional(readOnly = true)
     public UserResponseDto getUserById(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findById(java.util.Objects.requireNonNull(userId))
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId));
-        
+
         return UserResponseDto.from(user);
     }
-    
+
     /**
      * 비밀번호 재설정 (이메일 인증 후)
      */
@@ -318,18 +318,18 @@ public class UserService implements UserDetailsService {
     public void resetPassword(String email, String newPassword) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
-        
+
         // 소셜 로그인 사용자는 비밀번호 재설정 불가
         // 일반 회원가입 사용자는 provider = LOCAL
         if (user.getProvider() != null && user.getProvider() != User.Provider.LOCAL) {
             throw new IllegalArgumentException("소셜 로그인 계정은 비밀번호 재설정이 불가능합니다");
         }
-        
+
         // 새 비밀번호 암호화하여 저장
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
-    
+
     /**
      * 이메일로 사용자 존재 여부 확인 (비밀번호 재설정 가능한 사용자)
      */
@@ -346,7 +346,7 @@ public class UserService implements UserDetailsService {
                 })
                 .orElse(false);
     }
-    
+
     /**
      * 아이디 찾기 - 이메일로 가입한 계정 정보 이메일 발송
      */
@@ -354,11 +354,11 @@ public class UserService implements UserDetailsService {
     public void findIdByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 이메일입니다"));
-        
+
         if (!user.getIsActive()) {
             throw new IllegalArgumentException("비활성화된 계정입니다");
         }
-        
+
         // 이메일로 아이디 정보 발송
         try {
             emailVerificationService.sendFindIdEmail(email, user.getUsername());
@@ -367,4 +367,3 @@ public class UserService implements UserDetailsService {
         }
     }
 }
-

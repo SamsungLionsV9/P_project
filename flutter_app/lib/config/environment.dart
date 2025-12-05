@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 
 /// 환경 설정 관리
 /// --dart-define으로 빌드 시 환경 주입 가능
@@ -8,7 +9,8 @@ import 'dart:io' show Platform;
 /// flutter build apk --dart-define=ENV=production --dart-define=ML_URL=https://api.car-sentix.com
 
 class Environment {
-  static const String env = String.fromEnvironment('ENV', defaultValue: 'development');
+  static const String env =
+      String.fromEnvironment('ENV', defaultValue: 'development');
 
   /// 로컬 호스트 주소 (플랫폼별)
   /// - Android 에뮬레이터: 10.0.2.2 (호스트 PC 접근용)
@@ -16,7 +18,7 @@ class Environment {
   static String get _localHost {
     try {
       if (Platform.isAndroid) {
-        return '10.0.2.2';  // Android 에뮬레이터 → 호스트 PC
+        return '10.0.2.2'; // Android 에뮬레이터 → 호스트 PC
       }
     } catch (_) {
       // Web에서는 Platform 체크 불가, localhost 사용
@@ -53,13 +55,13 @@ class Environment {
         return 'http://$_localHost:8080';
     }
   }
-  
+
   /// 이미지 서비스 URL
   static String get imageServiceUrl => '$mlServiceUrl/car-images';
-  
+
   /// 디버그 모드 여부
   static bool get isDebug => env == 'development';
-  
+
   /// API 타임아웃 (초)
   static Duration get apiTimeout {
     switch (env) {
@@ -69,15 +71,15 @@ class Environment {
         return const Duration(seconds: 60);
     }
   }
-  
+
   /// 환경 정보 출력
   static void printInfo() {
     if (isDebug) {
-      print('=== Environment ===');
-      print('ENV: $env');
-      print('ML Service: $mlServiceUrl');
-      print('User Service: $userServiceUrl');
-      print('==================');
+      debugPrint('=== Environment ===');
+      debugPrint('ENV: $env');
+      debugPrint('ML Service: $mlServiceUrl');
+      debugPrint('User Service: $userServiceUrl');
+      debugPrint('==================');
     }
   }
 }

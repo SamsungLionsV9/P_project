@@ -12,6 +12,7 @@ import 'theme/theme_provider.dart';
 import 'providers/comparison_provider.dart';
 import 'providers/recent_views_provider.dart';
 import 'providers/popular_cars_provider.dart';
+import 'providers/favorites_provider.dart';
 import 'widgets/deal_analysis_modal.dart';
 import 'widgets/model_deals_modal.dart';
 import 'widgets/market_trend_card.dart';
@@ -38,6 +39,11 @@ void main() async {
         ChangeNotifierProvider(create: (_) {
           final provider = PopularCarsProvider();
           provider.loadData();
+          return provider;
+        }),
+        ChangeNotifierProvider(create: (_) {
+          final provider = FavoritesProvider();
+          provider.loadFavorites();
           return provider;
         }),
       ],

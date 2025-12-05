@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -19,12 +20,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class MLGatewayController {
-    
+
     private final RestTemplate restTemplate;
-    
+
     @Value("${ml.service.url:http://localhost:8000}")
     private String mlServiceUrl;
-    
+
     /**
      * 가격 예측 (Gateway)
      * POST /api/ml/predict
@@ -32,28 +33,33 @@ public class MLGatewayController {
     @PostMapping("/predict")
     public ResponseEntity<?> predict(@RequestBody Map<String, Object> request) {
         log.info("🚗 가격 예측 요청: {}", request.get("model"));
-        
+
         try {
             String url = mlServiceUrl + "/api/predict";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
+
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            
-            log.info("✅ 예측 완료: {}만원", response.getBody().get("predicted_price"));
-            return ResponseEntity.ok(response.getBody());
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.POST),
+                    entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
+            Map<String, Object> body = response.getBody();
+            log.info("✅ 예측 완료: {}만원", body != null ? body.get("predicted_price") : "null");
+            return ResponseEntity.ok(body);
+
         } catch (Exception e) {
             log.error("❌ ML 서비스 호출 실패: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of(
-                        "error", "ML 서비스 연결 실패",
-                        "message", e.getMessage()
-                    ));
+                            "error", "ML 서비스 연결 실패",
+                            "message", e.getMessage()));
         }
     }
-    
+
     /**
      * 타이밍 분석 (Gateway)
      * POST /api/ml/timing
@@ -61,24 +67,29 @@ public class MLGatewayController {
     @PostMapping("/timing")
     public ResponseEntity<?> timing(@RequestBody Map<String, Object> request) {
         log.info("⏱️ 타이밍 분석 요청: {}", request.get("model"));
-        
+
         try {
             String url = mlServiceUrl + "/api/timing";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
+
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.POST),
+                    entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
             return ResponseEntity.ok(response.getBody());
-            
+
         } catch (Exception e) {
             log.error("❌ 타이밍 분석 실패: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", "ML 서비스 연결 실패"));
         }
     }
-    
+
     /**
      * 통합 스마트 분석 (Gateway)
      * POST /api/ml/smart-analysis
@@ -86,24 +97,29 @@ public class MLGatewayController {
     @PostMapping("/smart-analysis")
     public ResponseEntity<?> smartAnalysis(@RequestBody Map<String, Object> request) {
         log.info("🤖 통합 분석 요청: {} {}", request.get("brand"), request.get("model"));
-        
+
         try {
             String url = mlServiceUrl + "/api/smart-analysis";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
+
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.POST),
+                    entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
             return ResponseEntity.ok(response.getBody());
-            
+
         } catch (Exception e) {
             log.error("❌ 통합 분석 실패: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", "ML 서비스 연결 실패"));
         }
     }
-    
+
     /**
      * 비슷한 차량 분포 (Gateway)
      * POST /api/ml/similar
@@ -114,18 +130,23 @@ public class MLGatewayController {
             String url = mlServiceUrl + "/api/similar";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
+
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.POST),
+                    entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
             return ResponseEntity.ok(response.getBody());
-            
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", "ML 서비스 연결 실패"));
         }
     }
-    
+
     /**
      * 인기 차량 (Gateway)
      * GET /api/ml/popular
@@ -136,16 +157,21 @@ public class MLGatewayController {
             @RequestParam(defaultValue = "5") int limit) {
         try {
             String url = mlServiceUrl + "/api/popular?category=" + category + "&limit=" + limit;
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.GET),
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
             return ResponseEntity.ok(response.getBody());
-            
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", "ML 서비스 연결 실패"));
         }
     }
-    
+
     /**
      * 브랜드 목록 (Gateway)
      * GET /api/ml/brands
@@ -154,16 +180,21 @@ public class MLGatewayController {
     public ResponseEntity<?> brands() {
         try {
             String url = mlServiceUrl + "/api/brands";
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.GET),
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
             return ResponseEntity.ok(response.getBody());
-            
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", "ML 서비스 연결 실패"));
         }
     }
-    
+
     /**
      * 모델 목록 (Gateway)
      * GET /api/ml/models/{brand}
@@ -172,16 +203,21 @@ public class MLGatewayController {
     public ResponseEntity<?> models(@PathVariable String brand) {
         try {
             String url = mlServiceUrl + "/api/models/" + brand;
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.GET),
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
             return ResponseEntity.ok(response.getBody());
-            
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", "ML 서비스 연결 실패"));
         }
     }
-    
+
     /**
      * ML 서비스 헬스체크
      * GET /api/ml/health
@@ -190,19 +226,22 @@ public class MLGatewayController {
     public ResponseEntity<?> health() {
         try {
             String url = mlServiceUrl + "/api/health";
-            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
-            
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    java.util.Objects.requireNonNull(HttpMethod.GET),
+                    null,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
             return ResponseEntity.ok(Map.of(
-                "gateway", "healthy",
-                "ml_service", response.getBody()
-            ));
-            
+                    "gateway", "healthy",
+                    "ml_service", response.getBody()));
+
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of(
-                "gateway", "healthy",
-                "ml_service", "unavailable",
-                "error", e.getMessage()
-            ));
+                    "gateway", "healthy",
+                    "ml_service", "unavailable",
+                    "error", e.getMessage()));
         }
     }
 }

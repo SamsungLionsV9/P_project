@@ -4,6 +4,7 @@ import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'providers/comparison_provider.dart';
 import 'providers/recent_views_provider.dart';
+import 'providers/favorites_provider.dart';
 import 'models/car_data.dart';
 import 'comparison_page.dart';
 import 'widgets/deal_analysis_modal.dart';
@@ -25,8 +26,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   // 데이터 상태
-  List<Favorite> _favorites = [];
-
+  // _favorites는 FavoritesProvider에서 관리
   List<PriceAlert> _alerts = [];
 
   bool _isLoading = true;
@@ -50,7 +50,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     final authService = AuthService();
     if (!authService.isLoggedIn) {
       setState(() {
-        _favorites = [];
+        // _favorites = []; // Provider에서 관리
         _alerts = [];
         _isLoading = false;
         _error = null;
@@ -64,14 +64,17 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     });
 
     try {
+      // FavoritesProvider 로드
+      if (mounted) {
+        context.read<FavoritesProvider>().loadFavorites();
+      }
+
       final results = await Future.wait([
-        _api.getFavorites(),
         _api.getAlerts(),
       ]);
 
       setState(() {
-        _favorites = results[0] as List<Favorite>;
-        _alerts = results[1] as List<PriceAlert>;
+        _alerts = results[0];
         _isLoading = false;
       });
     } catch (e) {
@@ -83,9 +86,22 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   }
 
   Future<void> _removeFavorite(Favorite fav) async {
-    await _api.removeFavorite(fav.id);
+    await context.read<FavoritesProvider>().toggleFavorite(RecommendedCar(
+          brand: fav.brand,
+          model: fav.model,
+          year: fav.year,
+          mileage: fav.mileage,
+          actualPrice: fav.actualPrice ?? 0,
+          predictedPrice: (fav.predictedPrice ?? 0).toInt(),
+          fuel: '가솔린',
+          carId: fav.carId,
+          detailUrl: fav.detailUrl,
+          priceDiff: 0,
+          isGoodDeal: false,
+          score: 0.0,
+          type: 'domestic',
+        ));
     _showSnackBar("'${fav.brand} ${fav.model}' 찜 목록에서 삭제되었습니다.");
-    _loadData();
   }
 
   Future<void> _toggleAlert(Favorite fav) async {
@@ -128,7 +144,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
 
   Future<void> _handleLogout() async {
     final authService = AuthService();
-    
+
     // 비로그인 상태에서는 아무 동작도 하지 않음
     if (!authService.isLoggedIn) {
       return;
@@ -154,16 +170,17 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
 
     if (confirmed == true) {
       await authService.logout();
-      
+
       if (mounted) {
         // 계정별 데이터 로드 (guest 계정으로 전환)
         try {
-          final provider = Provider.of<RecentViewsProvider>(context, listen: false);
+          final provider =
+              Provider.of<RecentViewsProvider>(context, listen: false);
           await provider.reloadForCurrentUser();
         } catch (e) {
           debugPrint('Failed to reload recent views after logout: $e');
         }
-        
+
         // 메인 화면으로 돌아가기 (로그인 페이지로 이동하지 않음)
         // 이미 비로그인 상태이므로 메인 화면에 그대로 유지
         setState(() {
@@ -271,7 +288,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   // 1. 찜한 차량 탭 (DB 기반)
   Widget _buildFavoritesTab(bool isDark, Color cardColor, Color textColor) {
     final authService = AuthService();
-    
+
     // 비로그인 상태 확인
     if (!authService.isLoggedIn) {
       return Center(
@@ -298,7 +315,8 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0066FF),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -307,8 +325,10 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     }
 
     final comparisonProvider = Provider.of<ComparisonProvider>(context);
+    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    final favorites = favoritesProvider.favorites;
 
-    if (_favorites.isEmpty) {
+    if (favorites.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -359,11 +379,11 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
             onRefresh: _loadData,
             child: ListView.separated(
               padding: const EdgeInsets.all(20),
-              itemCount: _favorites.length,
+              itemCount: favorites.length,
               separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
                 return _buildFavoriteCard(
-                    _favorites[index], isDark, cardColor, textColor);
+                    favorites[index], isDark, cardColor, textColor);
               },
             ),
           ),
@@ -375,7 +395,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   // 2. 최근 분석 탭 (분석 페이지에서 클릭한 매물들)
   Widget _buildHistoryTab(bool isDark, Color cardColor, Color textColor) {
     final authService = AuthService();
-    
+
     // 비로그인 상태 확인
     if (!authService.isLoggedIn) {
       return Center(
@@ -402,7 +422,8 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0066FF),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -503,8 +524,9 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
   Widget _buildAnalysisDealCard(
       RecommendedCar deal, bool isDark, Color cardColor, Color textColor) {
     final isGood = deal.priceDiff > 0;
-    // 찜 여부 확인 (고유 매물 단위로 구별)
-    final isFavorite = _favorites.any((f) => f.isSameDeal(deal));
+    // 찜 여부 확인 (Provider 사용)
+    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    final isFavorite = favoritesProvider.isFavorite(deal);
 
     return GestureDetector(
       onTap: () => _showDealAnalysis(deal),
@@ -628,60 +650,17 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin {
     );
   }
 
-  /// RecommendedCar에서 찜 토글 (고유 매물 단위로 구별 + 즉시 UI 반영)
+  /// RecommendedCar에서 찜 토글 (Provider 사용)
   Future<void> _toggleFavoriteFromDeal(RecommendedCar deal) async {
-    // isSameDeal로 정확한 매물 구별 (detailUrl 또는 가격+주행거리 조합)
-    final existing = _favorites.where((f) => f.isSameDeal(deal)).toList();
-    final isCurrentlyFavorite = existing.isNotEmpty;
+    final provider = context.read<FavoritesProvider>();
+    final isFavorite = provider.isFavorite(deal);
 
-    // 1. 즉시 로컬 상태 업데이트 (optimistic update)
-    if (isCurrentlyFavorite) {
-      setState(() {
-        _favorites.removeWhere((f) => f.isSameDeal(deal));
-      });
+    await provider.toggleFavorite(deal);
+
+    if (isFavorite) {
+      _showSnackBar("'${deal.brand} ${deal.model}' 찜 목록에서 삭제되었습니다.");
     } else {
-      // 임시 Favorite 객체 생성
-      final tempFavorite = Favorite(
-        id: DateTime.now().millisecondsSinceEpoch,
-        carId: deal.carId,
-        brand: deal.brand,
-        model: deal.model,
-        year: deal.year,
-        mileage: deal.mileage,
-        predictedPrice: deal.predictedPrice.toDouble(),
-        actualPrice: deal.actualPrice,
-        detailUrl: deal.detailUrl,
-      );
-      setState(() {
-        _favorites.add(tempFavorite);
-      });
-    }
-
-    // 2. 서버에 요청
-    try {
-      if (isCurrentlyFavorite) {
-        await _api.removeFavorite(existing.first.id);
-        _showSnackBar("'${deal.brand} ${deal.model}' 찜 목록에서 삭제되었습니다.");
-      } else {
-        await _api.addFavorite(
-          brand: deal.brand,
-          model: deal.model,
-          year: deal.year,
-          mileage: deal.mileage,
-          predictedPrice: deal.predictedPrice.toDouble(),
-          actualPrice: deal.actualPrice,
-          detailUrl: deal.detailUrl,
-          carId: deal.carId,
-        );
-        _showSnackBar("'${deal.brand} ${deal.model}' 찜 목록에 추가되었습니다.");
-      }
-
-      // 3. 서버에서 최신 상태로 동기화
-      await _loadData();
-    } catch (e) {
-      // 실패 시 원래 상태로 복구
-      await _loadData();
-      _showSnackBar("오류가 발생했습니다.");
+      _showSnackBar("'${deal.brand} ${deal.model}' 찜 목록에 추가되었습니다.");
     }
   }
 

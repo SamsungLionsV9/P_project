@@ -16,20 +16,20 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
-    
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    
+
     // 기본 관리자 계정 정보
     private static final String ADMIN_EMAIL = "admin@carsentix.com";
     private static final String ADMIN_PASSWORD = "admin1234!";
     private static final String ADMIN_USERNAME = "admin";
-    
+
     @Override
     public void run(String... args) {
         createAdminIfNotExists();
     }
-    
+
     /**
      * 관리자 계정이 없으면 생성
      */
@@ -42,8 +42,8 @@ public class DataInitializer implements CommandLineRunner {
                     .role(User.Role.ADMIN)
                     .isActive(true)
                     .build();
-            
-            userRepository.save(admin);
+
+            userRepository.save(java.util.Objects.requireNonNull(admin));
             log.info("✅ 관리자 계정 생성 완료: {}", ADMIN_EMAIL);
             log.info("   비밀번호: {}", ADMIN_PASSWORD);
         } else {
@@ -51,4 +51,3 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 }
-

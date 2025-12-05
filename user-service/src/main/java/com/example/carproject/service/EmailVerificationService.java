@@ -20,15 +20,15 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 public class EmailVerificationService {
-    
+
     private final EmailVerificationRepository verificationRepository;
     private final JavaMailSender mailSender;
-    
+
     @Value("${app.mail.verification-code-expiry:300}")
     private int codeExpirySeconds;
-    
+
     private static final SecureRandom random = new SecureRandom();
-    
+
     /**
      * 인증 코드 생성 및 이메일 발송
      */
@@ -36,10 +36,10 @@ public class EmailVerificationService {
     public void sendVerificationCode(String email) {
         // 6자리 인증 코드 생성
         String code = generateCode();
-        
+
         // 기존 인증 코드 삭제
         verificationRepository.deleteByEmail(email);
-        
+
         // 새 인증 코드 저장
         EmailVerification verification = EmailVerification.builder()
                 .email(email)
@@ -47,8 +47,8 @@ public class EmailVerificationService {
                 .expiryTime(LocalDateTime.now().plusSeconds(codeExpirySeconds))
                 .verified(false)
                 .build();
-        verificationRepository.save(verification);
-        
+        verificationRepository.save(java.util.Objects.requireNonNull(verification));
+
         // 개발 환경: 항상 콘솔에 인증 코드 출력
         log.info("========================================");
         log.info("🔐 [인증 코드] {} -> {}", email, code);
@@ -56,7 +56,7 @@ public class EmailVerificationService {
         System.out.println("========================================");
         System.out.println("🔐 [인증 코드] " + email + " -> " + code);
         System.out.println("========================================");
-        
+
         // 이메일 발송 시도
         try {
             sendEmail(email, code);
@@ -65,46 +65,45 @@ public class EmailVerificationService {
             log.warn("⚠️ 이메일 발송 실패 (개발 환경에서는 위 콘솔 코드 사용): {}", e.getMessage());
         }
     }
-    
+
     /**
      * 인증 코드 검증
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean verifyCode(String email, String code) {
-        Optional<EmailVerification> verificationOpt = 
-            verificationRepository.findByEmailAndCodeAndVerifiedFalse(email, code);
-        
+        Optional<EmailVerification> verificationOpt = verificationRepository.findByEmailAndCodeAndVerifiedFalse(email,
+                code);
+
         if (verificationOpt.isEmpty()) {
             log.warn("인증 코드 없음 또는 이미 사용됨: {}", email);
             return false;
         }
-        
+
         EmailVerification verification = verificationOpt.get();
-        
+
         if (verification.isExpired()) {
             log.warn("인증 코드 만료됨: {}", email);
             return false;
         }
-        
+
         // 인증 완료 처리
         verification.setVerified(true);
         verificationRepository.save(verification);
-        
+
         log.info("이메일 인증 완료: {}", email);
         return true;
     }
-    
+
     /**
      * 이메일 인증 완료 여부 확인
      */
     @Transactional(readOnly = true)
     public boolean isEmailVerified(String email) {
-        Optional<EmailVerification> verificationOpt = 
-            verificationRepository.findTopByEmailOrderByCreatedAtDesc(email);
-        
+        Optional<EmailVerification> verificationOpt = verificationRepository.findTopByEmailOrderByCreatedAtDesc(email);
+
         return verificationOpt.map(EmailVerification::isVerified).orElse(false);
     }
-    
+
     /**
      * 6자리 숫자 코드 생성
      */
@@ -112,49 +111,50 @@ public class EmailVerificationService {
         int code = 100000 + random.nextInt(900000);
         return String.valueOf(code);
     }
-    
+
     /**
      * 인증 이메일 발송
      */
     private void sendEmail(String to, String code) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        
-        helper.setTo(to);
+
+        helper.setTo(java.util.Objects.requireNonNull(to));
         helper.setSubject("[중고차 시세 예측] 이메일 인증 코드");
-        
+
         String htmlContent = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-            </head>
-            <body style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background: linear-gradient(135deg, #0066FF, #00AAFF); padding: 30px; border-radius: 10px; text-align: center;">
-                    <h1 style="color: white; margin: 0;">🚗 중고차 시세 예측</h1>
-                </div>
-                <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                    <h2 style="color: #333;">이메일 인증 코드</h2>
-                    <p style="color: #666; font-size: 16px;">아래 인증 코드를 입력해주세요.</p>
-                    <div style="background: white; border: 2px solid #0066FF; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
-                        <span style="font-size: 32px; font-weight: bold; color: #0066FF; letter-spacing: 8px;">%s</span>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                </head>
+                <body style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="background: linear-gradient(135deg, #0066FF, #00AAFF); padding: 30px; border-radius: 10px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">🚗 중고차 시세 예측</h1>
                     </div>
-                    <p style="color: #999; font-size: 14px;">
-                        • 인증 코드는 <strong>5분간</strong> 유효합니다.<br>
-                        • 본인이 요청하지 않은 경우 이 메일을 무시하세요.
+                    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+                        <h2 style="color: #333;">이메일 인증 코드</h2>
+                        <p style="color: #666; font-size: 16px;">아래 인증 코드를 입력해주세요.</p>
+                        <div style="background: white; border: 2px solid #0066FF; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
+                            <span style="font-size: 32px; font-weight: bold; color: #0066FF; letter-spacing: 8px;">%s</span>
+                        </div>
+                        <p style="color: #999; font-size: 14px;">
+                            • 인증 코드는 <strong>5분간</strong> 유효합니다.<br>
+                            • 본인이 요청하지 않은 경우 이 메일을 무시하세요.
+                        </p>
+                    </div>
+                    <p style="color: #aaa; font-size: 12px; text-align: center; margin-top: 20px;">
+                        © 2025 중고차 시세 예측 AI. All rights reserved.
                     </p>
-                </div>
-                <p style="color: #aaa; font-size: 12px; text-align: center; margin-top: 20px;">
-                    © 2025 중고차 시세 예측 AI. All rights reserved.
-                </p>
-            </body>
-            </html>
-            """.formatted(code);
-        
-        helper.setText(htmlContent, true);
+                </body>
+                </html>
+                """
+                .formatted(code);
+
+        helper.setText(java.util.Objects.requireNonNull(htmlContent), true);
         mailSender.send(message);
     }
-    
+
     /**
      * 아이디 찾기 이메일 발송
      */
@@ -162,40 +162,41 @@ public class EmailVerificationService {
     public void sendFindIdEmail(String email, String username) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        
-        helper.setTo(email);
+
+        helper.setTo(java.util.Objects.requireNonNull(email));
         helper.setSubject("[중고차 시세 예측] 아이디 찾기 결과");
-        
+
         String htmlContent = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-            </head>
-            <body style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background: linear-gradient(135deg, #0066FF, #00AAFF); padding: 30px; border-radius: 10px; text-align: center;">
-                    <h1 style="color: white; margin: 0;">🚗 중고차 시세 예측</h1>
-                </div>
-                <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
-                    <h2 style="color: #333;">아이디 찾기 결과</h2>
-                    <p style="color: #666; font-size: 16px;">요청하신 계정 정보입니다.</p>
-                    <div style="background: white; border: 2px solid #0066FF; border-radius: 10px; padding: 20px; margin: 20px 0;">
-                        <p style="color: #333; font-size: 14px; margin: 8px 0;"><strong>이메일:</strong> %s</p>
-                        <p style="color: #333; font-size: 14px; margin: 8px 0;"><strong>사용자명:</strong> %s</p>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                </head>
+                <body style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="background: linear-gradient(135deg, #0066FF, #00AAFF); padding: 30px; border-radius: 10px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">🚗 중고차 시세 예측</h1>
                     </div>
-                    <p style="color: #999; font-size: 14px;">
-                        • 로그인은 이메일 주소로 가능합니다.<br>
-                        • 본인이 요청하지 않은 경우 이 메일을 무시하세요.
+                    <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+                        <h2 style="color: #333;">아이디 찾기 결과</h2>
+                        <p style="color: #666; font-size: 16px;">요청하신 계정 정보입니다.</p>
+                        <div style="background: white; border: 2px solid #0066FF; border-radius: 10px; padding: 20px; margin: 20px 0;">
+                            <p style="color: #333; font-size: 14px; margin: 8px 0;"><strong>이메일:</strong> %s</p>
+                            <p style="color: #333; font-size: 14px; margin: 8px 0;"><strong>사용자명:</strong> %s</p>
+                        </div>
+                        <p style="color: #999; font-size: 14px;">
+                            • 로그인은 이메일 주소로 가능합니다.<br>
+                            • 본인이 요청하지 않은 경우 이 메일을 무시하세요.
+                        </p>
+                    </div>
+                    <p style="color: #aaa; font-size: 12px; text-align: center; margin-top: 20px;">
+                        © 2025 중고차 시세 예측 AI. All rights reserved.
                     </p>
-                </div>
-                <p style="color: #aaa; font-size: 12px; text-align: center; margin-top: 20px;">
-                    © 2025 중고차 시세 예측 AI. All rights reserved.
-                </p>
-            </body>
-            </html>
-            """.formatted(email, username);
-        
-        helper.setText(htmlContent, true);
+                </body>
+                </html>
+                """
+                .formatted(email, username);
+
+        helper.setText(java.util.Objects.requireNonNull(htmlContent), true);
         mailSender.send(message);
     }
 }

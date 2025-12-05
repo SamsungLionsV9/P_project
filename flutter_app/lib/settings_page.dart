@@ -193,7 +193,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: const Icon(Icons.logout, color: Colors.red, size: 20),
             ),
             const SizedBox(width: 16),
-            Expanded(
+            const Expanded(
               child: Text(
                 "로그아웃",
                 style: TextStyle(
@@ -251,8 +251,11 @@ class _SettingsPageState extends State<SettingsPage> {
           // 서버 삭제 실패해도 로컬 삭제는 진행
         }
 
+        if (!mounted) return;
+
         // 2. 로컬의 최근 조회 기록 삭제
-        final recentViewsProvider = Provider.of<RecentViewsProvider>(context, listen: false);
+        final recentViewsProvider =
+            Provider.of<RecentViewsProvider>(context, listen: false);
         await recentViewsProvider.clearAll();
 
         // 로딩 다이얼로그 닫기
@@ -290,7 +293,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _handleLogout() async {
     final authService = AuthService();
-    
+
     // 비로그인 상태에서는 아무 동작도 하지 않음
     if (!authService.isLoggedIn) {
       return;
@@ -316,16 +319,17 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (confirmed == true) {
       await authService.logout();
-      
+
       if (mounted) {
         // 계정별 데이터 로드 (guest 계정으로 전환)
         try {
-          final provider = Provider.of<RecentViewsProvider>(context, listen: false);
+          final provider =
+              Provider.of<RecentViewsProvider>(context, listen: false);
           await provider.reloadForCurrentUser();
         } catch (e) {
           debugPrint('Failed to reload recent views after logout: $e');
         }
-        
+
         // 메인 화면으로 돌아가기 (로그인 페이지로 이동하지 않음)
         // 이미 비로그인 상태이므로 메인 화면에 그대로 유지
         // Navigator를 사용하지 않고 상태만 갱신

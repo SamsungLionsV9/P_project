@@ -95,6 +95,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 정적 파일 마운트 (차량 이미지)
+if os.path.exists(CAR_IMAGES_DIR):
+    app.mount("/car-images", StaticFiles(directory=CAR_IMAGES_DIR), name="car-images")
+    logger.info(f"Mounted car images directory: {CAR_IMAGES_DIR}")
+else:
+    logger.warning(f"Car images directory not found: {CAR_IMAGES_DIR}")
+
 # 서비스 초기화
 prediction_service = PredictionServiceV12()
 timing_service = TimingService()

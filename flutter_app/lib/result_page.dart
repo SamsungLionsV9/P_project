@@ -156,35 +156,61 @@ class _ResultPageState extends State<ResultPage>
                         "${widget.brand} ${widget.model} (${widget.year}년식)",
                         style: TextStyle(color: subTextColor, fontSize: 12),
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        "예상 시세",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "${_formatPrice(prediction.predictedPrice)}만원",
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0066FF),
-                        ),
-                      ),
                       const SizedBox(height: 16),
-                      Divider(color: borderColor),
-                      const SizedBox(height: 16),
-                      const Text(
-                        "합리적 범위",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "${_formatPrice(prediction.priceRange[0])} ~ ${_formatPrice(prediction.priceRange[1])}만원",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "예상 시세",
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "${_formatPrice(prediction.predictedPrice)}만원",
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0066FF),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            height: 40,
+                            width: 1,
+                            color: borderColor,
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "합리적 범위",
+                                  style: TextStyle(
+                                      color: Colors.grey, fontSize: 12),
+                                ),
+                                const SizedBox(height: 4),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    "${_formatPrice(prediction.priceRange[0])} ~ ${_formatPrice(prediction.priceRange[1])}만원",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
