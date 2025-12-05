@@ -23,6 +23,7 @@ import 'widgets/common/bottom_nav_bar.dart';
 import 'widgets/market_trend_card.dart';
 import 'widgets/ai_pick_card.dart';
 import 'widgets/professional_timing_card.dart';
+import 'widgets/common/hover_card.dart';
 import 'utils/car_image_mapper.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 
@@ -1260,23 +1261,15 @@ class CarCard extends StatelessWidget {
     final textColor = isDark ? Colors.white : Colors.black87;
     final imageUrl = _getImageUrl();
 
-    return GestureDetector(
+    return HoverCard(
       onTap: onTap,
+      hoverScale: 1.05,
+      hoverElevation: 16,
+      borderRadius: BorderRadius.circular(20),
+      backgroundColor: cardColor,
       child: Container(
       width: 140,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[50]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
