@@ -11,7 +11,20 @@ export default defineConfig({
     port: 3001,
     host: '0.0.0.0',
     proxy: {
-      // ML Service API - 모든 /api/admin 경로
+      // User Service API (로그인, 사용자 관리) - 더 구체적인 경로 먼저!
+      '/api/admin/login': {
+        target: USER_SERVICE_URL,
+        changeOrigin: true,
+      },
+      '/api/admin/me': {
+        target: USER_SERVICE_URL,
+        changeOrigin: true,
+      },
+      '/api/admin/users': {
+        target: USER_SERVICE_URL,
+        changeOrigin: true,
+      },
+      // ML Service API - 나머지 /api/admin 경로
       '/api/admin': {
         target: ML_SERVICE_URL,
         changeOrigin: true,
@@ -20,7 +33,6 @@ export default defineConfig({
         target: ML_SERVICE_URL,
         changeOrigin: true,
       },
-      // User Service API
       '/api/auth': {
         target: USER_SERVICE_URL,
         changeOrigin: true,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 import 'car_info_input_page.dart';
 import 'mypage.dart';
 import 'settings_page.dart';
@@ -20,7 +22,9 @@ import 'widgets/model_deals_modal.dart';
 import 'widgets/common/bottom_nav_bar.dart';
 import 'widgets/market_trend_card.dart';
 import 'widgets/ai_pick_card.dart';
+import 'widgets/professional_timing_card.dart';
 import 'utils/car_image_mapper.dart';
+import 'package:percent_indicator/circular_percent_indicator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,37 +59,55 @@ class CarPriceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
-        return MaterialApp(
-          title: '언제 살까?',  // 차별화: 시세가 아닌 타이밍
-          debugShowCheckedModeBanner: false,
-          themeMode: themeProvider.themeMode,
-          // 라이트 테마 정의
-          theme: ThemeData(
-            brightness: Brightness.light,
-            primaryColor: const Color(0xFF0066FF),
-            scaffoldBackgroundColor: const Color(0xFFF5F7FA),
-            fontFamily: 'Pretendard',
-            useMaterial3: true,
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFFF5F7FA),
-              foregroundColor: Colors.black,
-            ),
-          ),
-          // 다크 테마 정의
-          darkTheme: ThemeData(
-            brightness: Brightness.dark,
-            primaryColor: const Color(0xFF0066FF),
-            scaffoldBackgroundColor: const Color(0xFF121212),
-            fontFamily: 'Pretendard',
-            useMaterial3: true,
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF121212),
-              foregroundColor: Colors.white,
-            ),
-          ),
-          home: const MainScreen(),
+    return ScreenUtilInit(
+      // 디자인 기준 사이즈 (일반적인 모바일 기준)
+      designSize: const Size(390, 844),
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return Consumer<ThemeProvider>(
+          builder: (context, themeProvider, child) {
+            return MaterialApp(
+              title: '언제 살까?',  // 차별화: 시세가 아닌 타이밍
+              debugShowCheckedModeBanner: false,
+              themeMode: themeProvider.themeMode,
+              // 반응형 브레이크포인트 설정
+              builder: (context, child) => ResponsiveBreakpoints.builder(
+                child: child!,
+                breakpoints: [
+                  const Breakpoint(start: 0, end: 450, name: MOBILE),
+                  const Breakpoint(start: 451, end: 800, name: TABLET),
+                  const Breakpoint(start: 801, end: 1920, name: DESKTOP),
+                  const Breakpoint(start: 1921, end: double.infinity, name: '4K'),
+                ],
+              ),
+              // 라이트 테마 정의
+              theme: ThemeData(
+                brightness: Brightness.light,
+                primaryColor: const Color(0xFF0066FF),
+                scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+                fontFamily: 'Pretendard',
+                useMaterial3: true,
+                appBarTheme: const AppBarTheme(
+                  backgroundColor: Color(0xFFF5F7FA),
+                  foregroundColor: Colors.black,
+                ),
+              ),
+              // 다크 테마 정의
+              darkTheme: ThemeData(
+                brightness: Brightness.dark,
+                primaryColor: const Color(0xFF0066FF),
+                scaffoldBackgroundColor: const Color(0xFF121212),
+                fontFamily: 'Pretendard',
+                useMaterial3: true,
+                appBarTheme: const AppBarTheme(
+                  backgroundColor: Color(0xFF121212),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+              home: const MainScreen(),
+            );
+          },
         );
       },
     );
@@ -281,10 +303,14 @@ class _HomePageContentState extends State<HomePageContent> {
 
     if (result['success'] == true) {
       setState(() => _isLoggedIn = true);
-      _showMessage('로그인 성공!');
       _emailController.clear();
       _passwordController.clear();
-      // 로그인 성공 시 MyPage 업데이트
+      // 로그인 성공 시 모달 닫기
+      if (mounted) {
+        Navigator.pop(context);
+        _showMessage('로그인 성공!');
+      }
+      // MyPage 업데이트
       widget.onLoginSuccess?.call();
     } else {
       _showMessage(result['message'] ?? '로그인 실패', isError: true);
@@ -321,8 +347,12 @@ class _HomePageContentState extends State<HomePageContent> {
 
     if (result != null && result['success'] == true) {
       setState(() => _isLoggedIn = true);
-      _showMessage('${_getProviderName(provider)} 로그인 성공!');
-      // 로그인 성공 시 MyPage 업데이트
+      // 로그인 성공 시 모달 닫기
+      if (mounted) {
+        Navigator.pop(context);
+        _showMessage('${_getProviderName(provider)} 로그인 성공!');
+      }
+      // MyPage 업데이트
       widget.onLoginSuccess?.call();
     }
   }
@@ -337,6 +367,46 @@ class _HomePageContentState extends State<HomePageContent> {
   }
 
   /// 회원가입 페이지로 이동
+
+  /// 로그인 바텀시트 표시
+  void _showLoginBottomSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              _buildLoginForm(isDark, textColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _navigateToSignup() async {
     final result = await Navigator.push<bool>(
       context,
@@ -477,13 +547,7 @@ class _HomePageContentState extends State<HomePageContent> {
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const SignupPage()),
-                      );
-                      _checkLoginStatus();
-                    },
+                    onPressed: _showLoginBottomSheet,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white, width: 1),
@@ -502,13 +566,20 @@ class _HomePageContentState extends State<HomePageContent> {
             )
           else
             Center(
-              child: Text(
-                "환영합니다, ${_authService.userEmail ?? '사용자'}님!",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "${_authService.userEmail ?? '사용자'}님",
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _logout,
+                    style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                    child: const Text('로그아웃', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
               ),
             ),
         ],
@@ -532,24 +603,12 @@ class _HomePageContentState extends State<HomePageContent> {
 
             const SizedBox(height: 24),
 
-            // 2. 구매 지수 & AI 추천 픽 (듀얼 카드)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: MarketTrendCard(
-                      onTap: () => widget.onNavigateToSearch?.call(),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AiPickCard(
-                      onTap: () => _showAiPickDetails(),
-                    ),
-                  ),
-                ],
-              ),
+            // 2.  차별화: 오늘의 구매 타이밍 (핵심 강조)
+            // ★ 전문적인 타이밍 카드 (고도화)
+            ProfessionalTimingCard(
+              timing: _marketTiming ?? MarketTimingResult.defaultValue(),
+              isLoading: _isLoadingTiming,
+              onTap: () => widget.onNavigateToSearch?.call(),
             ),
 
             const SizedBox(height: 32),
@@ -843,12 +902,19 @@ class _HomePageContentState extends State<HomePageContent> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              scoreColor.withOpacity(0.15),
-              scoreColor.withOpacity(0.05),
+              Colors.white,
+              scoreColor.withOpacity(0.08),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: scoreColor.withOpacity(0.3), width: 1),
+          border: Border.all(color: scoreColor.withOpacity(0.2), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: scoreColor.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

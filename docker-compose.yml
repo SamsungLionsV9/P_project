@@ -27,11 +27,14 @@ services:
       - ./config:/app/config:cached
       - ./run_server.py:/app/run_server.py:cached
       - ./.env:/app/.env:cached
+      - "./차량 이미지:/app/차량 이미지:cached"
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - BOK_API_KEY=${BOK_API_KEY:-}
+      - NAVER_CLIENT_ID=${NAVER_CLIENT_ID:-}
+      - NAVER_CLIENT_SECRET=${NAVER_CLIENT_SECRET:-}
       - SPRING_BOOT_URL=http://user-service:8080
     depends_on:
       - user-service

@@ -76,6 +76,8 @@ from services.admin_service import AdminService  # 관리자 대시보드
 from services.history_service import get_history_service  # 분석 이력 및 AI 로그
 from services.database_service import get_database_service  # 영구 DB 저장소
 from services.car_image_service import CarImageService  # 차량 이미지
+from services.enhanced_timing import EnhancedTimingService, get_economic_insights, get_timing_prediction, get_regional_analysis  # Phase 3 고도화
+from services.b2b_intelligence import get_b2b_intelligence  # B2B Market Intelligence
 
 app = FastAPI(
     title="Car-Sentix API",
@@ -105,6 +107,8 @@ similar_service = get_similar_service()
 admin_service = AdminService()  # 관리자 대시보드
 history_service = get_history_service()  # 분석 이력 및 AI 로그
 db_service = get_database_service()  # 영구 DB 저장소
+enhanced_timing_service = EnhancedTimingService()  # Phase 3 고도화
+b2b_intelligence = get_b2b_intelligence()  # B2B Market Intelligence
 
 logger.info("All services initialized successfully")
 
@@ -327,9 +331,21 @@ async def get_car_image(filename: str, size: int = 400, quality: int = 85):
             }
         )
 
-    # 파일이 없으면 404 (로그 추가)
-    logger.warning(f"Image not found: {base_name} (searched in domestic & imported)")
-    raise HTTPException(status_code=404, detail=f"이미지를 찾을 수 없습니다: {base_name}")
+    # 파일이 없으면 CarImageService의 CDN URL로 리다이렉트
+    from services.car_image_service import CarImageService
+    
+    # 모델명으로 CDN 이미지 URL 조회
+    cdn_url = CarImageService.get_model_image("", base_name)
+    
+    if cdn_url and cdn_url != CarImageService.DEFAULT_CAR_IMAGE:
+        logger.info(f"Redirecting to CDN: {base_name} -> {cdn_url}")
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url=cdn_url, status_code=302)
+    
+    # CDN에도 없으면 기본 이미지로 리다이렉트
+    logger.warning(f"Image not found: {base_name}, using default")
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url=CarImageService.DEFAULT_CAR_IMAGE, status_code=302)
 
 @app.get("/api/car-images/list")
 async def list_car_images():
@@ -468,6 +484,178 @@ async def get_market_timing():
             "updated_at": datetime.now().isoformat(),
             "message": "시장 데이터를 수집하고 있습니다"
         }
+
+# ========== Phase 3: 고도화된 타이밍 API ==========
+
+@app.get("/api/economic-insights")
+async def get_economic_insights_api():
+    """
+    경제 인사이트 API (대시보드용)
+    
+    T3.1: 전월 대비 추세
+    T3.3: 지역별 수요
+    T3.4: 향후 1-2주 예측
+    """
+    try:
+        result = enhanced_timing_service.get_full_analysis()
+        return {
+            "success": True,
+            **result
+        }
+    except Exception as e:
+        logger.error(f"Economic insights error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "current_score": 50,
+            "economic_indicators": {},
+            "prediction": {}
+        }
+
+@app.get("/api/timing-prediction")
+async def get_timing_prediction_api(days: int = 14):
+    """
+    타이밍 예측 API
+    
+    Args:
+        days: 예측 기간 (기본 14일)
+    
+    Returns:
+        향후 1-2주 타이밍 예측 데이터
+    """
+    try:
+        result = get_timing_prediction(days)
+        return {
+            "success": True,
+            **result
+        }
+    except Exception as e:
+        logger.error(f"Timing prediction error: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/regional-analysis")
+async def get_regional_analysis_api(region: str = "전국", vehicle_type: str = None):
+    """
+    지역별 수요 분석 API
+    
+    Args:
+        region: 지역명 (서울, 경기, 부산 등)
+        vehicle_type: 차종 (SUV, 세단, 경차, 전기차)
+    """
+    try:
+        result = get_regional_analysis(region, vehicle_type)
+        return {
+            "success": True,
+            **result
+        }
+    except Exception as e:
+        logger.error(f"Regional analysis error: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/admin/economic-dashboard")
+async def get_economic_dashboard():
+    """
+    관리자 대시보드용 경제 인사이트 통합 데이터
+    """
+    try:
+        # 1. 경제지표
+        insights = enhanced_timing_service.get_full_analysis()
+        
+        # 2. 지역별 TOP 5
+        regions = ['서울', '경기', '부산', '대구', '인천']
+        regional_data = []
+        for region in regions:
+            data = get_regional_analysis(region)
+            regional_data.append({
+                'region': region,
+                'demand_index': data.get('demand_index', 50),
+                'price_premium': data.get('price_premium', 0)
+            })
+        
+        return {
+            "success": True,
+            "current_score": insights['current_score'],
+            "indicators": insights['economic_indicators'],
+            "prediction": insights['prediction'],
+            "regional_ranking": sorted(regional_data, key=lambda x: x['demand_index'], reverse=True),
+            "summary": insights['summary'],
+            "updated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Economic dashboard error: {e}")
+        return {"success": False, "error": str(e)}
+
+# ========== B2B Market Intelligence API ==========
+
+@app.get("/api/b2b/dashboard")
+async def get_b2b_dashboard():
+    """
+    B2B Market Intelligence 대시보드 전체 데이터
+    
+    - 시장 기회 지수 (Market Opportunity Index)
+    - 매집 추천 (Buying Signals)
+    - 매각 경고 (Sell Signals)
+    - 포트폴리오 ROI
+    - 예측 정확도
+    - 민감도 분석
+    - API 사용 현황
+    """
+    try:
+        data = b2b_intelligence.get_full_dashboard_data()
+        return {"success": True, **data}
+    except Exception as e:
+        logger.error(f"B2B dashboard error: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/b2b/market-opportunity")
+async def get_market_opportunity():
+    """시장 기회 지수"""
+    try:
+        return {"success": True, **b2b_intelligence.get_market_opportunity_index()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/b2b/buying-signals")
+async def get_buying_signals(limit: int = 5):
+    """매집 추천"""
+    try:
+        signals = b2b_intelligence.get_buying_signals(limit)
+        return {"success": True, "signals": signals}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/b2b/sell-signals")
+async def get_sell_signals(limit: int = 5):
+    """매각 경고"""
+    try:
+        signals = b2b_intelligence.get_sell_signals(limit)
+        return {"success": True, "signals": signals}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/b2b/sensitivity")
+async def get_sensitivity_analysis():
+    """민감도 분석"""
+    try:
+        return {"success": True, **b2b_intelligence.get_sensitivity_analysis()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/b2b/forecast-accuracy")
+async def get_forecast_accuracy():
+    """예측 정확도"""
+    try:
+        return {"success": True, **b2b_intelligence.get_forecast_accuracy()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/b2b/api-analytics")
+async def get_api_analytics():
+    """API 사용 현황"""
+    try:
+        return {"success": True, **b2b_intelligence.get_api_analytics()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/smart-analysis")
 async def smart_analysis(request: SmartAnalysisRequest, user_id: str = "guest"):

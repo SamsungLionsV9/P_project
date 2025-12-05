@@ -398,16 +398,16 @@ class PredictionServiceV12:
                 features = self._create_domestic_features_v12(
                     model_name, year, mileage, '가솔린', options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력 (만원 단위 - log 변환됨)
+                base_price = np.expm1(pred_log)
                 base_price = base_price * fuel_adj  # 시장 현실 기반 연료 조정
             else:
                 # Fallback V11
                 features = self._create_domestic_features_v11(
                     model_name, year, mileage, options, accident_free, grade)
                 pred_log = self.domestic_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력 (만원 단위 - log 변환됨)
+                base_price = np.expm1(pred_log)
                 base_price = base_price * fuel_adj
             
             # 국산차 옵션 프리미엄 명시적 추가
@@ -429,15 +429,15 @@ class PredictionServiceV12:
                 features = self._create_imported_features_v14(
                     model_name, brand, year, mileage, '가솔린', options, accident_free, grade)
                 pred_log = self.imported_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력 (만원 단위 - log 변환됨)
+                base_price = np.expm1(pred_log)
             else:
                 # Fallback V13
                 features = self._create_imported_features_v13(
                     model_name, brand, year, mileage, options, accident_free, grade)
                 pred_log = self.imported_model.predict(features)[0]
-                # 모델 출력(억원) -> 만원 변환
-                base_price = np.expm1(pred_log) * 1000
+                # 모델 출력 (만원 단위 - log 변환됨)
+                base_price = np.expm1(pred_log)
             
             # 연료 조정 + 옵션 프리미엄
             base_price = base_price * imported_fuel_adj

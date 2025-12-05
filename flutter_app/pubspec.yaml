@@ -47,6 +47,16 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   provider: ^6.1.5+1
+  
+  # 🎨 전문 디자인 패키지
+  google_fonts: ^6.1.0         # Pretendard 등 전문 폰트
+  animate_do: ^3.3.4           # 간단한 애니메이션
+  percent_indicator: ^4.2.3    # 신뢰도 원형 게이지
+  shimmer: ^3.0.0              # 로딩 스켈레톤
+  
+  # 📱 반응형 디자인
+  flutter_screenutil: ^5.9.3   # 화면 크기 적응형 UI
+  responsive_framework: ^1.5.1 # 반응형 레이아웃 프레임워크
 
 dev_dependencies:
   flutter_test:

@@ -1,12 +1,14 @@
 # ============================================================
-# Car-Sentix Git Ignore
+# Car-Sentix Project .gitignore
 # ============================================================
 
-# ========== Environment ==========
+# ========== 환경 변수 (절대 커밋 금지!) ==========
 .env
 .env.local
-.env.*.local
-*.env
+.env.*
+ml-service/.env
+user-service/.env
+admin-dashboard/.env
 
 # ========== Python ==========
 __pycache__/
@@ -14,110 +16,97 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 .pytest_cache/
 .mypy_cache/
-.coverage
-htmlcov/
-.tox/
-
-# ========== Java/Gradle ==========
-.gradle/
-**/build/
-!gradle/wrapper/gradle-wrapper.jar
-*.class
-*.jar
-*.war
-*.ear
-*.nar
-target/
-*.iml
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
 
 # ========== Node.js ==========
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+npm-debug.log
+yarn-error.log
 .pnpm-store/
 
+# ========== Java/Gradle ==========
+.gradle/
+build/
+target/
+*.class
+*.jar
+*.war
+!gradle-wrapper.jar
+bin/
+
+# ========== Flutter ==========
+flutter_app/.dart_tool/
+flutter_app/.packages
+flutter_app/build/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/.idea/
+flutter_app/*.iml
+flutter_app/android/.kotlin/
+flutter_app/android/*.iml
+flutter_sdk/
+
 # ========== IDE ==========
-.idea/
 .vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
+.idea/
 *.swp
 *.swo
-*.sublime-*
-.project
-.classpath
-.settings/
-
-# ========== OS ==========
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+*.iml
 
 # ========== Logs ==========
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# ========== Data & Models ==========
-# Large data files (add specific ones to track if needed)
-data/*.csv
-data/*.json
-!data/.gitkeep
-models/*.pkl
-models/*.joblib
-models/*.h5
-!models/.gitkeep
+# ========== Database ==========
+*.db
+*.mv.db
+*.trace.db
+data/*.db
 
-# ========== Docker ==========
-# Don't ignore Dockerfiles and compose files
-!Dockerfile
-!docker-compose*.yml
-!.dockerignore
+# ========== OS ==========
+.DS_Store
+Thumbs.db
 
 # ========== Temporary ==========
 tmp/
 temp/
 *.tmp
-*.temp
 *.bak
-*.backup
 
-# ========== Flutter ==========
-flutter/.pub-cache/
-flutter_app/.dart_tool/
-flutter_app/.packages
-flutter_app/build/
-*.ipr
-*.iws
+# ========== Large Files ==========
+*.csv
+*.zip
+*.tar.gz
+*.pkl
+*.joblib
 
 # ========== Archive ==========
 _archive/
 
-# ========== Large files ==========
-*.zip
-*.tar.gz
-*.rar
-*.7z
+# ========== Cache ==========
+config/__pycache__/
+src/__pycache__/
+ml-service/__pycache__/
+ml-service/models/__pycache__/
+ml-service/schemas/__pycache__/
+ml-service/services/__pycache__/
+ml-service/utils/__pycache__/
+user-service/data/
+
+# ========== Generated ==========
+*.json
+!package.json
+!package-lock.json
+!pnpm-lock.yaml
+!tsconfig.json
+!*.config.json
+
+# ========== Scripts (임시) ==========
+fix_ui.py
+scripts/check_overfitting.py

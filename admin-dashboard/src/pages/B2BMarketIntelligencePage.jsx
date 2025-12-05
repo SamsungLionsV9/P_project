@@ -107,7 +107,7 @@ function B2BMarketIntelligencePage() {
       {/* 헤더 */}
       <div className="dashboard-header">
         <div className="header-left">
-          <h1><Rocket size={24} style={{display: 'inline', marginRight: '8px'}} /> B2B 인사이트</h1>
+          <h1><Rocket size={24} style={{ display: 'inline', marginRight: '8px' }} /> B2B 인사이트</h1>
           <p className="subtitle">중고차 시장 예측 API 대시보드</p>
         </div>
         <div className="header-right">
@@ -335,8 +335,8 @@ function B2BMarketIntelligencePage() {
             {apiStats.use_cases && Object.entries(apiStats.use_cases).map(([key, value]) => (
               <div key={key} className="use-case-item">
                 <span className="use-case-name">
-                  {key === 'dynamic_pricing' ? '동적 가격 책정' : 
-                   key === 'inventory_risk' ? '재고 리스크 관리' : '대출 심사 로직'}
+                  {key === 'dynamic_pricing' ? '동적 가격 책정' :
+                    key === 'inventory_risk' ? '재고 리스크 관리' : '대출 심사 로직'}
                 </span>
                 <div className="use-case-bar">
                   <div className="bar-fill" style={{ width: `${value}%` }}></div>
@@ -489,14 +489,14 @@ function B2BMarketIntelligencePage() {
         .b2b-dashboard {
           background: #f8fafc;
           min-height: 100vh;
-          padding: 20px 24px;
+          padding: 16px 20px;
         }
         .dashboard-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 12px;
-          padding-bottom: 8px;
+          margin: 0 0 16px 0;
+          padding: 0 0 12px 0;
           border-bottom: 1px solid #e2e8f0;
         }
         .header-left h1 {
@@ -558,14 +558,17 @@ function B2BMarketIntelligencePage() {
           to { transform: rotate(360deg); }
         }
         
-        /* KPI Section - 컴팩트 버전 */
-        .kpi-section {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-          margin-bottom: 12px;
-          margin-top: 0;
-        }
+       /* KPI Section 수정 */
+/* KPI Section 수정 */
+.kpi-section {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 16px;
+  margin: 0 0 20px 0;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
         .kpi-card {
           background: white;
           border-radius: 12px;
@@ -573,26 +576,34 @@ function B2BMarketIntelligencePage() {
           border: 1px solid #e2e8f0;
           transition: all 0.2s;
           min-height: auto;
+          box-sizing: border-box;
         }
         .kpi-card:hover {
           box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .kpi-card.main {
-          border-left: none;
+          /* border-left는 기본 1px solid 유지 */
         }
-        .kpi-card.combined {
-          padding: 12px;
-          border-top: 3px solid;
-        }
+/* 첫 번째 카드 설정 단순화 */
+.kpi-card.main.combined {
+  border-top: 3px solid;
+  grid-column: 1; /* 강제로 1번 컬럼 시작 지정 */
+  justify-self: start; /* 왼쪽 정렬 강제 */
+  width: 100%; /* 너비 꽉 채우기 */
+  margin-left: 0; /* 마진 제거 */
+}
         .moi-combined {
           display: flex;
-          gap: 12px;
+          gap: 0;
           width: 100%;
+          align-items: stretch;
+          margin: 0;
         }
         .macro-indicators {
-          flex: 0 0 auto;
+          flex: 1;
           border-right: 1px solid #e2e8f0;
           padding-right: 12px;
+          margin-right: 12px;
         }
         .macro-title {
           font-size: 11px;
