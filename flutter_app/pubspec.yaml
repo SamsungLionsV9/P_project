@@ -80,9 +80,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # 차량 이미지: 네트워크 URL 방식으로 변경 (APK 크기 최소화)
-  # assets:
-  #   - assets/images/cars/
+  # 앱 로고 및 이미지
+  assets:
+    - assets/logo.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

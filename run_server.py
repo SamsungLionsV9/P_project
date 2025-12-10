@@ -70,6 +70,9 @@ stats_cache = SimpleCache(ttl_seconds=30)
 from services.prediction_v12 import PredictionServiceV12  # V12 (FuelType 포함)
 from services.timing import TimingService
 from services.groq_service import GroqService
+
+# Groq 모델 이름
+GROQ_MODEL = "llama-3.3-70b-versatile"
 from services.recommendation_service import get_recommendation_service  # 신규: 추천 서비스
 from services.similar_service import get_similar_service
 from services.admin_service import AdminService  # 관리자 대시보드

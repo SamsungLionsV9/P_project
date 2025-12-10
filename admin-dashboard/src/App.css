@@ -52,6 +52,13 @@ body {
   border-radius: 10px;
 }
 
+.logo-image {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
 .service-name {
   font-size: 18px;
   font-weight: 600;

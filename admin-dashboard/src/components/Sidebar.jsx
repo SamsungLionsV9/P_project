@@ -23,7 +23,7 @@ function Sidebar({ activeMenu, setActiveMenu }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <div className="logo-box" />
+        <img src="/logo.png" alt="언제 살까?" className="logo-image" />
         <span className="service-name">언제 살까?</span>
       </div>
 

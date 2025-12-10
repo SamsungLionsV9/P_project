@@ -38,7 +38,7 @@ import {
   Legend,
 } from "recharts";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "";  // 프록시 사용
 
 /**
  * B2B Market Intelligence Dashboard
@@ -311,20 +311,20 @@ function B2BMarketIntelligencePage() {
           </div>
           <div className="api-metrics">
             <div className="metric">
-              <div className="metric-value">{(apiStats.daily_calls / 1000).toFixed(1)}K</div>
-              <div className="metric-label">일일 호출</div>
+              <div className="metric-value">{apiStats.daily_calls || 0}</div>
+              <div className="metric-label">오늘 분석</div>
             </div>
             <div className="metric">
-              <div className="metric-value">{(apiStats.monthly_calls / 1000000).toFixed(1)}M</div>
-              <div className="metric-label">월간 호출</div>
+              <div className="metric-value">{apiStats.monthly_calls || 0}</div>
+              <div className="metric-label">전체 분석</div>
             </div>
             <div className="metric">
               <div className="metric-value">{apiStats.avg_latency_ms || "--"}ms</div>
               <div className="metric-label">평균 응답</div>
             </div>
             <div className="metric">
-              <div className="metric-value">{apiStats.enterprise_clients || 0}</div>
-              <div className="metric-label">기업 고객</div>
+              <div className="metric-value">{apiStats.active_users || 1}</div>
+              <div className="metric-label">활성 사용자</div>
             </div>
           </div>
           <div className="use-cases">
@@ -335,8 +335,11 @@ function B2BMarketIntelligencePage() {
             {apiStats.use_cases && Object.entries(apiStats.use_cases).map(([key, value]) => (
               <div key={key} className="use-case-item">
                 <span className="use-case-name">
-                  {key === 'dynamic_pricing' ? '동적 가격 책정' :
-                    key === 'inventory_risk' ? '재고 리스크 관리' : '대출 심사 로직'}
+                  {key === 'price_prediction' ? '시세 예측' :
+                   key === 'deal_analysis' ? '매물 분석' :
+                   key === 'negotiation' ? '네고 대본' :
+                   key === 'dynamic_pricing' ? '동적 가격 책정' :
+                   key === 'inventory_risk' ? '재고 리스크 관리' : '대출 심사 로직'}
                 </span>
                 <div className="use-case-bar">
                   <div className="bar-fill" style={{ width: `${value}%` }}></div>
@@ -361,7 +364,7 @@ function B2BMarketIntelligencePage() {
               <tr>
                 <th>모델</th>
                 <th>예상 ROI</th>
-                <th>회전율</th>
+                <th>관심도</th>
                 <th>신호</th>
                 <th>사유</th>
               </tr>
@@ -369,14 +372,17 @@ function B2BMarketIntelligencePage() {
             <tbody>
               {buyingSignals.map((item, idx) => (
                 <tr key={idx}>
-                  <td className="model-cell">{item.model}</td>
+                  <td className="model-cell">
+                    {item.model}
+                    {item.data_source === 'real' && <span className="real-badge">실제</span>}
+                  </td>
                   <td className={`roi-cell ${item.expected_roi > 8 ? 'positive' : ''}`}>
                     +{item.expected_roi}%
                   </td>
-                  <td>{item.turnover_weeks}주</td>
+                  <td>{item.interest_score ? `${item.interest_score}회` : (item.turnover_weeks ? `${item.turnover_weeks}주` : '-')}</td>
                   <td>
                     <span className={`signal-badge ${item.signal}`}>
-                      {item.signal === 'buy' ? 'BUY' : item.signal === 'hold' ? 'HOLD' : 'AVOID'}
+                      {item.signal === 'buy' ? 'BUY' : item.signal === 'hold' ? 'HOLD' : item.signal === 'watch' ? 'WATCH' : 'AVOID'}
                     </span>
                   </td>
                   <td className="reason-cell">{item.reason}</td>
@@ -405,7 +411,10 @@ function B2BMarketIntelligencePage() {
             <tbody>
               {sellSignals.map((item, idx) => (
                 <tr key={idx}>
-                  <td className="model-cell">{item.model}</td>
+                  <td className="model-cell">
+                    {item.model}
+                    {item.data_source === 'real' && <span className="real-badge">실제</span>}
+                  </td>
                   <td>{item.risk_score}</td>
                   <td className="negative">-{item.expected_drop}%</td>
                   <td>
@@ -875,6 +884,17 @@ function B2BMarketIntelligencePage() {
           font-weight: 600;
           color: #1e293b;
         }
+        .real-badge {
+          display: inline-block;
+          margin-left: 6px;
+          padding: 2px 6px;
+          background: #dbeafe;
+          color: #1d4ed8;
+          font-size: 9px;
+          font-weight: 600;
+          border-radius: 4px;
+          vertical-align: middle;
+        }
         .roi-cell.positive { color: #22c55e; font-weight: 600; }
         .negative { color: #ef4444; }
         .reason-cell {
@@ -889,6 +909,7 @@ function B2BMarketIntelligencePage() {
         }
         .signal-badge.buy { background: #dcfce7; color: #16a34a; }
         .signal-badge.hold { background: #fef3c7; color: #d97706; }
+        .signal-badge.watch { background: #e0e7ff; color: #4338ca; }
         .signal-badge.avoid { background: #fee2e2; color: #dc2626; }
         .risk-badge {
           padding: 3px 8px;

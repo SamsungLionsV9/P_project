@@ -33,6 +33,14 @@ export default defineConfig({
         target: ML_SERVICE_URL,
         changeOrigin: true,
       },
+      '/api/b2b': {
+        target: ML_SERVICE_URL,
+        changeOrigin: true,
+      },
+      '/api/notifications': {
+        target: ML_SERVICE_URL,
+        changeOrigin: true,
+      },
       '/api/auth': {
         target: USER_SERVICE_URL,
         changeOrigin: true,

@@ -1,112 +1,39 @@
-# ============================================================
-# Car-Sentix Project .gitignore
-# ============================================================
-
-# ========== 환경 변수 (절대 커밋 금지!) ==========
-.env
-.env.local
-.env.*
-ml-service/.env
-user-service/.env
-admin-dashboard/.env
-
-# ========== Python ==========
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.pytest_cache/
-.mypy_cache/
-*.egg-info/
-dist/
-build/
-eggs/
-*.egg
-
-# ========== Node.js ==========
+# Dependencies
 node_modules/
-npm-debug.log
-yarn-error.log
-.pnpm-store/
-
-# ========== Java/Gradle ==========
-.gradle/
-build/
-target/
-*.class
-*.jar
-*.war
-!gradle-wrapper.jar
-bin/
-
-# ========== Flutter ==========
-flutter_app/.dart_tool/
-flutter_app/.packages
-flutter_app/build/
-flutter_app/.flutter-plugins
-flutter_app/.flutter-plugins-dependencies
-flutter_app/.idea/
-flutter_app/*.iml
-flutter_app/android/.kotlin/
-flutter_app/android/*.iml
-flutter_sdk/
-
-# ========== IDE ==========
-.vscode/
+__pycache__/
+*.pyc
+.dart_tool/
 .idea/
-*.swp
-*.swo
 *.iml
 
-# ========== Logs ==========
+# Build outputs
+build/
+dist/
+*.egg-info/
+.gradle/
+bin/
+
+# IDE
+.vscode/
+*.swp
+
+# Logs
 logs/
 *.log
 
-# ========== Database ==========
-*.db
-*.mv.db
-*.trace.db
-data/*.db
+# Environment (API 키 포함 - 절대 커밋 금지!)
+.env
+ml-service/.env
 
-# ========== OS ==========
-.DS_Store
-Thumbs.db
+# Flutter SDK (너무 큼)
+flutter_sdk/
 
-# ========== Temporary ==========
-tmp/
-temp/
+# Temporary files
 *.tmp
 *.bak
 
-# ========== Large Files ==========
-*.csv
-*.zip
-*.tar.gz
-*.pkl
-*.joblib
-
-# ========== Archive ==========
-_archive/
-
-# ========== Cache ==========
-config/__pycache__/
-src/__pycache__/
-ml-service/__pycache__/
-ml-service/models/__pycache__/
-ml-service/schemas/__pycache__/
-ml-service/services/__pycache__/
-ml-service/utils/__pycache__/
+# User service DB (개발용)
 user-service/data/
 
-# ========== Generated ==========
-*.json
-!package.json
-!package-lock.json
-!pnpm-lock.yaml
-!tsconfig.json
-!*.config.json
-
-# ========== Scripts (임시) ==========
-fix_ui.py
-scripts/check_overfitting.py
+# 대용량 임시 파일
+_Used_Car_Price_Predictor_Overview__*.json
