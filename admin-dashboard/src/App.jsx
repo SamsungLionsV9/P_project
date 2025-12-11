@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./App.css";
-import { Settings, Bell, LogOut, AlertTriangle, X } from "lucide-react";
+import { Bell, LogOut, AlertTriangle, X } from "lucide-react";
 
 // 컴포넌트 임포트
 import { Sidebar, PlaceholderPage } from "./components";
@@ -20,7 +20,7 @@ const pageTitleMap = {
   settings: "설정",
 };
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "";  // 프록시 사용 (vite.config.js)
 
 function App({ user, onLogout }) {
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -115,9 +115,6 @@ function App({ user, onLogout }) {
           <h1 className="page-title">{pageTitleMap[activeMenu]}</h1>
           <div className="topbar-right">
             <span className="admin-name">{user?.username || "관리자"}</span>
-            <button className="top-icon-btn" title="설정">
-              <Settings size={18} />
-            </button>
             <div className="notification-wrapper" ref={notifRef}>
               <button 
                 className={`top-icon-btn ${unreadCount > 0 ? 'has-notif' : ''}`} 

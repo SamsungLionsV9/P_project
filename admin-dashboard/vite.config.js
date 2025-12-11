@@ -37,6 +37,14 @@ export default defineConfig({
         target: ML_SERVICE_URL,
         changeOrigin: true,
       },
+      '/api/economic-insights': {
+        target: ML_SERVICE_URL,
+        changeOrigin: true,
+      },
+      '/api/market-timing': {
+        target: ML_SERVICE_URL,
+        changeOrigin: true,
+      },
       '/api/notifications': {
         target: ML_SERVICE_URL,
         changeOrigin: true,

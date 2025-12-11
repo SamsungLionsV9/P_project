@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'theme/theme_provider.dart';
 import 'services/api_service.dart';
 
@@ -11,14 +13,157 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  static const String _adminEmail = 'admin@carsentix.com';
+  static const String _prefKeyFraudAlert = 'notification_fraud_alert';
+  
   final ApiService _api = ApiService();
   AiStatus? _aiStatus;
   bool _isLoadingAiStatus = true;
+  bool _fraudAlertEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _loadAiStatus();
+    _loadNotificationSettings();
+  }
+  
+  Future<void> _loadNotificationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _fraudAlertEnabled = prefs.getBool(_prefKeyFraudAlert) ?? true;
+    });
+  }
+  
+  Future<void> _setFraudAlertEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefKeyFraudAlert, value);
+    setState(() => _fraudAlertEnabled = value);
+  }
+  
+  Future<void> _openEmailApp() async {
+    // mailto URI 직접 생성 (queryParameters 인코딩 문제 방지)
+    final String emailUrl = 'mailto:$_adminEmail?subject=${Uri.encodeComponent('[CarSentix] 문의사항')}&body=${Uri.encodeComponent('문의 내용을 작성해주세요.\n\n---\n앱 버전: v1.0.0')}';
+    final Uri emailUri = Uri.parse(emailUrl);
+    
+    try {
+      final launched = await launchUrl(
+        emailUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이메일 앱을 열 수 없습니다. 직접 admin@carsentix.com으로 문의해주세요.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('이메일 앱 오류: $e')),
+        );
+      }
+    }
+  }
+  
+  void _showNotificationSettings(bool isDark, Color cardColor, Color textColor, Color? subTextColor) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '🔔 알림 설정',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildNotificationOption(
+                title: '허위매물 경고',
+                subtitle: '고위험 매물 감지 시 알림',
+                value: _fraudAlertEnabled,
+                onChanged: (value) {
+                  _setFraudAlertEnabled(value);
+                  setModalState(() {});
+                },
+                textColor: textColor,
+                subTextColor: subTextColor,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[400], size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '허위매물 경고는 분석 시 자동으로 확인됩니다',
+                        style: TextStyle(color: subTextColor, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildNotificationOption({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required Color textColor,
+    Color? subTextColor,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(color: subTextColor, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        Switch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: const Color(0xFF0066FF),
+        ),
+      ],
+    );
   }
 
   Future<void> _loadAiStatus() async {
@@ -89,8 +234,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildDivider(isDark),
                   _buildListTile(
                     title: "알림 설정",
-                    onTap: () {},
+                    subtitle: _fraudAlertEnabled ? "허위매물 경고 켜짐" : "알림 꺼짐",
+                    onTap: () => _showNotificationSettings(isDark, cardColor, textColor, subTextColor),
                     textColor: textColor,
+                    subTextColor: subTextColor,
                     iconColor: iconColor,
                   ),
                 ],
@@ -142,8 +289,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   _buildDivider(isDark),
                   _buildListTile(
                     title: "문의하기",
-                    onTap: () {},
+                    subtitle: _adminEmail,
+                    onTap: _openEmailApp,
                     textColor: textColor,
+                    subTextColor: subTextColor,
                     iconColor: iconColor,
                   ),
                   _buildDivider(isDark),

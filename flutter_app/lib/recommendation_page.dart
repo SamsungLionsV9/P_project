@@ -39,6 +39,12 @@ class _RecommendationPageState extends State<RecommendationPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // 탭 변경 시 찜 목록 새로고침 (최근 조회 탭 = 인덱스 2)
+    _tabController.addListener(() {
+      if (_tabController.index == 2 && !_tabController.indexIsChanging) {
+        _loadFavorites();
+      }
+    });
     _loadData();
     _loadFavorites();  // 찜 목록 로드
     // Provider 초기화

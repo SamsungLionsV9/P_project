@@ -814,7 +814,7 @@ class _MyPageState extends State<MyPage> with SingleTickerProviderStateMixin, Wi
                   } else {
                     _showSnackBar(isComparing 
                       ? "비교 목록에서 제거되었습니다"
-                      : "비교 목록에 추가되었습니다 (${comparisonProvider.compareCount + 1}/3)");
+                      : "비교 목록에 추가되었습니다 (${comparisonProvider.compareCount}/3)");
                   }
                 },
                 child: Container(

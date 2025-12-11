@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "";  // 프록시 사용 (vite.config.js)
 
 /**
  * 경제지표 인사이트 페이지 (Phase 3 고도화)
